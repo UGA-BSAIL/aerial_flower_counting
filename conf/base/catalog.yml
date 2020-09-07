@@ -1,0 +1,19 @@
+# Cotton counting dataset from CVAT.
+cotton_images:
+  type: pycvat.kedro.CvatDataSet
+  task_id: 2
+  host: "localhost:8080"
+  credentials: dev_cvat
+
+# EDA plots from CVAT data.
+# Histogram of the number of annotations per frame.
+eda_annotation_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/eda/plots/annotation_histogram.png
+  versioned: True
+
+# Visualization of the spatial distribution of annotations within the frame.
+eda_annotation_spatial_dist:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/eda/plots/annotation_spatial_dist.png
+  versioned: True
