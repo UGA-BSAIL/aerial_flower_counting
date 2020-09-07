@@ -12,6 +12,8 @@ pycvat = {path = "../pycvat"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = "^1.19.1"
+pandas = "^1.1.1"
+pyarrow = "^1.0.1"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

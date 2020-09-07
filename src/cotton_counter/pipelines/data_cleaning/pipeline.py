@@ -7,7 +7,7 @@ from typing import Any
 
 from kedro.pipeline import Pipeline, node
 
-from .nodes import remove_unannotated
+from .nodes import annotations_as_dataframe, remove_unannotated
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
@@ -22,5 +22,12 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
 
     """
     return Pipeline(
-        [node(remove_unannotated, ["cotton_images"], "cleaned_annotations")]
+        [
+            node(remove_unannotated, ["cotton_images"], "cleaned_annotations"),
+            node(
+                annotations_as_dataframe,
+                ["cleaned_annotations"],
+                "local_annotations",
+            ),
+        ]
     )

@@ -24,12 +24,12 @@ def create_pipeline(**kwargs: Any):
         [
             node(
                 annotation_histogram,
-                "cleaned_annotations",
+                "local_annotations",
                 "eda_annotation_histogram",
             ),
             node(
                 annotation_spatial_dist,
-                "cleaned_annotations",
+                "local_annotations",
                 "eda_annotation_spatial_dist",
             ),
         ]

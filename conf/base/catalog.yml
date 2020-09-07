@@ -5,6 +5,12 @@ cotton_images:
   host: "localhost:8080"
   credentials: dev_cvat
 
+# Cotton counting dataset annotations, stored locally.
+local_annotations:
+  type: pandas.FeatherDataSet
+  filepath: data/03_primary/annotations/annotations.feather
+  versioned: True
+
 # EDA plots from CVAT data.
 # Histogram of the number of annotations per frame.
 eda_annotation_histogram:
