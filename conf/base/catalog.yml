@@ -23,3 +23,21 @@ eda_annotation_spatial_dist:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/eda/plots/annotation_spatial_dist.png
   versioned: True
+
+# TFRecord dataset of training split.
+tfrecord_train:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/train.tfrecord
+  versioned: True
+
+# TFRecord dataset of testing split.
+tfrecord_test:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/test.tfrecord
+  versioned: True
+
+# TFRecord dataset of validation split.
+tfrecord_validate:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/validate.tfrecord
+  versioned: True

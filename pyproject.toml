@@ -11,9 +11,11 @@ kedro = "^0.16.4"
 pycvat = {path = "../pycvat"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
-numpy = "^1.19.1"
+numpy = ">=1.16"
 pandas = "^1.1.1"
 pyarrow = "^1.0.1"
+tensorflow = "^2.3.0"
+opencv-python = "^4.4.0"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
@@ -24,6 +26,7 @@ pytest_mock = "^3.3.1"
 pytest_cov = "^2.10.1"
 pytest_black = "^0.3.11"
 pytest_flake8 = "^1.0.6"
+kedro-viz = "^3.4.0"
 
 [tool.black]
 line-length = 79

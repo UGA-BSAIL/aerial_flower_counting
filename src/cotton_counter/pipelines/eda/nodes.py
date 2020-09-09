@@ -32,7 +32,7 @@ def annotation_histogram(local_annotations: pd.DataFrame) -> plot.Figure:
     # Plot it.
     axes = sns.distplot(annotations_per_frame)
     axes.set_title("Number of Annotations per Frame")
-    axes.set(xlabel="Number of Annotations", ylabel="Number of Frames")
+    axes.set(xlabel="Number of Annotations", ylabel="Normalized Density")
 
     return plot.gcf()
 
