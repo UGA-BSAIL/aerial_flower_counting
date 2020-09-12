@@ -34,7 +34,7 @@ class TfRecordsDataSet(AbstractVersionedDataSet):
         """
         load_path = self._get_load_path()
         logger.debug("Loading TFRecords from {}.", load_path)
-        raw_dataset = tf.data.TFRecordDataset([load_path])
+        raw_dataset = tf.data.TFRecordDataset([load_path.as_posix()])
 
         return raw_dataset
 

@@ -1,7 +1,17 @@
+# Fraction of the dataset to be used as training data.
+train_fraction: 0.9
+# Fraction of the dataset to be used as test data. (The rest will be validation data.)
+test_fraction: 0.05
 
-# Parameters for the example pipeline. Feel free to delete these once you
-# remove the example pipeline from pipeline.py and the example nodes in
-# `src/pipelines/`
-example_test_data_ratio: 0.2
-example_num_train_iter: 10000
-example_learning_rate: 0.01
+# The shape of the density maps to use.
+# (These are derived from the expected input dimensions, down-sampled by a factor of 8).
+density_map_width: 576
+density_map_height: 432
+# The standard deviation to use for the gaussian kernel when creating density maps.
+density_map_sigma: 1
+
+# Batch size to use for training.
+batch_size: 32
+# Number of batches to pre-fetch into memory.
+# (Increasing this can increase training performance at the expense of memory usage.)
+num_prefetch_batches: 5

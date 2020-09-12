@@ -26,7 +26,11 @@ def create_pipeline(**kwargs: Any):
             # Split into training, testing and validation.
             node(
                 make_splits,
-                "local_annotations",
+                dict(
+                    local_annotations="local_annotations",
+                    train_fraction="params:train_fraction",
+                    test_fraction="params:test_fraction",
+                ),
                 [
                     "train_annotations",
                     "test_annotations",

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cotton_counter"
-version = "0.1"
+version = "0.2"
 description = "HTP project for counting cotton plant organs from aerial imagery."
 authors = ["Daniel Petti <djpetti@gmail.com>"]
 license = "MIT"
@@ -16,6 +16,7 @@ pandas = "^1.1.1"
 pyarrow = "^1.0.1"
 tensorflow = "^2.3.0"
 opencv-python = "^4.4.0"
+tensorflow-addons = "^0.11.2"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

@@ -5,7 +5,6 @@ Contains node definitions for the `data_engineering` pipeline.
 
 from typing import Iterable, Tuple, Union
 
-import cv2
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -118,14 +117,35 @@ def _float_feature(feature_floats: Iterable[float]):
     )
 
 
+def _int_feature(feature_ints: Iterable[int]):
+    """
+    Converts integer data to a Tensorflow feature.
+
+    Args:
+        feature_ints: The input float data.
+
+    Returns:
+        The resulting feature.
+
+    """
+    return tf.train.Feature(
+        int64_list=tf.train.Int64List(value=list(feature_ints))
+    )
+
+
 def _make_example(
-    *, image: np.ndarray, annotation_x: np.ndarray, annotation_y: np.ndarray
+    *,
+    image: np.ndarray,
+    frame_num: int,
+    annotation_x: np.ndarray,
+    annotation_y: np.ndarray,
 ) -> tf.train.Example:
     """
     Creates a single Tensorflow example.
 
     Args:
         image: The image data to include in the example.
+        frame_num: The frame number associated with the image.
         annotation_x: The x-coordinates of the annotation points in the image.
         annotation_y: The y-coordinates of the annotation points in the image.
 
@@ -133,10 +153,15 @@ def _make_example(
         The example that it created.
 
     """
+    # Expand the frame number so it has the same shape as the others.
+    frame_numbers = np.empty_like(annotation_x, dtype=np.int32)
+    frame_numbers[:] = frame_num
+
     features = dict(
         image=_bytes_feature(image),
         annotation_x=_float_feature(annotation_x),
         annotation_y=_float_feature(annotation_y),
+        frame_numbers=_int_feature(frame_numbers),
     )
     return tf.train.Example(features=tf.train.Features(feature=features))
 
@@ -168,8 +193,17 @@ def generate_tf_records(
         # Get the corresponding image.
         frame_image = cotton_images.get_frame(frame_num, compressed=True)
 
+        # Normalize points to the shape of the image.
+        frame_height, frame_width = cotton_images.get_frame_size(frame_num)
+        annotation_x /= frame_width - 1
+        annotation_y /= frame_height - 1
+        # Clip out-of-bounds annotations.
+        annotation_x = annotation_x.clip(0.0, 1.0)
+        annotation_y = annotation_y.clip(0.0, 1.0)
+
         yield _make_example(
             image=frame_image,
+            frame_num=frame_num,
             annotation_x=annotation_x,
             annotation_y=annotation_y,
         )
