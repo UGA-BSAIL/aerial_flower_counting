@@ -84,3 +84,54 @@ def annotations_as_dataframe(
     merged_data_frame.set_index("frame_num", append=True)
 
     return merged_data_frame
+
+
+def get_frame_sizes(
+    annotations_frame: pd.DataFrame, cvat_data: CvatHandle
+) -> pd.DataFrame:
+    """
+    Gets a `DataFrame` containing the sizes in pixels of each frame. Each row
+    should correspond exactly to the same row in the annotations `DataFrame`.
+
+    Args:
+        annotations_frame: The `DataFrame` containing annotations.
+        cvat_data: The raw CVAT data handle.
+
+    Returns:
+        A `DataFrame` containing columns for the width and height of each
+        frame image.
+
+    """
+    # Get the frame sizes.
+    frame_sizes = [
+        cvat_data.get_frame_size(n) for n in annotations_frame["frame_num"]
+    ]
+    # Coerce into its own data frame.
+    return pd.DataFrame(
+        data=np.array(frame_sizes), columns=["width", "height"]
+    )
+
+
+def drop_out_of_bounds(
+    annotations_frame: pd.DataFrame, frame_sizes: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Removes annotations that are outside the bounds of frame images.
+
+    Args:
+        annotations_frame: The `DataFrame` containing annotations.
+        frame_sizes: The `DataFrame` containing the corresponding size of
+            each frame image.
+
+    Returns:
+        A version of `annotations_frame` with out-of-bounds data removed.
+
+    """
+    out_of_bounds_x = (annotations_frame["x"] < 0) | (
+        annotations_frame["x"] >= frame_sizes["width"]
+    )
+    out_of_bounds_y = (annotations_frame["y"] < 0) | (
+        annotations_frame["y"] >= frame_sizes["height"]
+    )
+
+    return annotations_frame[~(out_of_bounds_x | out_of_bounds_y)]

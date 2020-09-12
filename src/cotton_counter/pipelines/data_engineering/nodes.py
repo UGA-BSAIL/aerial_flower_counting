@@ -194,12 +194,9 @@ def generate_tf_records(
         frame_image = cotton_images.get_frame(frame_num, compressed=True)
 
         # Normalize points to the shape of the image.
-        frame_height, frame_width = cotton_images.get_frame_size(frame_num)
+        frame_width, frame_height = cotton_images.get_frame_size(frame_num)
         annotation_x /= frame_width - 1
         annotation_y /= frame_height - 1
-        # Clip out-of-bounds annotations.
-        annotation_x = annotation_x.clip(0.0, 1.0)
-        annotation_y = annotation_y.clip(0.0, 1.0)
 
         yield _make_example(
             image=frame_image,

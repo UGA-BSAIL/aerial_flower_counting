@@ -7,7 +7,7 @@ cotton_images:
 
 # Cotton counting dataset annotations, stored locally.
 local_annotations:
-  type: pandas.FeatherDataSet
+  type: pandas.ParquetDataSet
   filepath: data/03_primary/annotations/annotations.feather
   versioned: True
 
