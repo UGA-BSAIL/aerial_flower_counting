@@ -76,21 +76,5 @@ def train_model(
         loss_weights={"density_map": 1.0, "count": 0.0},
     )
     model.fit(
-        training_input, validation_data=testing_input, epochs=3,
-    )
-
-    optimizer = keras.optimizers.SGD(
-        learning_rate=learning_rate * 0.01, momentum=momentum
-    )
-    model.compile(
-        optimizer=optimizer,
-        loss=[SparseMse(), CountAccuracy()],
-        loss_weights=[1.0, 0.1],
-    )
-    model.fit(
-        training_input,
-        validation_data=testing_input,
-        batch_size=batch_size,
-        validation_batch_size=batch_size,
-        epochs=4,
+        training_input, validation_data=testing_input, epochs=100,
     )

@@ -15,6 +15,7 @@ numpy = ">=1.16"
 pandas = "^1.1.1"
 pyarrow = "^1.0.1"
 # TODO (daniel) Upgrade tensorflow after Sapelo2 upgrade.
+tensorflow = "~2.0.0"
 tensorflow-gpu = "~2.0.0"
 # Temporary workaround for https://github.com/tensorflow/tensorflow/issues/37525
 tensorflow-estimator = "==2.0.0"

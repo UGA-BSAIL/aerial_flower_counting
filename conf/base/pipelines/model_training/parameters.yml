@@ -12,12 +12,12 @@ density_map_height: 432
 density_map_sigma: 1
 
 # Batch size to use for training.
-batch_size: 8
+batch_size: 10
 # Number of batches to pre-fetch into memory.
 # (Increasing this can increase training performance at the expense of memory usage.)
-num_prefetch_batches: 5
+num_prefetch_batches: 10
 
 # (Initial) learning rate to use for training.
-learning_rate: 0.001
+learning_rate: 0.0001
 # Momentum to use for training.
 momentum: 0.9

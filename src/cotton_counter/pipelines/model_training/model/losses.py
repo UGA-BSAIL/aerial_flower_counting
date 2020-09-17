@@ -7,6 +7,40 @@ import tensorflow as tf
 import tensorflow.keras.losses as losses
 
 
+def _mse(
+    true: tf.Tensor, predicted: tf.Tensor, normalize: bool = False
+) -> tf.Tensor:
+    """
+    A normalized version of MSE.
+
+    Args:
+        true: The true values.
+        predicted: The predicted values.
+        normalize: If true, the squares will be divided by the true values
+            before taking the mean.
+
+    Returns:
+        The normalized MSE value for the entire batch.
+
+    """
+
+    def _do_mse() -> tf.Tensor:
+        delta = predicted - true
+        if normalize:
+            delta /= true + tf.constant(1.0, dtype=tf.float32)
+
+        loss = tf.square(delta)
+        return tf.reduce_mean(loss)
+
+    # A corner case is if we have no data. In that situation, we want the
+    # MSE to be 0, since that's what makes the most sense for a loss.
+    return tf.cond(
+        tf.equal(tf.size(true), 0),
+        lambda: tf.constant(0.0, tf.float32),
+        _do_mse,
+    )
+
+
 class CountAccuracy(losses.Loss):
     """
     A loss that computes that accuracy of the predicted counts.
@@ -22,14 +56,10 @@ class CountAccuracy(losses.Loss):
         true_zero = true_count[~true_non_zero_mask]
         predicted_zero = predicted_count[~true_non_zero_mask]
 
-        zero_loss = tf.square((predicted_zero - true_zero) / (true_zero + 1))
-        zero_loss = tf.reduce_mean(zero_loss)
-        non_zero_loss = tf.square(
-            (predicted_non_zero - true_non_zero) / (true_non_zero + 1)
-        )
-        non_zero_loss = tf.reduce_mean(non_zero_loss)
-        tf.print(true_count, predicted_count, zero_loss, non_zero_loss)
-        return non_zero_loss + 0.1 * zero_loss
+        zero_loss = _mse(true_zero, predicted_zero, normalize=True)
+        non_zero_loss = _mse(true_non_zero, predicted_non_zero, normalize=True)
+
+        return non_zero_loss + tf.constant(0.1) * zero_loss
 
 
 class SparseMse(losses.Loss):
@@ -47,9 +77,7 @@ class SparseMse(losses.Loss):
         true_zero = y_true[~true_non_zero_mask]
         predicted_zero = y_pred[~true_non_zero_mask]
 
-        zero_loss = tf.square(predicted_zero - true_zero)
-        zero_loss = tf.reduce_mean(zero_loss)
-        non_zero_loss = tf.square(predicted_non_zero - true_non_zero)
-        non_zero_loss = tf.reduce_mean(non_zero_loss)
+        zero_loss = _mse(true_zero, predicted_zero)
+        non_zero_loss = _mse(true_non_zero, predicted_non_zero)
 
-        return non_zero_loss + zero_loss * 0.1
+        return non_zero_loss + zero_loss * tf.constant(0.1)
