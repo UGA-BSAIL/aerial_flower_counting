@@ -8,7 +8,7 @@ cotton_images:
 # Cotton counting dataset annotations, stored locally.
 local_annotations:
   type: pandas.ParquetDataSet
-  filepath: data/03_primary/annotations/annotations.feather
+  filepath: data/03_primary/annotations/annotations.parquet
   versioned: True
 
 # TFRecord dataset of training split.

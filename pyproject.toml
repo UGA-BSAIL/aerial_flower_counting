@@ -6,17 +6,19 @@ authors = ["Daniel Petti <djpetti@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "~3.8"
+python = "~3.7"
 kedro = "^0.16.4"
-pycvat = {path = "../pycvat"}
+pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "348f462"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"
 pandas = "^1.1.1"
 pyarrow = "^1.0.1"
-tensorflow = "^2.3.0"
+# TODO (daniel) Upgrade tensorflow after Sapelo2 upgrade.
+tensorflow-gpu = "~2.0.0"
+# Temporary workaround for https://github.com/tensorflow/tensorflow/issues/37525
+tensorflow-estimator = "==2.0.0"
 opencv-python = "^4.4.0"
-tensorflow-addons = "^0.11.2"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

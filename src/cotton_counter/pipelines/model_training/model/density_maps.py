@@ -6,10 +6,10 @@ Layer that creates density maps from a set of annotations.
 from typing import Iterable, Tuple
 
 import tensorflow as tf
-import tensorflow_addons as tfa
 from loguru import logger
 
 from ..type_helpers import Vector2I
+from .filters import gaussian_blur
 from .records import Annotations
 
 
@@ -113,7 +113,7 @@ def _flatten_annotations(
     # Deliberately not a generator so that Tensorflow AutoGraph can handle it.
     flat_annotations = []
     for annotations in annotation_vectors:
-        flat_annotations.append(annotations.merge_dims(0, 1))
+        flat_annotations.append(annotations.flat_values)
 
     return flat_annotations
 
@@ -207,18 +207,13 @@ def make_density_maps(
     # Compute our filter size so that it's odd and has sigma pixels on either
     # side.
     kernel_size = int(1 + 6 * sigma)
-    kernel_shape = [kernel_size, kernel_size]
-    logger.debug("Using {}-shape kernel for gaussian blur.", kernel_shape)
+    logger.debug("Using {}-pixel kernel for gaussian blur.", kernel_size)
 
     # Obtain initial point annotations.
     dense_annotations = _make_point_annotation_maps(
         annotations, map_shape=map_shape
     )
 
-    return tfa.image.gaussian_filter2d(
-        dense_annotations,
-        filter_shape=kernel_shape,
-        sigma=[sigma, sigma],
-        padding="CONSTANT",
-        name="gaussian_blur",
+    return gaussian_blur(
+        dense_annotations, kernel_size=kernel_size, sigma=sigma,
     )

@@ -1,0 +1,4 @@
+# Fraction of the dataset to be used as training data.
+train_fraction: 0.9
+# Fraction of the dataset to be used as test data. (The rest will be validation data.)
+test_fraction: 0.05

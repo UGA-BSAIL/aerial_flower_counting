@@ -1,5 +1,23 @@
-# This is a boilerplate parameters config generated for pipeline 'model_training'
-# using Kedro 0.16.4.
-#
-# Documentation for this file format can be found in
-# https://kedro.readthedocs.io/en/stable/04_user_guide/03_configuration.html#parameters
+# The expected input image dimensions.
+input_width: 4608
+input_height: 3456
+# The scale factor to apply for the patches we extract.
+patch_scale: 0.25
+
+# The shape of the density maps to use.
+# (These are derived from the expected input dimensions, down-sampled by a factor of 8).
+density_map_width: 576
+density_map_height: 432
+# The standard deviation to use for the gaussian kernel when creating density maps.
+density_map_sigma: 1
+
+# Batch size to use for training.
+batch_size: 8
+# Number of batches to pre-fetch into memory.
+# (Increasing this can increase training performance at the expense of memory usage.)
+num_prefetch_batches: 5
+
+# (Initial) learning rate to use for training.
+learning_rate: 0.001
+# Momentum to use for training.
+momentum: 0.9
