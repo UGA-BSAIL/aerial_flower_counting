@@ -17,7 +17,15 @@ batch_size: 10
 # (Increasing this can increase training performance at the expense of memory usage.)
 num_prefetch_batches: 10
 
-# (Initial) learning rate to use for training.
-learning_rate: 0.0001
-# Momentum to use for training.
-momentum: 0.9
+# Defines different learning phases to carry out.
+learning_phases:
+  # The initial learning rate to use for the phase.
+  - learning_rate: 0.0001
+    # The momentum to use for the phase.
+    momentum: 0.9
+    # The loss weight for density maps.
+    density_map_loss_weight: 1.0
+    # The loss weight for counts.
+    count_loss_weight: 0.0
+    # Number of epochs to train for in this phase.
+    num_epochs: 100

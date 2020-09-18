@@ -51,11 +51,7 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     conv4_2 = layers.Conv2D(512, 3, padding="same", activation="relu")(conv4_1)
 
     # Add the projection layers.
-    p_conv3 = layers.Conv2D(1, 1)(conv4_2)
-    # Normalize between 1 and 0.
-    density_map = layers.Lambda(
-        lambda x: (x - K.min(x)) / (K.max(x) - K.min(x)), name="density_map"
-    )(p_conv3)
+    density_map = layers.Conv2D(1, 1, name="density_map")(conv4_2)
 
     # Sum everything to predict the total count.
     count = layers.Lambda(

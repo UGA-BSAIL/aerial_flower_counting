@@ -1,5 +1,19 @@
-# This is a boilerplate catalog config generated for pipeline 'model_training'
-# using Kedro 0.16.4.
-#
-# Documentation for this file format can be found in "The Data Catalog"
-# Link: https://kedro.readthedocs.io/en/stable/04_user_guide/04_data_catalog.html
+# Intermediate TF Datasets containing pre-processed data.
+training_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+testing_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Initial untrained model. We don't bother saving this to the disk.
+initial_model:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Saved model, produced at the end of training.
+trained_model:
+  type: tensorflow.TensorFlowModelDataset
+  filepath: data/06_models/fully_trained
+  versioned: True
