@@ -451,7 +451,7 @@ description = "File identification library for Python"
 name = "identify"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
-version = "1.5.2"
+version = "1.5.3"
 
 [package.extras]
 license = ["editdistance"]
@@ -650,7 +650,7 @@ click = "<8.0"
 cookiecutter = ">=1.6.0,<1.7.0"
 fsspec = ">=0.5.1,<0.7.0"
 jmespath = ">=0.9.5,<1.0"
-jupyter-client = ">=5.1,<7.0"
+jupyter_client = ">=5.1,<7.0"
 pip-tools = ">=5.0,<6.0"
 pluggy = ">=0.13.0,<0.14.0"
 python-json-logger = ">=0.1.9,<0.2.0"
@@ -658,45 +658,49 @@ setuptools = ">=38.0"
 toposort = ">=1.5,<2.0"
 
 [package.extras]
-all = ["Pillow (>=7.1.2,<7.2.0)", "PyYAML (>=4.2,<6.0)", "SQLAlchemy (>=1.2,<2.0)", "biopython (>=1.73,<2.0)", "dask (>=2.6,<3.0)", "geopandas (>=0.6.0,<1.0)", "hdfs (>=2.5.8,<3.0)", "holoviews (>=1.13.0,<1.14.0)", "ipykernel (>=4.8.1,<5.0)", "jupyter-client (>=5.1,<7.0)", "matplotlib (>=3.0.3,<4.0)", "memory-profiler (>=0.50.0,<1.0)", "nbconvert (>=5.3.1,<6.0)", "nbformat (>=4.4,<5.0)", "nbsphinx (0.4.2)", "nbstripout (0.3.3)", "networkx (>=2.4,<3.0)", "openpyxl (>=3.0.3,<4.0)", "pandas-gbq (>=0.12.0,<1.0)", "pandas (>=0.24)", "pyarrow (>=0.12.0,<1.0.0)", "pyspark (>=2.2,<3.0)", "recommonmark (0.5.0)", "requests (>=2.20,<3.0)", "s3fs (>=0.3.0,<0.4.1)", "sphinx-autodoc-typehints (1.6.0)", "sphinx (>=1.8.4,<2.0)", "sphinx-copybutton (0.2.5)", "sphinx-rtd-theme (0.4.3)", "tables (>=3.6,<4.0)", "tensorflow (>=2.0,<3.0)", "tornado (>=4.2,<6.0)", "xlrd (>=1.0,<2.0)", "xlsxwriter (>=1.0,<2.0)"]
+all = ["Pillow (>=7.1.2,<7.2.0)", "PyYAML (>=4.2,<6.0)", "SQLAlchemy (>=1.2,<2.0)", "biopython (>=1.73,<2.0)", "dask (>=2.6,<3.0)", "geopandas (>=0.6.0,<1.0)", "hdfs (>=2.5.8,<3.0)", "holoviews (>=1.13.0,<1.14.0)", "ipykernel (>=4.8.1,<5.0)", "jupyter_client (>=5.1,<7.0)", "matplotlib (>=3.0.3,<4.0)", "memory_profiler (>=0.50.0,<1.0)", "nbconvert (>=5.3.1,<6.0)", "nbformat (>=4.4,<5.0)", "nbsphinx (0.4.2)", "nbstripout (0.3.3)", "networkx (>=2.4,<3.0)", "openpyxl (>=3.0.3,<4.0)", "pandas-gbq (>=0.12.0,<1.0)", "pandas (>=0.24)", "pyarrow (>=0.12.0,<1.0.0)", "pyspark (>=2.2,<3.0)", "recommonmark (0.5.0)", "requests (>=2.20,<3.0)", "s3fs (>=0.3.0,<0.4.1)", "sphinx-autodoc-typehints (1.6.0)", "sphinx (>=1.8.4,<2.0)", "sphinx_copybutton (0.2.5)", "sphinx_rtd_theme (0.4.3)", "tables (>=3.6,<4.0)", "tensorflow (>=2.0,<3.0)", "tornado (>=4.2,<6.0)", "xlrd (>=1.0,<2.0)", "xlsxwriter (>=1.0,<2.0)"]
 api = ["requests (>=2.20,<3.0)"]
-"api.apidataset" = ["requests (>=2.20,<3.0)"]
+"api.APIDataSet" = ["requests (>=2.20,<3.0)"]
 biosequence = ["biopython (>=1.73,<2.0)"]
-"biosequence.biosequencedataset" = ["biopython (>=1.73,<2.0)"]
+"biosequence.BioSequenceDataSet" = ["biopython (>=1.73,<2.0)"]
 dask = ["dask (>=2.6,<3.0)"]
-"dask.parquetdataset" = ["dask (>=2.6,<3.0)"]
-docs = ["sphinx (>=1.8.4,<2.0)", "sphinx-rtd-theme (0.4.3)", "nbsphinx (0.4.2)", "nbstripout (0.3.3)", "recommonmark (0.5.0)", "sphinx-autodoc-typehints (1.6.0)", "sphinx-copybutton (0.2.5)", "jupyter-client (>=5.1,<7.0)", "tornado (>=4.2,<6.0)", "ipykernel (>=4.8.1,<5.0)"]
+"dask.ParquetDataSet" = ["dask (>=2.6,<3.0)"]
+docs = ["sphinx (>=1.8.4,<2.0)", "sphinx_rtd_theme (0.4.3)", "nbsphinx (0.4.2)", "nbstripout (0.3.3)", "recommonmark (0.5.0)", "sphinx-autodoc-typehints (1.6.0)", "sphinx_copybutton (0.2.5)", "jupyter_client (>=5.1,<7.0)", "tornado (>=4.2,<6.0)", "ipykernel (>=4.8.1,<5.0)"]
 geopandas = ["geopandas (>=0.6.0,<1.0)"]
-"geopandas.geojsondataset" = ["geopandas (>=0.6.0,<1.0)"]
+"geopandas.GeoJSONDataSet" = ["geopandas (>=0.6.0,<1.0)"]
 holoviews = ["holoviews (>=1.13.0,<1.14.0)"]
-"holoviews.holoviewswriter" = ["holoviews (>=1.13.0,<1.14.0)"]
+"holoviews.HoloviewsWriter" = ["holoviews (>=1.13.0,<1.14.0)"]
 matplotlib = ["matplotlib (>=3.0.3,<4.0)"]
-"matplotlib.matplotlibwriter" = ["matplotlib (>=3.0.3,<4.0)"]
+"matplotlib.MatplotlibWriter" = ["matplotlib (>=3.0.3,<4.0)"]
 networkx = ["networkx (>=2.4,<3.0)"]
-"networkx.networkxdataset" = ["networkx (>=2.4,<3.0)"]
+"networkx.NetworkXDataSet" = ["networkx (>=2.4,<3.0)"]
 notebook_templates = ["nbconvert (>=5.3.1,<6.0)", "nbformat (>=4.4,<5.0)"]
 pandas = ["SQLAlchemy (>=1.2,<2.0)", "openpyxl (>=3.0.3,<4.0)", "pandas-gbq (>=0.12.0,<1.0)", "pandas (>=0.24)", "pyarrow (>=0.12.0,<1.0.0)", "tables (>=3.6,<4.0)", "xlrd (>=1.0,<2.0)", "xlsxwriter (>=1.0,<2.0)"]
-"pandas.appendableexceldataset" = ["pandas (>=0.24)", "openpyxl (>=3.0.3,<4.0)"]
-"pandas.csvdataset" = ["pandas (>=0.24)"]
-"pandas.exceldataset" = ["pandas (>=0.24)", "xlrd (>=1.0,<2.0)", "xlsxwriter (>=1.0,<2.0)"]
-"pandas.featherdataset" = ["pandas (>=0.24)"]
-"pandas.gbqtabledataset" = ["pandas (>=0.24)", "pandas-gbq (>=0.12.0,<1.0)"]
-"pandas.hdfdataset" = ["pandas (>=0.24)", "tables (>=3.6,<4.0)"]
-"pandas.jsondataset" = ["pandas (>=0.24)"]
-"pandas.parquetdataset" = ["pandas (>=0.24)", "pyarrow (>=0.12.0,<1.0.0)"]
-"pandas.sqltabledataset" = ["pandas (>=0.24)", "SQLAlchemy (>=1.2,<2.0)"]
+"pandas.AppendableExcelDataSet" = ["pandas (>=0.24)", "openpyxl (>=3.0.3,<4.0)"]
+"pandas.CSVDataSet" = ["pandas (>=0.24)"]
+"pandas.ExcelDataSet" = ["pandas (>=0.24)", "xlrd (>=1.0,<2.0)", "xlsxwriter (>=1.0,<2.0)"]
+"pandas.FeatherDataSet" = ["pandas (>=0.24)"]
+"pandas.GBQTableDataSet" = ["pandas (>=0.24)", "pandas-gbq (>=0.12.0,<1.0)"]
+"pandas.HDFDataSet" = ["pandas (>=0.24)", "tables (>=3.6,<4.0)"]
+"pandas.JSONDataSet" = ["pandas (>=0.24)"]
+"pandas.ParquetDataSet" = ["pandas (>=0.24)", "pyarrow (>=0.12.0,<1.0.0)"]
+"pandas.SQLTableDataSet" = ["pandas (>=0.24)", "SQLAlchemy (>=1.2,<2.0)"]
 pillow = ["Pillow (>=7.1.2,<7.2.0)"]
-"pillow.imagedataset" = ["Pillow (>=7.1.2,<7.2.0)"]
-profilers = ["memory-profiler (>=0.50.0,<1.0)"]
+"pillow.ImageDataSet" = ["Pillow (>=7.1.2,<7.2.0)"]
+profilers = ["memory_profiler (>=0.50.0,<1.0)"]
 spark = ["hdfs (>=2.5.8,<3.0)", "pyspark (>=2.2,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
-"spark.sparkdataset" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
-"spark.sparkhivedataset" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
-"spark.sparkjdbcdataset" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
+"spark.SparkDataSet" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
+"spark.SparkHiveDataSet" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
+"spark.SparkJDBCDataSet" = ["pyspark (>=2.2,<3.0)", "hdfs (>=2.5.8,<3.0)", "s3fs (>=0.3.0,<0.4.1)"]
 tensorflow = ["tensorflow (>=2.0,<3.0)"]
-"tensorflow.tensorflowmodeldataset" = ["tensorflow (>=2.0,<3.0)"]
+"tensorflow.TensorflowModelDataset" = ["tensorflow (>=2.0,<3.0)"]
 yaml = ["PyYAML (>=4.2,<6.0)", "pandas (>=0.24)"]
-"yaml.yamldataset" = ["pandas (>=0.24)", "PyYAML (>=4.2,<6.0)"]
+"yaml.YAMLDataSet" = ["pandas (>=0.24)", "PyYAML (>=4.2,<6.0)"]
 
+[package.source]
+reference = "2e10246eeb44c241c1cbe97fad7ba0e4e38f1492"
+type = "git"
+url = "https://github.com/djpetti/kedro.git"
 [[package]]
 category = "dev"
 description = "Kedro-Viz helps visualise Kedro data and analytics pipelines"
@@ -1506,6 +1510,17 @@ version = "3.0.4"
 
 [[package]]
 category = "main"
+description = "Pretty-print tabular data"
+name = "tabulate"
+optional = false
+python-versions = "*"
+version = "0.8.7"
+
+[package.extras]
+widechars = ["wcwidth"]
+
+[[package]]
+category = "main"
 description = "TensorBoard lets you watch Tensors Flow"
 name = "tensorboard"
 optional = false
@@ -1800,7 +1815,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "80561e77286160d232ada0b6f3b6a889f6cdb3ecf6f3cba63b371ac8009fe373"
+content-hash = "abb6b8b2f42e5033c7b1b0881a0998bd7d4bac82bb5552779a3f55795d6ea0fc"
 lock-version = "1.0"
 python-versions = "~3.7"
 
@@ -2085,8 +2100,8 @@ h5py = [
     {file = "h5py-2.10.0.tar.gz", hash = "sha256:84412798925dc870ffd7107f045d7659e60f5d46d1c70c700375248bf6bf512d"},
 ]
 identify = [
-    {file = "identify-1.5.2-py2.py3-none-any.whl", hash = "sha256:e5cc8ba10ca658c278f841813c5f1556804141c93f82a7e620a938528a0c3f32"},
-    {file = "identify-1.5.2.tar.gz", hash = "sha256:56e70094705056ac75e66eb9f068beb323f4a31b24eb649cb1cf3126d138e35c"},
+    {file = "identify-1.5.3-py2.py3-none-any.whl", hash = "sha256:d02d004568c5a01261839a05e91705e3e9f5c57a3551648f9b3fb2b9c62c0f62"},
+    {file = "identify-1.5.3.tar.gz", hash = "sha256:c770074ae1f19e08aadbda1c886bc6d0cb55ffdc503a8c0fe8699af2fc9664ae"},
 ]
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
@@ -2140,10 +2155,7 @@ jupyter-core = [
     {file = "jupyter_core-4.6.3-py2.py3-none-any.whl", hash = "sha256:a4ee613c060fe5697d913416fc9d553599c05e4492d58fac1192c9a6844abb21"},
     {file = "jupyter_core-4.6.3.tar.gz", hash = "sha256:394fd5dd787e7c8861741880bdf8a00ce39f95de5d18e579c74b882522219e7e"},
 ]
-kedro = [
-    {file = "kedro-0.16.5-py3-none-any.whl", hash = "sha256:f42482f13988d05594b3a77b8ded4839f2bb042a0a3618ba0801167ed266e229"},
-    {file = "kedro-0.16.5.tar.gz", hash = "sha256:84f992aaa6451e3b1c9fef2671fdebcc6715b027db7e22471adf8572214da6d1"},
-]
+kedro = []
 kedro-viz = [
     {file = "kedro-viz-3.5.1.tar.gz", hash = "sha256:b845fa67477df571bbee4fa2c42bfbd2aa8302e9909f6841bcebe72017eb98e4"},
     {file = "kedro_viz-3.5.1-py3-none-any.whl", hash = "sha256:b29d10fc5aab5325e631e46f25c9235f31a8b2661f0996e68557faf6b5e1da89"},
@@ -2776,6 +2788,10 @@ six = [
 smmap = [
     {file = "smmap-3.0.4-py2.py3-none-any.whl", hash = "sha256:54c44c197c819d5ef1991799a7e30b662d1e520f2ac75c9efbeb54a742214cf4"},
     {file = "smmap-3.0.4.tar.gz", hash = "sha256:9c98bbd1f9786d22f14b3d4126894d56befb835ec90cef151af566c7e19b5d24"},
+]
+tabulate = [
+    {file = "tabulate-0.8.7-py3-none-any.whl", hash = "sha256:ac64cb76d53b1231d364babcd72abbb16855adac7de6665122f97b593f1eb2ba"},
+    {file = "tabulate-0.8.7.tar.gz", hash = "sha256:db2723a20d04bcda8522165c73eea7c300eda74e0ce852d9022e0159d7895007"},
 ]
 tensorboard = [
     {file = "tensorboard-2.0.2-py2-none-any.whl", hash = "sha256:32d9dec38d053d7d75796eb7c2e0d77285af35f69ee1a6796ab5ecc896679fb3"},

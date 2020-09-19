@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import tensorflow as tf
 import tensorflow.keras as keras
 from loguru import logger
+from tabulate import tabulate
 
 from .model.load_from_dataset import extract_model_input
 from .model.losses import CountAccuracy, SparseMse
@@ -123,3 +124,28 @@ def train_model(
         )
 
     return model
+
+
+def evaluate_model(model: keras.Model, *, eval_data: tf.data.Dataset) -> str:
+    """
+    Evaluates a model and generates a text report.
+
+    Args:
+        model: The model to evaluate.
+        eval_data: The data to evaluate the model on.
+
+    Returns:
+        A human-readable report of the evaluation results.
+
+    """
+    model.compile(loss={"density_map": SparseMse(), "count": CountAccuracy()},)
+
+    # Evaluate the model.
+    results = model.evaluate(eval_data)
+
+    # Create the report.
+    table_rows = []
+    for metric_name, metric_value in zip(model.metrics_names, results):
+        table_rows.append((metric_name, metric_value))
+
+    return f"Evaluation Results:\n{tabulate(table_rows)}"

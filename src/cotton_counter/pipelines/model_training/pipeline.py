@@ -7,7 +7,12 @@ from typing import Any
 
 from kedro.pipeline import Pipeline, node
 
-from .nodes import create_model, pre_process_dataset, train_model
+from .nodes import (
+    create_model,
+    evaluate_model,
+    pre_process_dataset,
+    train_model,
+)
 
 
 def create_pipeline(**kwargs: Any):
@@ -29,6 +34,7 @@ def create_pipeline(**kwargs: Any):
 
     return Pipeline(
         [
+            # Pre-process the data.
             node(
                 pre_process_dataset,
                 dict(raw_dataset="tfrecord_train", **pre_process_params,),
@@ -39,6 +45,12 @@ def create_pipeline(**kwargs: Any):
                 dict(raw_dataset="tfrecord_test", **pre_process_params),
                 "testing_data",
             ),
+            node(
+                pre_process_dataset,
+                dict(raw_dataset="tfrecord_validate", **pre_process_params),
+                "validation_data",
+            ),
+            # Build and train the model.
             node(
                 create_model,
                 dict(
@@ -57,6 +69,22 @@ def create_pipeline(**kwargs: Any):
                     learning_phases="params:learning_phases",
                 ),
                 "trained_model",
+            ),
+            # Evaluate model on all datasets.
+            node(
+                evaluate_model,
+                dict(model="trained_model", eval_data="training_data",),
+                "model_report_train",
+            ),
+            node(
+                evaluate_model,
+                dict(model="trained_model", eval_data="testing_data",),
+                "model_report_test",
+            ),
+            node(
+                evaluate_model,
+                dict(model="trained_model", eval_data="validation_data",),
+                "model_report_validate",
             ),
         ]
     )
