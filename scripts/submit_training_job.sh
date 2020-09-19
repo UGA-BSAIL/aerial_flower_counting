@@ -10,8 +10,8 @@
 #PBS -q patterli_q
 #PBS -N cotton_count_model_train
 #PBS -l nodes=1:ppn=6:gpus=1
-#PBS -l walltime=12:00:00
-#PBS -l mem=20gb
+#PBS -l walltime=2:00:00
+#PBS -l mem=10gb
 #PBS -M daniel.petti@uga.edu
 #PBS -m ae
 
