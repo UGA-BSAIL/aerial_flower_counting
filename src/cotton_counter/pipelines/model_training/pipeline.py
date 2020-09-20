@@ -67,6 +67,8 @@ def create_pipeline(**kwargs: Any):
                     training_data="training_data",
                     testing_data="testing_data",
                     learning_phases="params:learning_phases",
+                    tensorboard_output_dir="params:tensorboard_output_dir",
+                    histogram_frequency="params:histogram_frequency",
                 ),
                 "trained_model",
             ),

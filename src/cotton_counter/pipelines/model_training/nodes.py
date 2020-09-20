@@ -2,6 +2,8 @@
 Defines nodes for the `model_training` pipeline.
 """
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 import tensorflow as tf
@@ -87,6 +89,8 @@ def train_model(
     training_data: tf.data.Dataset,
     testing_data: tf.data.Dataset,
     learning_phases: List[Dict[str, Any]],
+    tensorboard_output_dir: str,
+    histogram_frequency: int,
 ) -> keras.Model:
     """
     Trains a model.
@@ -97,11 +101,22 @@ def train_model(
         testing_data: The `Dataset` containing pre-processed testing data.
         learning_phases: List of hyperparameter configurations for each training
             stage, in order.
+        tensorboard_output_dir: The directory to use for storing Tensorboard
+            logs.
+        histogram_frequency: Frequency at which to generate histograms for
+            Tensorboard output.
 
     Returns:
         The trained model.
 
     """
+    # Create a callback for storing Tensorboard logs.
+    log_dir = Path(tensorboard_output_dir) / datetime.now().isoformat()
+    logger.debug("Writing Tensorboard logs to {}.", log_dir)
+    tensorboard_callback = keras.callbacks.TensorBoard(
+        log_dir=log_dir, histogram_freq=histogram_frequency
+    )
+
     for phase in learning_phases:
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
@@ -121,6 +136,7 @@ def train_model(
             training_data,
             validation_data=testing_data,
             epochs=phase["num_epochs"],
+            callbacks=[tensorboard_callback],
         )
 
     return model

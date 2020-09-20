@@ -17,6 +17,11 @@ batch_size: 10
 # (Increasing this can increase training performance at the expense of memory usage.)
 num_prefetch_batches: 10
 
+# Directory to use for storing Tensorboard output.
+tensorboard_output_dir: "logs/tensorboard"
+# Frequency at which to generate histograms for Tensorboard output.
+histogram_frequency: 5
+
 # Defines different learning phases to carry out.
 learning_phases:
   # The initial learning rate to use for the phase.
@@ -28,4 +33,4 @@ learning_phases:
     # The loss weight for counts.
     count_loss_weight: 0.0
     # Number of epochs to train for in this phase.
-    num_epochs: 200
+    num_epochs: 250
