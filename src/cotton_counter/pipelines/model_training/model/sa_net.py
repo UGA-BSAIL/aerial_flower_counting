@@ -2,6 +2,7 @@
 Implements the SaNet model architecture.
 """
 
+import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.backend as K
 import tensorflow.keras.layers as layers
@@ -27,31 +28,42 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     logger.debug("Creating model with input shape {}.", input_shape)
     image_input = keras.Input(shape=input_shape, name="image")
 
-    # Normalize the image.
-    normalized = K.cast(image_input, K.floatx())
-    normalized /= 255.0
+    # Normalize the images before putting them through the model.
+    float_images = K.cast(image_input, K.floatx())
+    normalized = layers.Lambda(tf.image.per_image_standardization)(
+        float_images
+    )
 
     # Main convolution layers.
     conv1_1 = layers.Conv2D(64, 3, padding="same", activation="relu")(
         normalized
     )
-    conv1_2 = layers.Conv2D(64, 3, padding="same", activation="relu")(conv1_1)
-    pool1 = layers.MaxPool2D()(conv1_2)
+    norm1_1 = layers.BatchNormalization()(conv1_1)
+    conv1_2 = layers.Conv2D(64, 3, padding="same", activation="relu")(norm1_1)
+    norm1_2 = layers.BatchNormalization()(conv1_2)
+    pool1 = layers.MaxPool2D()(norm1_2)
 
     conv2_1 = layers.Conv2D(128, 3, padding="same", activation="relu")(pool1)
-    conv2_2 = layers.Conv2D(128, 3, padding="same", activation="relu")(conv2_1)
-    pool2 = layers.MaxPool2D()(conv2_2)
+    norm2_1 = layers.BatchNormalization()(conv2_1)
+    conv2_2 = layers.Conv2D(128, 3, padding="same", activation="relu")(norm2_1)
+    norm2_2 = layers.BatchNormalization()(conv2_2)
+    pool2 = layers.MaxPool2D()(norm2_2)
 
     conv3_1 = layers.Conv2D(256, 3, padding="same", activation="relu")(pool2)
-    conv3_2 = layers.Conv2D(256, 3, padding="same", activation="relu")(conv3_1)
-    conv3_3 = layers.Conv2D(256, 3, padding="same", activation="relu")(conv3_2)
-    pool3 = layers.MaxPool2D()(conv3_3)
+    norm3_1 = layers.BatchNormalization()(conv3_1)
+    conv3_2 = layers.Conv2D(256, 3, padding="same", activation="relu")(norm3_1)
+    norm3_2 = layers.BatchNormalization()(conv3_2)
+    conv3_3 = layers.Conv2D(256, 3, padding="same", activation="relu")(norm3_2)
+    norm3_3 = layers.BatchNormalization()(conv3_3)
+    pool3 = layers.MaxPool2D()(norm3_3)
 
     conv4_1 = layers.Conv2D(512, 3, padding="same", activation="relu")(pool3)
-    conv4_2 = layers.Conv2D(512, 3, padding="same", activation="relu")(conv4_1)
+    norm4_1 = layers.BatchNormalization()(conv4_1)
+    conv4_2 = layers.Conv2D(512, 3, padding="same", activation="relu")(norm4_1)
+    norm4_2 = layers.BatchNormalization()(conv4_2)
 
     # Add the projection layers.
-    density_map = layers.Conv2D(1, 1, name="density_map")(conv4_2)
+    density_map = layers.Conv2D(1, 1, name="density_map")(norm4_2)
 
     # Sum everything to predict the total count.
     count = layers.Lambda(
