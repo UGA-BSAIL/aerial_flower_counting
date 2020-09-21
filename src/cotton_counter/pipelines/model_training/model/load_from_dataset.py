@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from ..type_helpers import Vector2I
 from .density_maps import make_density_maps
-from .patches import extract_random_patches
+from .patches import extract_random_patches, extract_standard_patches
 from .records import Annotations
 
 _FEATURE_DESCRIPTION = {
@@ -123,7 +123,8 @@ def extract_model_input(
     sigma: float,
     batch_size: int = 32,
     num_prefetch_batches: int = 5,
-    patch_scale: float = 1.0
+    patch_scale: float = 1.0,
+    random_patches: bool = True,
 ) -> tf.data.Dataset:
     """
     Deserializes raw data from a `Dataset`, and coerces it into the form
@@ -141,6 +142,8 @@ def extract_model_input(
             Increasing this can increase performance at the expense of memory
             usage.
         patch_scale: Scale of the patches to extract from each image.
+        random_patches: Whether to extract random patches from the input. If
+            false, it will instead extract a set of standardized patches.
 
     Returns:
         A dataset that produces input images and density maps.
@@ -156,11 +159,20 @@ def extract_model_input(
         )
     )
     # Extract patches.
-    patched_dataset = density_dataset.map(
-        lambda i, d: extract_random_patches(
-            images=i, density_maps=d, patch_scale=patch_scale
+    if random_patches:
+        patched_dataset = density_dataset.map(
+            lambda i, d: extract_random_patches(
+                images=i, density_maps=d, patch_scale=patch_scale
+            )
         )
-    )
+    else:
+        patched_dataset = density_dataset.flat_map(
+            lambda i, d: extract_standard_patches(
+                images=i, density_maps=d, patch_scale=patch_scale
+            )
+        )
+        # This effectively removed the batching, so we need to re-batch.
+        patched_dataset = patched_dataset.batch(batch_size)
     # Compute total counts.
     patches_with_counts = patched_dataset.map(
         lambda i, d: _add_counts(images=i, density_maps=d)

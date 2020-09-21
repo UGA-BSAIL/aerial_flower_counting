@@ -3,6 +3,7 @@ Defines a pipeline that trains the model.
 """
 
 
+from functools import partial
 from typing import Any
 
 from kedro.pipeline import Pipeline, node
@@ -32,21 +33,30 @@ def create_pipeline(**kwargs: Any):
         num_prefetch_batches="params:num_prefetch_batches",
     )
 
+    # Training datasets should use random patches, but testing and validation
+    # datasets shouldn't.
+    pre_process_node_training = partial(
+        pre_process_dataset, random_patches=True
+    )
+    pre_process_node_not_training = partial(
+        pre_process_dataset, random_patches=False
+    )
+
     return Pipeline(
         [
             # Pre-process the data.
             node(
-                pre_process_dataset,
-                dict(raw_dataset="tfrecord_train", **pre_process_params,),
+                pre_process_node_training,
+                dict(raw_dataset="tfrecord_train", **pre_process_params),
                 "training_data",
             ),
             node(
-                pre_process_dataset,
+                pre_process_node_not_training,
                 dict(raw_dataset="tfrecord_test", **pre_process_params),
                 "testing_data",
             ),
             node(
-                pre_process_dataset,
+                pre_process_node_not_training,
                 dict(raw_dataset="tfrecord_validate", **pre_process_params),
                 "validation_data",
             ),
@@ -69,6 +79,8 @@ def create_pipeline(**kwargs: Any):
                     learning_phases="params:learning_phases",
                     tensorboard_output_dir="params:tensorboard_output_dir",
                     histogram_frequency="params:histogram_frequency",
+                    visualization_period="params:visualization_period",
+                    max_density_threshold="params:max_density_threshold",
                 ),
                 "trained_model",
             ),

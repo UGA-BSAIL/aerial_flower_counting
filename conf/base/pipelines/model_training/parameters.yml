@@ -21,6 +21,11 @@ num_prefetch_batches: 10
 tensorboard_output_dir: "logs/tensorboard"
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 5
+# Every time this many epochs elapse, it will generate new density map visualizations.
+visualization_period: 50
+# Density threshold to use for colorization. Any pixel with a density above this
+# threshold will show up as the maximum density color.
+max_density_threshold: 0.02
 
 # Defines different learning phases to carry out.
 learning_phases:
