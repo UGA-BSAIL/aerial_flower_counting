@@ -4,10 +4,11 @@ Defines nodes for the `model_training` pipeline.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import tensorflow as tf
 import tensorflow.keras as keras
+import tensorflow.keras.optimizers.schedules as schedules
 from loguru import logger
 from tabulate import tabulate
 
@@ -15,6 +16,36 @@ from .model.callbacks import LogDensityMaps
 from .model.load_from_dataset import extract_model_input
 from .model.losses import CountAccuracy, SparseMse
 from .model.sa_net import build_model
+
+
+def _make_learning_rate(
+    config: Dict[str, Any]
+) -> Union[float, schedules.LearningRateSchedule]:
+    """
+    Creates the learning rate to use for optimization, based on the user
+    configuration.
+
+    Args:
+        config: The configuration for the learning rate.
+
+    Returns:
+        Either a float for a fixed learning rate, or a `LearningRateSchedule`.
+
+    """
+    initial_rate = config["initial"]
+    if not config.get("decay", False):
+        # No decay is configured.
+        logger.debug("Using fixed learning rate of {}.", initial_rate)
+        return initial_rate
+
+    logger.debug("Using decaying learning rate.")
+    return keras.experimental.CosineDecayRestarts(
+        initial_rate,
+        config["decay_steps"],
+        t_mul=config["t_mul"],
+        m_mul=config["m_mul"],
+        alpha=config["min_learning_rate"],
+    )
 
 
 def pre_process_dataset(
@@ -143,7 +174,8 @@ def train_model(
         logger.debug("Using phase parameters: {}", phase)
 
         optimizer = keras.optimizers.SGD(
-            learning_rate=phase["learning_rate"], momentum=phase["momentum"]
+            learning_rate=_make_learning_rate(phase["learning_rate"]),
+            momentum=phase["momentum"],
         )
         model.compile(
             optimizer=optimizer,
