@@ -261,6 +261,7 @@ tf-gpu = ["tensorflow-gpu"]
 reference = "8d85909719ea1098474cbd4229f3c81b8c4e71f3"
 type = "git"
 url = "https://github.com/openvinotoolkit/datumaro"
+
 [[package]]
 category = "main"
 description = "Decorators for Humans"
@@ -701,6 +702,7 @@ yaml = ["PyYAML (>=4.2,<6.0)", "pandas (>=0.24)"]
 reference = "2e10246eeb44c241c1cbe97fad7ba0e4e38f1492"
 type = "git"
 url = "https://github.com/djpetti/kedro.git"
+
 [[package]]
 category = "dev"
 description = "Kedro-Viz helps visualise Kedro data and analytics pipelines"
@@ -1199,6 +1201,7 @@ requests = "^2.24.0"
 reference = "348f462ed6de1c5192b7f5c68b9bcddad77f51da"
 type = "git"
 url = "git@github.com:UGA-BSAIL/pycvat.git"
+
 [[package]]
 category = "main"
 description = "Data validation and settings management using python 3.6 type hinting"
@@ -1815,7 +1818,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "abb6b8b2f42e5033c7b1b0881a0998bd7d4bac82bb5552779a3f55795d6ea0fc"
+content-hash = "8b75c2deaa5a8fffcad6bfce3ae75f7530626120fe944e9e56b61a926b1adb72"
 lock-version = "1.0"
 python-versions = "~3.7"
 

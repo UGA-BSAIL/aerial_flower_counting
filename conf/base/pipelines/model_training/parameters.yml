@@ -30,7 +30,7 @@ max_density_threshold: 0.02
 # Defines different learning phases to carry out.
 learning_phases:
   # The initial learning rate to use for the phase.
-  - learning_rate: 0.0001
+  - learning_rate: 0.001
     # The momentum to use for the phase.
     momentum: 0.9
     # The loss weight for density maps.
