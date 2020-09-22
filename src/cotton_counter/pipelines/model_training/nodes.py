@@ -176,6 +176,7 @@ def train_model(
         optimizer = keras.optimizers.SGD(
             learning_rate=_make_learning_rate(phase["learning_rate"]),
             momentum=phase["momentum"],
+            nesterov=True,
         )
         model.compile(
             optimizer=optimizer,

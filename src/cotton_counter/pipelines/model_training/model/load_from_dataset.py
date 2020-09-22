@@ -151,8 +151,12 @@ def extract_model_input(
     """
     # Deserialize it.
     feature_dataset = raw_dataset.map(_parse_example)
+    # Shuffle the data so we get different batches every time.
+    shuffled = feature_dataset.shuffle(
+        batch_size * num_prefetch_batches, reshuffle_each_iteration=True
+    )
     # Batch and wrangle it.
-    batched = feature_dataset.batch(batch_size)
+    batched = shuffled.batch(batch_size)
     density_dataset = batched.map(
         functools.partial(
             _load_from_feature_dict, map_shape=map_shape, sigma=sigma
