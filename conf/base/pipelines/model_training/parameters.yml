@@ -29,6 +29,13 @@ max_density_threshold: 0.02
 
 # Defines different learning phases to carry out.
 learning_phases:
+  # Initial training phase that doesn't change any weights, just
+  # updates batch normalization layers.
+  - learning_rate: 0.0
+    momentum: 0.9
+    density_map_loss_weight: 1.0
+    count_loss_weight: 0.0
+    num_epochs: 3
   # The initial learning rate to use for the phase.
   - learning_rate: 0.001
     # The momentum to use for the phase.
