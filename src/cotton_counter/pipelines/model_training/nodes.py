@@ -180,7 +180,7 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss={"density_map": SparseMse(), "count": CountAccuracy()},
+            loss={"density_map": "mse", "count": CountAccuracy()},
             loss_weights={
                 "density_map": phase["density_map_loss_weight"],
                 "count": phase["count_loss_weight"],
