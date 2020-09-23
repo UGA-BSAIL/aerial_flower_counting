@@ -125,6 +125,7 @@ def extract_model_input(
     num_prefetch_batches: int = 5,
     patch_scale: float = 1.0,
     random_patches: bool = True,
+    shuffle: bool = True,
 ) -> tf.data.Dataset:
     """
     Deserializes raw data from a `Dataset`, and coerces it into the form
@@ -144,6 +145,8 @@ def extract_model_input(
         patch_scale: Scale of the patches to extract from each image.
         random_patches: Whether to extract random patches from the input. If
             false, it will instead extract a set of standardized patches.
+        shuffle: If true, it will shuffle the data in the dataset randomly.
+            Disable if you want the output to always be deterministic.
 
     Returns:
         A dataset that produces input images and density maps.
@@ -151,12 +154,15 @@ def extract_model_input(
     """
     # Deserialize it.
     feature_dataset = raw_dataset.map(_parse_example)
+
     # Shuffle the data so we get different batches every time.
-    shuffled = feature_dataset.shuffle(
-        batch_size * num_prefetch_batches, reshuffle_each_iteration=True
-    )
+    if shuffle:
+        feature_dataset = feature_dataset.shuffle(
+            batch_size * num_prefetch_batches, reshuffle_each_iteration=True
+        )
+
     # Batch and wrangle it.
-    batched = shuffled.batch(batch_size)
+    batched = feature_dataset.batch(batch_size)
     density_dataset = batched.map(
         functools.partial(
             _load_from_feature_dict, map_shape=map_shape, sigma=sigma

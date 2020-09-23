@@ -36,10 +36,10 @@ def create_pipeline(**kwargs: Any):
     # Training datasets should use random patches, but testing and validation
     # datasets shouldn't.
     pre_process_node_training = partial(
-        pre_process_dataset, random_patches=True
+        pre_process_dataset, allow_randomized=True
     )
     pre_process_node_not_training = partial(
-        pre_process_dataset, random_patches=False
+        pre_process_dataset, allow_randomized=False
     )
 
     return Pipeline(

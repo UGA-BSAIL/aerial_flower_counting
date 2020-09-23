@@ -57,7 +57,7 @@ def pre_process_dataset(
     sigma: int,
     batch_size: int,
     num_prefetch_batches: int,
-    random_patches: bool,
+    allow_randomized: bool,
 ) -> tf.data.Dataset:
     """
     Generates the `Datasets` containing pre-processed data to use for
@@ -76,8 +76,10 @@ def pre_process_dataset(
         num_prefetch_batches: The number of batches to prefetch into memory.
             Increasing this can increase performance at the expense of memory
             usage.
-        random_patches: Whether to extract random patches for this dataset.
-            Otherwise, it will extract standard patches.
+        allow_randomized: Whether to allow randomized transformations on this
+            dataset that make the output non-deterministic. This includes the
+            extraction of random patches as well as the random shuffling of
+            data.
 
     Returns:
        A new `Dataset` containing pre-processed data that is ready to use as
@@ -90,7 +92,8 @@ def pre_process_dataset(
         batch_size=batch_size,
         num_prefetch_batches=num_prefetch_batches,
         patch_scale=patch_scale,
-        random_patches=random_patches,
+        random_patches=allow_randomized,
+        shuffle=allow_randomized,
     )
     return extract_model_input(raw_dataset, **extraction_kwargs)
 

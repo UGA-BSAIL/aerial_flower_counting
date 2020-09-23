@@ -12,7 +12,7 @@ density_map_height: 432
 density_map_sigma: 1
 
 # Batch size to use for training.
-batch_size: 5
+batch_size: 10
 # Number of batches to pre-fetch into memory.
 # (Increasing this can increase training performance at the expense of memory usage.)
 num_prefetch_batches: 10
@@ -29,14 +29,6 @@ max_density_threshold: 0.02
 
 # Defines different learning phases to carry out.
 learning_phases:
-  # Initial training phase that doesn't change any weights, just
-  # updates batch normalization layers.
-  - learning_rate:
-      initial: 0.0
-    momentum: 0.9
-    density_map_loss_weight: 1.0
-    count_loss_weight: 0.0
-    num_epochs: 5
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
@@ -44,7 +36,7 @@ learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 130
+      decay_steps: 65
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
