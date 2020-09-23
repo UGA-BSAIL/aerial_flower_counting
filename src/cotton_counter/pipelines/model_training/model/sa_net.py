@@ -36,7 +36,9 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
         float_images
     )
 
-    batch_norm = partial(layers.BatchNormalization, momentum=0.9)
+    # batch_norm = partial(layers.BatchNormalization, momentum=0.9)
+    def batch_norm():
+        return lambda x: x
 
     # Main convolution layers.
     conv1_1 = layers.Conv2D(64, 3, padding="same", activation="relu")(
