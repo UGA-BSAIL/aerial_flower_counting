@@ -18,11 +18,11 @@ batch_size: 10
 num_prefetch_batches: 10
 
 # Directory to use for storing Tensorboard output.
-tensorboard_output_dir: "logs/tensorboard"
+tensorboard_output_dir: ${log_dir}/tensorboard
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 10
 # Every time this many epochs elapse, it will generate new density map visualizations.
-visualization_period: 100
+visualization_period: 50
 # Density threshold to use for colorization. Any pixel with a density above this
 # threshold will show up as the maximum density color.
 max_density_threshold: 0.02
@@ -32,11 +32,11 @@ learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
-      initial: 0.001
+      initial: 0.002
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 65
+      decay_steps: 70
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
@@ -50,4 +50,4 @@ learning_phases:
     # The loss weight for counts.
     count_loss_weight: 0.0
     # Number of epochs to train for in this phase.
-    num_epochs: 270
+    num_epochs: 310

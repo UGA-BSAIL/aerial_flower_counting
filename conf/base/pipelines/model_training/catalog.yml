@@ -19,7 +19,7 @@ initial_model:
 # Saved model, produced at the end of training.
 trained_model:
   type: tensorflow.TensorFlowModelDataset
-  filepath: data/06_models/fully_trained.hd5
+  filepath: ${output_data_dir}/06_models/fully_trained.hd5
   load_args:
     # Compiling during loading doesn't work with custom loss functions.
     compile: False
@@ -30,15 +30,15 @@ trained_model:
 # Evaluation reports for the model.
 model_report_train:
   type: text.TextDataSet
-  filepath: data/08_reporting/model_reports/train_results.txt
+  filepath: ${output_data_dir}/08_reporting/model_reports/train_results.txt
   versioned: True
 
 model_report_test:
   type: text.TextDataSet
-  filepath: data/08_reporting/model_reports/test_results.txt
+  filepath: ${output_data_dir}/08_reporting/model_reports/test_results.txt
   versioned: True
 
 model_report_validate:
   type: text.TextDataSet
-  filepath: data/08_reporting/model_reports/validation_results.txt
+  filepath: ${output_data_dir}/08_reporting/model_reports/validation_results.txt
   versioned: True

@@ -8,6 +8,7 @@ from typing import Dict
 from kedro.framework.context import KedroContext, load_package_context
 from kedro.pipeline import Pipeline
 
+from .hooks import ProjectHooks
 from .pipeline import create_pipelines
 
 
@@ -20,6 +21,9 @@ class ProjectContext(KedroContext):
     # `project_version` is the version of kedro used to generate the project
     project_version = "0.16.4"
     package_name = "cotton_counter"
+
+    # Register hooks.
+    hooks = (ProjectHooks(),)
 
     def _get_pipelines(self) -> Dict[str, Pipeline]:
         return create_pipelines()
