@@ -5,8 +5,8 @@
 mkdir artifacts
 
 # Grab the models and reports
-zip -r artifacts/models.zip data/06_models/
-zip -r artifacts/reports.zip data/08_reporting/
+zip -r artifacts/models.zip output_data/06_models/
+zip -r artifacts/reports.zip output_data/08_reporting/
 
 # Grab the logs.
 zip -r artifacts/logs.zip logs/
