@@ -26,12 +26,12 @@ function package_artifacts() {
   zip -r artifacts/reports.zip "${job_dir}/output_data/08_reporting/"
 
   # Grab the logs.
-  zip -r artifacts/logs.zip logs/
+  zip -r artifacts/logs.zip "${job_dir}/logs/"
 }
 
 function clean_artifacts() {
   # Remove old job data.
-  rm "${job_dir}"
+  rm -rf "${job_dir}"
   # Remove old job output.
   rm cotton_count_model_train.*"${job_number}"
 }
