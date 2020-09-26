@@ -53,10 +53,14 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     pool3 = layers.MaxPool2D()(conv3_3)
 
     conv4_1 = layers.Conv2D(384, 3, padding="same", activation="relu")(pool3)
-    conv4_2 = layers.Conv2D(384, 3, padding="same", activation="relu")(conv4_1)
+    conv4_2 = layers.Conv2D(384, 1, activation="relu")(conv4_1)
+    conv4_3 = layers.Conv2D(384, 1, activation="relu")(conv4_2)
+    conv4_4 = layers.Conv2D(384, 3, padding="same", activation="relu")(conv4_3)
+    conv4_5 = layers.Conv2D(128, 1, activation="relu")(conv4_4)
+    conv4_6 = layers.Conv2D(128, 1, activation="relu")(conv4_5)
 
     # Add the projection layers.
-    density_map = layers.Conv2D(1, 1, name="density_map")(conv4_2)
+    density_map = layers.Conv2D(1, 1, name="density_map")(conv4_6)
 
     # Sum everything to predict the total count.
     count = layers.Lambda(
