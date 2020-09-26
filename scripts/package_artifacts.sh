@@ -2,14 +2,39 @@
 
 # Helper script that packages artifacts from a training run.
 
-mkdir artifacts
+set -e
 
-# Grab the models and reports
-zip -r artifacts/models.zip output_data/06_models/
-zip -r artifacts/reports.zip output_data/08_reporting/
+if [[ "$#" -ne 1 ]]; then
+  echo "Usage: $0 JOB_ID"
+  exit 1
+fi
 
-# Grab the logs.
-zip -r artifacts/logs.zip logs/
+# The job ID to collect artifacts from.
+JOB_ID=$1
+# Split the job ID on the dot.
+IFS=. read -r job_number cluster_name <<<"${JOB_ID}"
+job_dir="/scratch/$(whoami)/job_${job_number}.${cluster_name}"
 
-# Grab the job output.
-zip artifacts/output.zip cotton_count_model_train*
+function package_artifacts() {
+  mkdir artifacts
+
+  # Grab the job output.
+  zip artifacts/output.zip cotton_count_model_train.*"${job_number}"
+
+  # Grab the models and reports
+  zip -r artifacts/models.zip "${job_dir}/output_data/06_models/"
+  zip -r artifacts/reports.zip "${job_dir}/output_data/08_reporting/"
+
+  # Grab the logs.
+  zip -r artifacts/logs.zip logs/
+}
+
+function clean_artifacts() {
+  # Remove old job data.
+  rm "${job_dir}"
+  # Remove old job output.
+  rm cotton_count_model_train.*"${job_number}"
+}
+
+package_artifacts
+clean_artifacts
