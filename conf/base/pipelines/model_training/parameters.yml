@@ -50,4 +50,4 @@ learning_phases:
     # The loss weight for counts.
     count_loss_weight: 0.0
     # Number of epochs to train for in this phase.
-    num_epochs: 630
+    num_epochs: 1270
