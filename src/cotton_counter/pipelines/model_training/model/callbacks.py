@@ -55,16 +55,23 @@ class LogDensityMaps(callbacks.Callback):
             return
         logger.debug("Logging density map visualizations...")
 
-        for batch_num, (image_batch, _) in enumerate(self.__dataset):
+        for batch_num, (image_batch, target_batch) in enumerate(
+            self.__dataset
+        ):
             # Generate predicted density maps.
             image_batch = tf.cast(image_batch["image"], tf.float32)
             predictions = self.__model.predict_on_batch(image_batch)
             density_maps = predictions["density_map"]
 
             # Generate visualizations.
-            density_visualizations = visualize_density_maps(
+            predicted_density_vis = visualize_density_maps(
                 images=image_batch,
                 density_maps=density_maps,
+                max_density_threshold=self.__density_threshold,
+            )
+            true_density_vis = visualize_density_maps(
+                images=image_batch,
+                density_maps=target_batch["density_map"],
                 max_density_threshold=self.__density_threshold,
             )
 
@@ -72,6 +79,11 @@ class LogDensityMaps(callbacks.Callback):
             with self.__writer.as_default():
                 tf.summary.image(
                     f"Density Map (Batch {batch_num})",
-                    density_visualizations,
+                    predicted_density_vis,
+                    step=epoch,
+                )
+                tf.summary.image(
+                    f"GT Density Map (Batch {batch_num})",
+                    true_density_vis,
                     step=epoch,
                 )
