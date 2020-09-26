@@ -37,23 +37,23 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     )
 
     # Main convolution layers.
-    conv1_1 = layers.Conv2D(64, 3, padding="same", activation="relu")(
+    conv1_1 = layers.Conv2D(48, 3, padding="same", activation="relu")(
         normalized
     )
-    conv1_2 = layers.Conv2D(64, 3, padding="same", activation="relu")(conv1_1)
+    conv1_2 = layers.Conv2D(48, 3, padding="same", activation="relu")(conv1_1)
     pool1 = layers.MaxPool2D()(conv1_2)
 
-    conv2_1 = layers.Conv2D(128, 3, padding="same", activation="relu")(pool1)
-    conv2_2 = layers.Conv2D(128, 3, padding="same", activation="relu")(conv2_1)
+    conv2_1 = layers.Conv2D(96, 3, padding="same", activation="relu")(pool1)
+    conv2_2 = layers.Conv2D(96, 3, padding="same", activation="relu")(conv2_1)
     pool2 = layers.MaxPool2D()(conv2_2)
 
-    conv3_1 = layers.Conv2D(256, 3, padding="same", activation="relu")(pool2)
-    conv3_2 = layers.Conv2D(256, 3, padding="same", activation="relu")(conv3_1)
-    conv3_3 = layers.Conv2D(256, 3, padding="same", activation="relu")(conv3_2)
+    conv3_1 = layers.Conv2D(192, 3, padding="same", activation="relu")(pool2)
+    conv3_2 = layers.Conv2D(192, 3, padding="same", activation="relu")(conv3_1)
+    conv3_3 = layers.Conv2D(192, 3, padding="same", activation="relu")(conv3_2)
     pool3 = layers.MaxPool2D()(conv3_3)
 
-    conv4_1 = layers.Conv2D(512, 3, padding="same", activation="relu")(pool3)
-    conv4_2 = layers.Conv2D(512, 3, padding="same", activation="relu")(conv4_1)
+    conv4_1 = layers.Conv2D(384, 3, padding="same", activation="relu")(pool3)
+    conv4_2 = layers.Conv2D(384, 3, padding="same", activation="relu")(conv4_1)
 
     # Add the projection layers.
     density_map = layers.Conv2D(1, 1, name="density_map")(conv4_2)
