@@ -51,3 +51,15 @@ learning_phases:
     count_loss_weight: 0.0
     # Number of epochs to train for in this phase.
     num_epochs: 630
+  # Add an additional phase for optimizing the count loss.
+  - learning_rate:
+      initial: 0.002
+      decay: true
+      decay_steps: 90
+      t_mul: 2.0
+      m_mul: 1.0
+      min_learning_rate: 0.00001
+      momentum: 0.9
+      density_map_loss_weight: 1.0
+      count_loss_weight: 0.1
+      num_epochs: 310
