@@ -9,7 +9,7 @@ patch_scale: 0.25
 density_map_width: 576
 density_map_height: 432
 # The standard deviation to use for the gaussian kernel when creating density maps.
-density_map_sigma: 1
+density_map_sigma: 5
 
 # Batch size to use for training.
 batch_size: 10
@@ -50,4 +50,4 @@ learning_phases:
     # The loss weight for counts.
     count_loss_weight: 0.0
     # Number of epochs to train for in this phase.
-    num_epochs: 1270
+    num_epochs: 630
