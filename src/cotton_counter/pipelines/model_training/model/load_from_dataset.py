@@ -4,7 +4,7 @@ Tensorflow `Dataset`.
 """
 
 import functools
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import tensorflow as tf
 
@@ -94,8 +94,50 @@ def _load_from_feature_dict(
     return images, density_maps
 
 
+def _discretize_counts(
+    counts: tf.Tensor, *, bucket_min_values: List[float]
+) -> tf.Tensor:
+    """
+    Discretizes the count values into a fixed number of categories.
+
+    Args:
+        counts: The tensor containing raw count values.
+        bucket_min_values: A list of the minimum values that will go in each
+            bucket. Note that the highest bucket will contain anything that
+            falls between the largest minimum value and infinity.
+
+    Returns:
+        An integer tensor containing the categorical counts.
+
+    """
+    # Make sure they're sorted from high to low.
+    bucket_min_values.sort(reverse=True)
+
+    # These masks will determine which counts fall in which buckets.
+    bucket_masks = []
+    for min_value in bucket_min_values:
+        bucket_mask = counts >= tf.constant(min_value, dtype=tf.float32)
+        bucket_masks.append(bucket_mask)
+
+    # Generate the category vector.
+    categorical_counts = tf.zeros_like(counts, dtype=tf.int32)
+    already_filled = tf.zeros_like(categorical_counts, dtype=tf.bool)
+    for i, bucket_mask in enumerate(bucket_masks):
+        fill_mask = tf.logical_and(tf.logical_not(already_filled), bucket_mask)
+        fill_mask_int = tf.cast(fill_mask, tf.int32)
+
+        categorical_counts += fill_mask_int * tf.constant(i, dtype=tf.int32)
+
+        already_filled = tf.logical_or(fill_mask, already_filled)
+
+    return categorical_counts
+
+
 def _add_counts(
-    *, images: tf.Tensor, density_maps: tf.Tensor
+    *,
+    images: tf.Tensor,
+    density_maps: tf.Tensor,
+    bucket_min_values: List[float],
 ) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
     """
     Adds summed count values to a `Dataset`.
@@ -103,6 +145,10 @@ def _add_counts(
     Args:
         images: The input image data.
         density_maps: The corresponding density maps.
+        bucket_min_values: A list of the minimum count values that will go in
+            each discrete count bucket. Note that the highest bucket will
+            contain anything that falls between the largest minimum value and
+            infinity.
 
     Returns:
         A dictionary mapping model inputs to tensors and a dictionary mapping
@@ -110,10 +156,24 @@ def _add_counts(
 
     """
     counts = tf.reduce_sum(density_maps, axis=[1, 2, 3])
+
+    # Discretize the counts.
+    discrete_counts = _discretize_counts(
+        counts, bucket_min_values=bucket_min_values
+    )
+
     # Keras doesn't like 1D inputs, so add an extra dimension.
     counts = tf.expand_dims(counts, axis=1)
+    discrete_counts = tf.expand_dims(discrete_counts, axis=1)
 
-    return dict(image=images), dict(density_map=density_maps, count=counts)
+    return (
+        dict(image=images),
+        dict(
+            density_map=density_maps,
+            count=counts,
+            discrete_count=discrete_counts,
+        ),
+    )
 
 
 def extract_model_input(
@@ -121,6 +181,7 @@ def extract_model_input(
     *,
     map_shape: Vector2I,
     sigma: float,
+    bucket_min_values: List[float],
     batch_size: int = 32,
     num_prefetch_batches: int = 5,
     patch_scale: float = 1.0,
@@ -138,6 +199,10 @@ def extract_model_input(
         sigma:
             The standard deviation in pixels to use for the applied gaussian
             filter.
+        bucket_min_values: A list of the minimum count values that will go in
+            each discrete count bucket. Note that the highest bucket will
+            contain anything that falls between the largest minimum value and
+            infinity.
         batch_size: The size of the batches that we generate.
         num_prefetch_batches: The number of batches to prefetch into memory.
             Increasing this can increase performance at the expense of memory
@@ -185,7 +250,9 @@ def extract_model_input(
         patched_dataset = patched_dataset.batch(batch_size)
     # Compute total counts.
     patches_with_counts = patched_dataset.map(
-        lambda i, d: _add_counts(images=i, density_maps=d)
+        lambda i, d: _add_counts(
+            images=i, density_maps=d, bucket_min_values=bucket_min_values
+        )
     )
 
     # Prefetch the batches.

@@ -2,6 +2,8 @@
 Implements the SaNet model architecture.
 """
 
+from typing import Optional
+
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.backend as K
@@ -11,23 +13,35 @@ from loguru import logger
 from ..type_helpers import Vector2I
 
 
-def build_model(*, input_size: Vector2I) -> keras.Model:
+def _build_image_input(*, input_size: Vector2I) -> keras.Input:
     """
-    Creates the SaNet model.
+    Creates the image data input.
 
     Args:
         input_size: The size of the input images that will be provided,
             in the form (width, height).
 
     Returns:
-        The model that it created.
+        The `Input` that it created.
 
     """
     # Assume RGB images.
     input_shape = input_size[::-1] + (3,)
     logger.debug("Creating model with input shape {}.", input_shape)
-    image_input = keras.Input(shape=input_shape, name="image")
+    return keras.Input(shape=input_shape, name="image")
 
+
+def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
+    """
+    Creates the backbone SaNet model.
+
+    Args:
+        image_input: The image input to build the model off of.
+
+    Returns:
+        The top model layer.
+
+    """
     # Normalize the images before putting them through the model.
     float_images = K.cast(image_input, K.floatx())
     normalized = layers.Lambda(tf.image.per_image_standardization)(
@@ -67,18 +81,98 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     conv4_5 = layers.Conv2D(128, 1, activation="relu")(conv4_4)
     conv4_6 = layers.Conv2D(128, 1, activation="relu")(conv4_5)
 
-    # Add the projection layers.
-    density_map = layers.Conv2D(1, 1, name="density_map")(conv4_6)
+    return conv4_6
 
+
+def _build_density_map_head(model_top: layers.Layer) -> layers.Layer:
+    """
+    Adds the head for predicting density maps.
+
+    Args:
+        model_top: The top model layer to build the head on.
+
+    Returns:
+        The layer representing the density map output.
+
+    """
+    return layers.Conv2D(1, 1, name="density_map")(model_top)
+
+
+def _build_count_regression_head(
+    *, density_head: layers.Layer
+) -> layers.Layer:
+    """
+    Adds the head for regressing count values.
+
+    Args:
+        density_head: The layer that produces the density map output.
+
+    Returns:
+        The layer representing the count output.
+
+    """
     # Sum everything to predict the total count.
-    count = layers.Lambda(
+    return layers.Lambda(
         lambda x: K.expand_dims(K.sum(x, axis=[1, 2, 3])), name="count"
-    )(density_map)
+    )(density_head)
+
+
+def _build_count_classification_head(
+    model_top: layers.Layer, *, num_classes: int
+) -> layers.Layer:
+    """
+    Adds the head for classifying categorical count values.
+
+    Args:
+        model_top: The top model layer to build the head on.
+        num_classes: The total number of count classes we have.
+
+    Returns:
+        The layer representing the categorical count logits.
+
+    """
+    count_conv_1 = layers.Conv2D(num_classes, 1, activation="relu")(model_top)
+    count_pool_1 = layers.GlobalAveragePooling2D()(count_conv_1)
+    count_softmax = layers.Softmax()(count_pool_1)
+
+    return count_softmax
+
+
+def build_model(
+    *, input_size: Vector2I, num_classes: Optional[int] = None
+) -> keras.Model:
+    """
+    Creates the full SaNet model.
+
+    Args:
+        input_size: The size of the input images that will be provided,
+            in the form (width, height).
+        num_classes: The number of classes to use if we want to use the count
+            classification output. If this is `None`, it will assume we want to
+            regress the counts directly.
+
+    Returns:
+        The model that it created.
+
+    """
+    image_input = _build_image_input(input_size=input_size)
+    backbone = _build_model_backbone(image_input=image_input)
+
+    density_map = _build_density_map_head(backbone)
+    model_outputs = {"density_map": density_map}
+
+    # Build the regression head.
+    count = _build_count_regression_head(density_head=density_map)
+    model_outputs["count"] = count
+
+    if num_classes is not None:
+        # Use the classification head.
+        discrete_count = _build_count_classification_head(
+            backbone, num_classes=num_classes
+        )
+        model_outputs["discrete_count"] = discrete_count
 
     # Create the model.
-    model = keras.Model(
-        inputs=image_input,
-        outputs={"density_map": density_map, "count": count},
-    )
+    model = keras.Model(inputs=image_input, outputs=model_outputs,)
 
     return model

@@ -27,6 +27,13 @@ visualization_period: 100
 # threshold will show up as the maximum density color.
 max_density_threshold: 0.02
 
+# Whether we want to classify counts instead of regressing them.
+classify_counts: True
+# A list of the minimum count values that will go in each discrete
+# count bucket. Note that the highest bucket will contain anything
+# that falls between the largest minimum value and infinity.
+bucket_min_values: [0.0, 1.0]
+
 # Learning phases to use for training the base model.
 base_learning_phases:
   # The initial learning rate to use for the phase.

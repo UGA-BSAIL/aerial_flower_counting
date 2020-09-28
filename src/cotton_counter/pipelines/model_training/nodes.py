@@ -58,6 +58,7 @@ def pre_process_dataset(
     batch_size: int,
     num_prefetch_batches: int,
     allow_randomized: bool,
+    bucket_min_values: List[float],
 ) -> tf.data.Dataset:
     """
     Generates the `Datasets` containing pre-processed data to use for
@@ -80,6 +81,10 @@ def pre_process_dataset(
             dataset that make the output non-deterministic. This includes the
             extraction of random patches as well as the random shuffling of
             data.
+        bucket_min_values: A list of the minimum count values that will go in
+            each discrete count bucket. Note that the highest bucket will
+            contain anything that falls between the largest minimum value and
+            infinity.
 
     Returns:
        A new `Dataset` containing pre-processed data that is ready to use as
@@ -89,6 +94,7 @@ def pre_process_dataset(
     extraction_kwargs = dict(
         map_shape=(map_height, map_width),
         sigma=sigma,
+        bucket_min_values=bucket_min_values,
         batch_size=batch_size,
         num_prefetch_batches=num_prefetch_batches,
         patch_scale=patch_scale,
@@ -99,7 +105,11 @@ def pre_process_dataset(
 
 
 def create_model(
-    input_width: int, input_height: int, patch_scale: float,
+    input_width: int,
+    input_height: int,
+    patch_scale: float,
+    classify_counts: bool,
+    bucket_min_values: List[float],
 ) -> keras.Model:
     """
     Builds the model to use.
@@ -108,6 +118,12 @@ def create_model(
         input_width: The expected width of the input images, in px.
         input_height: The expected height of the input images, in px.
         patch_scale: The scale factor to apply for the patches we extract.
+        classify_counts: If true, will attempt to classify counts instead of
+            regressing them.
+        bucket_min_values: A list of the minimum count values that will go in
+            each discrete count bucket. Note that the highest bucket will
+            contain anything that falls between the largest minimum value and
+            infinity.
 
     Returns:
         The model that it created.
@@ -116,32 +132,63 @@ def create_model(
     # Build the model.
     patch_width = int(input_width * patch_scale)
     patch_height = int(input_height * patch_scale)
-    model = build_model(input_size=(patch_width, patch_height))
+
+    num_classes = None
+    if classify_counts:
+        num_classes = len(bucket_min_values)
+    model = build_model(
+        input_size=(patch_width, patch_height), num_classes=num_classes
+    )
+
     logger.info("Model has {} parameters.", model.count_params())
 
     return model
 
 
-def _make_losses() -> Dict[str, Union[str, keras.losses.Loss]]:
+def _make_losses(
+    classify_counts: bool = False,
+) -> Dict[str, Union[str, keras.losses.Loss]]:
     """
     Creates the loss dictionary to use when compiling a model.
+
+    Args:
+        classify_counts: Whether we are using the classification count output.
 
     Returns:
         The loss dictionary that it created.
 
     """
-    return {"density_map": "mse", "count": CountAccuracy()}
+    losses = {"density_map": "mse"}
+    if classify_counts:
+        # Use cross-entropy for classification.
+        losses["discrete_count"] = "sparse_categorical_crossentropy"
+    else:
+        # Use the standard regression loss.
+        losses["count"] = CountAccuracy()
+
+    return losses
 
 
-def _make_metrics() -> Dict[str, Union[str, keras.metrics.Metric]]:
+def _make_metrics(
+    classify_counts: bool = False,
+) -> Dict[str, Union[str, keras.metrics.Metric]]:
     """
     Creates the metrics dictionary to use when compiling a model.
+
+    Args:
+        classify_counts: Whether we are using the classification count output.
 
     Returns:
         The metrics dictionary that it created.
 
     """
-    return {"count": keras.metrics.MeanAbsoluteError()}
+    metrics = {"count": "mean_absolute_error"}
+
+    if classify_counts:
+        # Add a standard accuracy metric for the classification.
+        metrics["discrete_count"] = "categorical_accuracy"
+
+    return metrics
 
 
 def train_model(
@@ -154,6 +201,7 @@ def train_model(
     histogram_frequency: int,
     visualization_period: int,
     max_density_threshold: float,
+    classify_counts: bool,
 ) -> keras.Model:
     """
     Trains a model.
@@ -173,6 +221,8 @@ def train_model(
         max_density_threshold: Density threshold to use for colorization.
                 Any pixel with this density or more will show up as the maximum
                 density color.
+        classify_counts: If true, will attempt to classify counts instead of
+            regressing them.
 
     Returns:
         The trained model.
@@ -205,12 +255,12 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss=_make_losses(),
+            loss=_make_losses(classify_counts=classify_counts),
             loss_weights={
                 "density_map": phase["density_map_loss_weight"],
                 "count": phase["count_loss_weight"],
             },
-            metrics=_make_metrics(),
+            metrics=_make_metrics(classify_counts=classify_counts),
         )
         model.fit(
             training_data,
@@ -222,19 +272,26 @@ def train_model(
     return model
 
 
-def evaluate_model(model: keras.Model, *, eval_data: tf.data.Dataset) -> str:
+def evaluate_model(
+    model: keras.Model, *, eval_data: tf.data.Dataset, classify_counts: bool
+) -> str:
     """
     Evaluates a model and generates a text report.
 
     Args:
         model: The model to evaluate.
         eval_data: The data to evaluate the model on.
+        classify_counts: If true, will attempt to classify counts instead of
+            regressing them.
 
     Returns:
         A human-readable report of the evaluation results.
 
     """
-    model.compile(loss=_make_losses(), metrics=_make_metrics())
+    model.compile(
+        loss=_make_losses(classify_counts=classify_counts),
+        metrics=_make_metrics(classify_counts=classify_counts),
+    )
 
     # Evaluate the model.
     results = model.evaluate(eval_data)

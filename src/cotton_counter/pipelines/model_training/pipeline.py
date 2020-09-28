@@ -48,6 +48,7 @@ def create_pipeline(**kwargs: Any):
         sigma="params:density_map_sigma",
         batch_size="params:batch_size",
         num_prefetch_batches="params:num_prefetch_batches",
+        bucket_min_values="params:bucket_min_values",
     )
     # Common parameters shared by training nodes.
     training_params = dict(
@@ -57,6 +58,7 @@ def create_pipeline(**kwargs: Any):
         histogram_frequency="params:histogram_frequency",
         visualization_period="params:visualization_period",
         max_density_threshold="params:max_density_threshold",
+        classify_counts="params:classify_counts",
     )
 
     # Training datasets should use random patches, but testing and validation
@@ -96,6 +98,8 @@ def create_pipeline(**kwargs: Any):
                     input_width="params:input_width",
                     input_height="params:input_height",
                     patch_scale="params:patch_scale",
+                    classify_counts="params:classify_counts",
+                    bucket_min_values="params:bucket_min_values",
                 ),
                 "initial_model",
                 tags={INITIAL_TRAIN_TAG},
