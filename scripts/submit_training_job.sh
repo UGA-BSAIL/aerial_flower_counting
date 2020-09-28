@@ -9,7 +9,7 @@
 #PBS -S /bin/bash
 #PBS -q patterli_q
 #PBS -N cotton_count_model_train
-#PBS -l nodes=1:ppn=6:gpus=1
+#PBS -l nodes=1:ppn=18:gpus=1
 #PBS -l walltime=8:00:00
 #PBS -l mem=10gb
 #PBS -M daniel.petti@uga.edu

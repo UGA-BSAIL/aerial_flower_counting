@@ -9,7 +9,7 @@ patch_scale: 0.25
 density_map_width: 576
 density_map_height: 432
 # The standard deviation to use for the gaussian kernel when creating density maps.
-density_map_sigma: 5
+density_map_sigma: 3
 
 # Batch size to use for training.
 batch_size: 10
