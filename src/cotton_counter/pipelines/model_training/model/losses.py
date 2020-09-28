@@ -80,4 +80,4 @@ class SparseMse(losses.Loss):
         zero_loss = _mse(true_zero, predicted_zero)
         non_zero_loss = _mse(true_non_zero, predicted_non_zero)
 
-        return non_zero_loss + zero_loss * tf.constant(0.1)
+        return non_zero_loss + zero_loss * tf.constant(1.0)

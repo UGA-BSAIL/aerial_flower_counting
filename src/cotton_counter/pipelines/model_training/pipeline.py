@@ -32,6 +32,15 @@ def create_pipeline(**kwargs: Any):
         batch_size="params:batch_size",
         num_prefetch_batches="params:num_prefetch_batches",
     )
+    # Common parameters shared by training nodes.
+    training_params = dict(
+        training_data="training_data",
+        testing_data="testing_data",
+        tensorboard_output_dir="params:tensorboard_output_dir",
+        histogram_frequency="params:histogram_frequency",
+        visualization_period="params:visualization_period",
+        max_density_threshold="params:max_density_threshold",
+    )
 
     # Training datasets should use random patches, but testing and validation
     # datasets shouldn't.
@@ -70,17 +79,23 @@ def create_pipeline(**kwargs: Any):
                 ),
                 "initial_model",
             ),
+            # Train initially with just the density map loss.
             node(
                 train_model,
                 dict(
                     model="initial_model",
-                    training_data="training_data",
-                    testing_data="testing_data",
-                    learning_phases="params:learning_phases",
-                    tensorboard_output_dir="params:tensorboard_output_dir",
-                    histogram_frequency="params:histogram_frequency",
-                    visualization_period="params:visualization_period",
-                    max_density_threshold="params:max_density_threshold",
+                    learning_phases="params:base_learning_phases",
+                    **training_params
+                ),
+                "base_model",
+            ),
+            # Train again with the count loss as well.
+            node(
+                train_model,
+                dict(
+                    model="base_model",
+                    learning_phases="params:refined_learning_phases",
+                    **training_params
                 ),
                 "trained_model",
             ),

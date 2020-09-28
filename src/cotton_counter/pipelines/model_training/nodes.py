@@ -14,7 +14,7 @@ from tabulate import tabulate
 
 from .model.callbacks import LogDensityMaps
 from .model.load_from_dataset import extract_model_input
-from .model.losses import CountAccuracy, SparseMse
+from .model.losses import CountAccuracy
 from .model.sa_net import build_model
 
 
@@ -122,6 +122,28 @@ def create_model(
     return model
 
 
+def _make_losses() -> Dict[str, Union[str, keras.losses.Loss]]:
+    """
+    Creates the loss dictionary to use when compiling a model.
+
+    Returns:
+        The loss dictionary that it created.
+
+    """
+    return {"density_map": "mse", "count": CountAccuracy()}
+
+
+def _make_metrics() -> Dict[str, Union[str, keras.metrics.Metric]]:
+    """
+    Creates the metrics dictionary to use when compiling a model.
+
+    Returns:
+        The metrics dictionary that it created.
+
+    """
+    return {"count": keras.metrics.MeanAbsoluteError()}
+
+
 def train_model(
     model: keras.Model,
     *,
@@ -183,11 +205,12 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss={"density_map": "mse", "count": CountAccuracy()},
+            loss=_make_losses(),
             loss_weights={
                 "density_map": phase["density_map_loss_weight"],
                 "count": phase["count_loss_weight"],
             },
+            metrics=_make_metrics(),
         )
         model.fit(
             training_data,
@@ -211,7 +234,7 @@ def evaluate_model(model: keras.Model, *, eval_data: tf.data.Dataset) -> str:
         A human-readable report of the evaluation results.
 
     """
-    model.compile(loss={"density_map": SparseMse(), "count": CountAccuracy()},)
+    model.compile(loss=_make_losses(), metrics=_make_metrics())
 
     # Evaluate the model.
     results = model.evaluate(eval_data)

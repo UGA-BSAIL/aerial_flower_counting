@@ -16,16 +16,24 @@ initial_model:
   type: MemoryDataSet
   copy_mode: assign
 
-# Saved model, produced at the end of training.
-trained_model:
+_model_args: &model_args
   type: tensorflow.TensorFlowModelDataset
-  filepath: ${output_data_dir}/06_models/fully_trained.hd5
   load_args:
     # Compiling during loading doesn't work with custom loss functions.
     compile: False
   save_args:
     save_format: h5
   versioned: True
+
+# Saved model, produced after training with only the density map loss.
+base_model:
+  filepath: data/06_models/base_trained.hd5
+  << : *model_args
+
+# Saved model, produced at the end of training.
+trained_model:
+  filepath: ${output_data_dir}/06_models/fully_trained.hd5
+  << : *model_args
 
 # Evaluation reports for the model.
 model_report_train:
