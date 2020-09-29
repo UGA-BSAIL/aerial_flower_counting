@@ -15,6 +15,23 @@ from .nodes import (
     train_model,
 )
 
+PRE_PROCESS_TAG = "pre_process"
+"""
+Marks nodes that are part of the pre-processing steps.
+"""
+INITIAL_TRAIN_TAG = "initial_train"
+"""
+Marks nodes that are part of the initial training phase.
+"""
+FINE_TUNING_TAG = "fine_tuning"
+"""
+Marks nodes that are part of the fine-tuning phase.
+"""
+EVAL_TAG = "evaluation"
+"""
+Marks nodes that are part of the evaluation phase.
+"""
+
 
 def create_pipeline(**kwargs: Any):
     """
@@ -58,16 +75,19 @@ def create_pipeline(**kwargs: Any):
                 pre_process_node_training,
                 dict(raw_dataset="tfrecord_train", **pre_process_params),
                 "training_data",
+                tags={PRE_PROCESS_TAG},
             ),
             node(
                 pre_process_node_not_training,
                 dict(raw_dataset="tfrecord_test", **pre_process_params),
                 "testing_data",
+                tags={PRE_PROCESS_TAG},
             ),
             node(
                 pre_process_node_not_training,
                 dict(raw_dataset="tfrecord_validate", **pre_process_params),
                 "validation_data",
+                tags={PRE_PROCESS_TAG},
             ),
             # Build and train the model.
             node(
@@ -78,6 +98,7 @@ def create_pipeline(**kwargs: Any):
                     patch_scale="params:patch_scale",
                 ),
                 "initial_model",
+                tags={INITIAL_TRAIN_TAG},
             ),
             # Train initially with just the density map loss.
             node(
@@ -88,6 +109,7 @@ def create_pipeline(**kwargs: Any):
                     **training_params
                 ),
                 "base_model",
+                tags={INITIAL_TRAIN_TAG},
             ),
             # Train again with the count loss as well.
             node(
@@ -98,22 +120,26 @@ def create_pipeline(**kwargs: Any):
                     **training_params
                 ),
                 "trained_model",
+                tags={FINE_TUNING_TAG},
             ),
             # Evaluate model on all datasets.
             node(
                 evaluate_model,
                 dict(model="trained_model", eval_data="training_data",),
                 "model_report_train",
+                tags={EVAL_TAG},
             ),
             node(
                 evaluate_model,
                 dict(model="trained_model", eval_data="testing_data",),
                 "model_report_test",
+                tags={EVAL_TAG},
             ),
             node(
                 evaluate_model,
                 dict(model="trained_model", eval_data="validation_data",),
                 "model_report_validate",
+                tags={EVAL_TAG},
             ),
         ]
     )
