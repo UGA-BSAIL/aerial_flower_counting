@@ -2,8 +2,6 @@
 Implements the SaNet model architecture.
 """
 
-from functools import partial
-
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.backend as K
@@ -44,8 +42,12 @@ def build_model(*, input_size: Vector2I) -> keras.Model:
     pool1 = layers.MaxPool2D()(conv1_2)
 
     conv2_1 = layers.Conv2D(96, 3, padding="same", activation="relu")(pool1)
-    conv2_2 = layers.Conv2D(96, 3, padding="same", activation="relu")(conv2_1)
-    pool2 = layers.MaxPool2D()(conv2_2)
+    conv2_2 = layers.Conv2D(96, 1, activation="relu")(conv2_1)
+    conv2_3 = layers.Conv2D(96, 1, activation="relu")(conv2_2)
+    conv2_4 = layers.Conv2D(96, 3, padding="same", activation="relu")(conv2_3)
+    conv2_5 = layers.Conv2D(96, 1, activation="relu")(conv2_4)
+    conv2_6 = layers.Conv2D(96, 1, activation="relu")(conv2_5)
+    pool2 = layers.MaxPool2D()(conv2_6)
 
     conv3_1 = layers.Conv2D(192, 3, padding="same", activation="relu")(pool2)
     conv3_2 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_1)
