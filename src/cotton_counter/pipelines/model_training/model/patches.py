@@ -6,6 +6,7 @@ Utilities for handling input patching.
 from typing import Tuple
 
 import tensorflow as tf
+import tensorflow.keras.backend as K
 from loguru import logger
 
 
@@ -147,6 +148,7 @@ def extract_standard_patches(
 
     # Determine the patch spacing.
     num_patches_1_dim = int(1.0 / patch_scale)
+    num_patches = num_patches_1_dim ** 2
     logger.debug("Using {} patches on each side.", num_patches_1_dim)
 
     vertical_spacing = tf.linspace(
@@ -157,12 +159,11 @@ def extract_standard_patches(
     )
     # Combine them to get patch coordinates in frame fractions.
     patch_coords = _cartesian_product(vertical_spacing, horizontal_spacing)
-    num_patches = tf.shape(patch_coords)[0]
 
     # Resize everything so we extract every patch for every item in the batch.
     patch_coords = tf.tile(patch_coords, [batch_size, 1])
-    images = tf.tile(images, [num_patches, 1, 1, 1])
-    density_maps = tf.tile(density_maps, [num_patches, 1, 1, 1])
+    images = K.repeat_elements(images, rep=num_patches, axis=0)
+    density_maps = K.repeat_elements(density_maps, rep=num_patches, axis=0)
 
     # Extract all the patches.
     image_patches = _crop_image_batch(

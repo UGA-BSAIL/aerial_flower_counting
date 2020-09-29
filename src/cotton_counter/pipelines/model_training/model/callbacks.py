@@ -28,6 +28,7 @@ class LogDensityMaps(callbacks.Callback):
         dataset: tf.data.Dataset,
         log_period: int = 1,
         max_density_threshold: float = 0.02,
+        num_images_per_batch: int = 3,
     ):
         """
         Args:
@@ -38,6 +39,8 @@ class LogDensityMaps(callbacks.Callback):
             max_density_threshold: Density threshold to use for colorization.
                 Any pixel with this density or more will show up as the maximum
                 density color.
+            num_images_per_batch: Maximum number of images to log for each
+                batch in the dataset.
         """
         super().__init__()
 
@@ -48,6 +51,7 @@ class LogDensityMaps(callbacks.Callback):
         self.__dataset = dataset
         self.__log_period = log_period
         self.__density_threshold = max_density_threshold
+        self.__num_images_per_batch = num_images_per_batch
 
     def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         if epoch % self.__log_period != 0:
@@ -60,6 +64,13 @@ class LogDensityMaps(callbacks.Callback):
         ):
             # Generate predicted density maps.
             image_batch = tf.cast(image_batch["image"], tf.float32)
+            true_density_maps = target_batch["density_map"]
+            # Don't bother with images that we're not going to log anyway.
+            image_batch = image_batch[: self.__num_images_per_batch]
+            true_density_maps = true_density_maps[
+                : self.__num_images_per_batch
+            ]
+
             predictions = self.__model.predict_on_batch(image_batch)
             density_maps = predictions["density_map"]
 
@@ -71,7 +82,7 @@ class LogDensityMaps(callbacks.Callback):
             )
             true_density_vis = visualize_density_maps(
                 images=image_batch,
-                density_maps=target_batch["density_map"],
+                density_maps=true_density_maps,
                 max_density_threshold=self.__density_threshold,
             )
 
