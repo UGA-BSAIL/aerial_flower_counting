@@ -61,8 +61,8 @@ refined_learning_phases:
       decay_steps: 90
       t_mul: 2.0
       m_mul: 1.0
-      min_learning_rate: 0.000001
+      min_learning_rate: 1.0e-6
     momentum: 0.9
     density_map_loss_weight: 1.0
-    count_loss_weight: 1.0e-6
+    count_loss_weight: 1.0e-5
     num_epochs: 310
