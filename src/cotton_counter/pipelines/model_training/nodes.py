@@ -135,6 +135,7 @@ def create_model(
 
     num_classes = None
     if classify_counts:
+        logger.info("Using classification model.")
         num_classes = len(bucket_min_values)
     model = build_model(
         input_size=(patch_width, patch_height), num_classes=num_classes
@@ -158,13 +159,10 @@ def _make_losses(
         The loss dictionary that it created.
 
     """
-    losses = {"density_map": "mse"}
+    losses = {"density_map": "mse", "count": CountAccuracy()}
     if classify_counts:
         # Use cross-entropy for classification.
         losses["discrete_count"] = "sparse_categorical_crossentropy"
-    else:
-        # Use the standard regression loss.
-        losses["count"] = CountAccuracy()
 
     return losses
 
@@ -186,7 +184,7 @@ def _make_metrics(
 
     if classify_counts:
         # Add a standard accuracy metric for the classification.
-        metrics["discrete_count"] = "categorical_accuracy"
+        metrics["discrete_count"] = "sparse_categorical_accuracy"
 
     return metrics
 
@@ -248,6 +246,11 @@ def train_model(
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
 
+        # If not specified explicitly, the discrete count is ignored.
+        discrete_count_loss_weight = phase.get(
+            "discrete_count_loss_weight", 0.0
+        )
+
         optimizer = keras.optimizers.SGD(
             learning_rate=_make_learning_rate(phase["learning_rate"]),
             momentum=phase["momentum"],
@@ -259,6 +262,7 @@ def train_model(
             loss_weights={
                 "density_map": phase["density_map_loss_weight"],
                 "count": phase["count_loss_weight"],
+                "discrete_count": discrete_count_loss_weight,
             },
             metrics=_make_metrics(classify_counts=classify_counts),
         )

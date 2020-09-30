@@ -54,4 +54,4 @@ ml CUDA/10.0.130
 ml cuDNN/7.6.5.32-CUDA-10.0.130
 
 # Run the training.
-poetry run kedro run --pipeline model_training -e sapelo "$@"
+poetry run kedro run --pipeline model_training -e sapelo -e categorical "$@"

@@ -60,6 +60,10 @@ def create_pipeline(**kwargs: Any):
         max_density_threshold="params:max_density_threshold",
         classify_counts="params:classify_counts",
     )
+    # Common parameters shared by evaluation nodes.
+    eval_params = dict(
+        model="trained_model", classify_counts="params:classify_counts"
+    )
 
     # Training datasets should use random patches, but testing and validation
     # datasets shouldn't.
@@ -129,19 +133,19 @@ def create_pipeline(**kwargs: Any):
             # Evaluate model on all datasets.
             node(
                 evaluate_model,
-                dict(model="trained_model", eval_data="training_data",),
+                dict(eval_data="training_data", **eval_params),
                 "model_report_train",
                 tags={EVAL_TAG},
             ),
             node(
                 evaluate_model,
-                dict(model="trained_model", eval_data="testing_data",),
+                dict(eval_data="testing_data", **eval_params),
                 "model_report_test",
                 tags={EVAL_TAG},
             ),
             node(
                 evaluate_model,
-                dict(model="trained_model", eval_data="validation_data",),
+                dict(eval_data="validation_data", **eval_params),
                 "model_report_validate",
                 tags={EVAL_TAG},
             ),

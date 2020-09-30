@@ -162,9 +162,8 @@ def _add_counts(
         counts, bucket_min_values=bucket_min_values
     )
 
-    # Keras doesn't like 1D inputs, so add an extra dimension.
+    # Keras doesn't like 1D regression inputs, so add an extra dimension.
     counts = tf.expand_dims(counts, axis=1)
-    discrete_counts = tf.expand_dims(discrete_counts, axis=1)
 
     return (
         dict(image=images),
