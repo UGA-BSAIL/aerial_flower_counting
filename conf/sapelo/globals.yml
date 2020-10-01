@@ -1,4 +1,0 @@
-# Location of the output data directory.
-# We use separate input and output data directories on Sapelo so we can
-# easily track output from multiple jobs.
-output_data_dir: output_data

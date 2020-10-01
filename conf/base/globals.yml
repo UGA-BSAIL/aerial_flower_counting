@@ -1,4 +1,4 @@
 # Location of the output data directory.
-output_data_dir: data
+output_data_dir: output_data
 # Location of the log directory.
 log_dir: logs
