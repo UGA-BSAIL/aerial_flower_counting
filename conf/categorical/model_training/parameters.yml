@@ -1,3 +1,6 @@
+# Batch size to use for training.
+batch_size: 4
+
 # Whether we want to classify counts instead of regressing them.
 classify_counts: True
 # A list of the minimum count values that will go in each discrete
@@ -14,7 +17,7 @@ base_learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 90
+      decay_steps: 160
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.

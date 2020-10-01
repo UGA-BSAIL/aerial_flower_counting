@@ -12,7 +12,7 @@ import tensorflow.keras.optimizers.schedules as schedules
 from loguru import logger
 from tabulate import tabulate
 
-from .model.callbacks import LogDensityMaps
+from .model.callbacks import LogClassActivations, LogDensityMaps
 from .model.load_from_dataset import extract_model_input
 from .model.losses import CountAccuracy
 from .model.sa_net import build_model
@@ -189,17 +189,83 @@ def _make_metrics(
     return metrics
 
 
+def make_callbacks(
+    model: keras.Model,
+    *,
+    testing_data: tf.data.Dataset,
+    tensorboard_output_dir: str,
+    histogram_frequency: int,
+    visualization_period: int,
+    max_density_threshold: float,
+    bucket_min_values: List[float],
+    classify_counts: bool,
+) -> List[keras.callbacks.Callback]:
+    """
+    Creates callbacks to use when training the model.
+
+    Args:
+        model: The model to train.
+        testing_data: The `Dataset` containing pre-processed testing data.
+        tensorboard_output_dir: The directory to use for storing Tensorboard
+            logs.
+        histogram_frequency: Frequency at which to generate histograms for
+            Tensorboard output.
+        visualization_period: Period in epochs at which to generate density
+            map visualizations.
+        max_density_threshold: Density threshold to use for colorization.
+                Any pixel with this density or more will show up as the maximum
+                density color.
+        bucket_min_values: A list of the minimum count values that will go in
+            each discrete count bucket. Note that the highest bucket will
+            contain anything that falls between the largest minimum value and
+            infinity.
+        classify_counts: If true, will attempt to classify counts instead of
+            regressing them.
+
+    Returns:
+        The list of callbacks.
+
+    """
+    # Create a callback for storing Tensorboard logs.
+    log_dir = Path(tensorboard_output_dir) / datetime.now().isoformat()
+    logger.debug("Writing Tensorboard logs to {}.", log_dir)
+    tensorboard_callback = keras.callbacks.TensorBoard(
+        log_dir=log_dir, histogram_freq=histogram_frequency
+    )
+    callbacks = [tensorboard_callback]
+
+    if not classify_counts:
+        # Create a callback for saving density map visualizations.
+        density_map_callback = LogDensityMaps(
+            log_dir=log_dir / "density_map",
+            model=model,
+            dataset=testing_data,
+            log_period=visualization_period,
+            max_density_threshold=max_density_threshold,
+        )
+        callbacks.append(density_map_callback)
+    else:
+        # Create a callback for visualizing classification activations.
+        activation_callback = LogClassActivations(
+            log_dir=log_dir / "class_activations",
+            model=model,
+            dataset=testing_data,
+            log_period=visualization_period,
+            num_classes=len(bucket_min_values),
+        )
+        callbacks.append(activation_callback)
+
+    return callbacks
+
+
 def train_model(
     model: keras.Model,
     *,
     training_data: tf.data.Dataset,
     testing_data: tf.data.Dataset,
     learning_phases: List[Dict[str, Any]],
-    tensorboard_output_dir: str,
-    histogram_frequency: int,
-    visualization_period: int,
-    max_density_threshold: float,
     classify_counts: bool,
+    callbacks: List[keras.callbacks.Callback] = [],
 ) -> keras.Model:
     """
     Trains a model.
@@ -210,38 +276,14 @@ def train_model(
         testing_data: The `Dataset` containing pre-processed testing data.
         learning_phases: List of hyperparameter configurations for each training
             stage, in order.
-        tensorboard_output_dir: The directory to use for storing Tensorboard
-            logs.
-        histogram_frequency: Frequency at which to generate histograms for
-            Tensorboard output.
-        visualization_period: Period in epochs at which to generate density
-            map visualizations.
-        max_density_threshold: Density threshold to use for colorization.
-                Any pixel with this density or more will show up as the maximum
-                density color.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
+        callbacks: The callbacks to use when training.
 
     Returns:
         The trained model.
 
     """
-    # Create a callback for storing Tensorboard logs.
-    log_dir = Path(tensorboard_output_dir) / datetime.now().isoformat()
-    logger.debug("Writing Tensorboard logs to {}.", log_dir)
-    tensorboard_callback = keras.callbacks.TensorBoard(
-        log_dir=log_dir, histogram_freq=histogram_frequency
-    )
-
-    # Create a callback for saving density map visualizations.
-    density_map_callback = LogDensityMaps(
-        log_dir=log_dir / "density_map",
-        model=model,
-        dataset=testing_data,
-        log_period=visualization_period,
-        max_density_threshold=max_density_threshold,
-    )
-
     for phase in learning_phases:
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
@@ -270,7 +312,7 @@ def train_model(
             training_data,
             validation_data=testing_data,
             epochs=phase["num_epochs"],
-            callbacks=[tensorboard_callback, density_map_callback],
+            callbacks=callbacks,
         )
 
     return model

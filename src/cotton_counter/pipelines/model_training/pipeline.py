@@ -11,6 +11,7 @@ from kedro.pipeline import Pipeline, node
 from .nodes import (
     create_model,
     evaluate_model,
+    make_callbacks,
     pre_process_dataset,
     train_model,
 )
@@ -54,11 +55,8 @@ def create_pipeline(**kwargs: Any):
     training_params = dict(
         training_data="training_data",
         testing_data="testing_data",
-        tensorboard_output_dir="params:tensorboard_output_dir",
-        histogram_frequency="params:histogram_frequency",
-        visualization_period="params:visualization_period",
-        max_density_threshold="params:max_density_threshold",
         classify_counts="params:classify_counts",
+        callbacks="callbacks",
     )
     # Common parameters shared by evaluation nodes.
     eval_params = dict(
@@ -107,6 +105,21 @@ def create_pipeline(**kwargs: Any):
                 ),
                 "initial_model",
                 tags={INITIAL_TRAIN_TAG},
+            ),
+            # Create the callbacks to use.
+            node(
+                make_callbacks,
+                dict(
+                    model="initial_model",
+                    testing_data="testing_data",
+                    tensorboard_output_dir="params:tensorboard_output_dir",
+                    histogram_frequency="params:histogram_frequency",
+                    visualization_period="params:visualization_period",
+                    max_density_threshold="params:max_density_threshold",
+                    bucket_min_values="params:bucket_min_values",
+                    classify_counts="params:classify_counts",
+                ),
+                "callbacks",
             ),
             # Train initially with just the density map loss.
             node(

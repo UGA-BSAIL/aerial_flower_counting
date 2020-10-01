@@ -11,6 +11,11 @@ validation_data:
   type: MemoryDataSet
   copy_mode: assign
 
+# Callbacks to use for training.
+callbacks:
+  type: MemoryDataSet
+  copy_mode: assign
+
 # Initial untrained model. We don't bother saving this to the disk.
 initial_model:
   type: MemoryDataSet
