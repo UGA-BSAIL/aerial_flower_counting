@@ -10,6 +10,7 @@ import tensorflow.keras.backend as K
 import tensorflow.keras.layers as layers
 from loguru import logger
 
+from ..model.layers import MlpConv
 from ..type_helpers import Vector2I
 
 
@@ -57,38 +58,28 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
     norm1_2 = layers.BatchNormalization()(conv1_2)
     pool1 = layers.MaxPool2D()(norm1_2)
 
-    conv2_1 = layers.Conv2D(96, 3, padding="same", activation="relu")(pool1)
-    conv2_2 = layers.Conv2D(96, 1, activation="relu")(conv2_1)
-    conv2_3 = layers.Conv2D(96, 1, activation="relu")(conv2_2)
-    norm2_1 = layers.BatchNormalization()(conv2_3)
-    conv2_4 = layers.Conv2D(96, 3, padding="same", activation="relu")(norm2_1)
-    conv2_5 = layers.Conv2D(96, 1, activation="relu")(conv2_4)
-    conv2_6 = layers.Conv2D(96, 1, activation="relu")(conv2_5)
-    norm2_2 = layers.BatchNormalization()(conv2_6)
+    conv2_1 = MlpConv(96, 3, padding="same", activation="relu")(pool1)
+    norm2_1 = layers.BatchNormalization()(conv2_1)
+    conv2_2 = MlpConv(96, 3, padding="same", activation="relu")(norm2_1)
+    norm2_2 = layers.BatchNormalization()(conv2_2)
     pool2 = layers.MaxPool2D()(norm2_2)
 
-    conv3_1 = layers.Conv2D(192, 3, padding="same", activation="relu")(pool2)
-    conv3_2 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_1)
-    conv3_3 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_2)
-    norm3_1 = layers.BatchNormalization()(conv3_3)
-    conv3_4 = layers.Conv2D(192, 3, padding="same", activation="relu")(norm3_1)
-    conv3_5 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_4)
-    conv3_6 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_5)
-    norm3_2 = layers.BatchNormalization()(conv3_6)
-    conv3_7 = layers.Conv2D(192, 3, padding="same", activation="relu")(norm3_2)
-    conv3_8 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_7)
-    conv3_9 = layers.Conv2D(192, 1, padding="same", activation="relu")(conv3_8)
-    norm3_3 = layers.BatchNormalization()(conv3_9)
-    pool3 = layers.MaxPool2D()(norm3_3)
+    conv3_1 = MlpConv(192, 3, padding="same", activation="relu")(pool2)
+    norm3_1 = layers.BatchNormalization()(conv3_1)
+    conv3_2 = MlpConv(192, 3, padding="same", activation="relu")(norm3_1)
+    norm3_2 = layers.BatchNormalization()(conv3_2)
+    conv3_3 = MlpConv(192, 3, padding="same", activation="relu")(norm3_2)
+    norm3_3 = layers.BatchNormalization()(conv3_3)
+    conv3_4 = MlpConv(192, 3, padding="same", activation="relu")(norm3_3)
+    norm3_4 = layers.BatchNormalization()(conv3_4)
+    pool3 = layers.MaxPool2D()(norm3_4)
 
-    conv4_1 = layers.Conv2D(384, 3, padding="same", activation="relu")(pool3)
-    conv4_2 = layers.Conv2D(384, 1, activation="relu")(conv4_1)
-    conv4_3 = layers.Conv2D(384, 1, activation="relu")(conv4_2)
-    norm4_1 = layers.BatchNormalization()(conv4_3)
-    conv4_4 = layers.Conv2D(384, 3, padding="same", activation="relu")(norm4_1)
-    conv4_5 = layers.Conv2D(128, 1, activation="relu")(conv4_4)
-    conv4_6 = layers.Conv2D(128, 1, activation="relu")(conv4_5)
-    norm4_2 = layers.BatchNormalization()(conv4_6)
+    conv4_1 = MlpConv(384, 3, padding="same", activation="relu")(pool3)
+    norm4_1 = layers.BatchNormalization()(conv4_1)
+    conv4_2 = MlpConv(
+        384, 3, padding="same", activation="relu", num_mlp_neurons=128
+    )(norm4_1)
+    norm4_2 = layers.BatchNormalization()(conv4_2)
 
     return norm4_2
 

@@ -104,7 +104,7 @@ def create_pipeline(**kwargs: Any):
                     bucket_min_values="params:bucket_min_values",
                 ),
                 "initial_model",
-                tags={INITIAL_TRAIN_TAG},
+                tags={PRE_PROCESS_TAG},
             ),
             # Create the callbacks to use.
             node(
@@ -120,6 +120,7 @@ def create_pipeline(**kwargs: Any):
                     classify_counts="params:classify_counts",
                 ),
                 "callbacks",
+                tags={PRE_PROCESS_TAG},
             ),
             # Train initially with just the density map loss.
             node(
