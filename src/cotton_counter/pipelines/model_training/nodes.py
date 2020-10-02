@@ -311,6 +311,7 @@ def train_model(
         model.fit(
             training_data,
             validation_data=testing_data,
+            validation_steps=2,
             epochs=phase["num_epochs"],
             callbacks=callbacks,
         )

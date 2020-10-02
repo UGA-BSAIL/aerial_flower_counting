@@ -209,6 +209,13 @@ class LogClassActivations(_ImageLoggingCallback):
 
         self.__num_classes = num_classes
 
+        # Create a dummy model for extracting activations.
+        activation_layer = self._model.get_layer("activation_maps")
+        activation_output = activation_layer.get_output_at(0)
+        self.__extractor = tf.keras.Model(
+            inputs=self._model.inputs, outputs=[activation_output]
+        )
+
     def _log_batch(
         self,
         *,
@@ -218,17 +225,11 @@ class LogClassActivations(_ImageLoggingCallback):
         batch_num: int,
     ) -> None:
         image_batch = inputs["image"]
-
-        # Retrieve the activations.
-        activation_layer = self._model.get_layer("activation_maps")
-        activation_output = activation_layer.get_output_at(0)
-        extractor = tf.keras.Model(
-            inputs=self._model.inputs, outputs=[activation_output]
-        )
-        activations = extractor(inputs)
-
         # Don't bother with data that we're not going to log anyway.
         image_batch = self._truncate_batch(image_batch)
+
+        # Retrieve the activations.
+        activations = self.__extractor(image_batch)
         activations = self._truncate_batch(activations)
 
         # Generate the heatmaps for each class.
