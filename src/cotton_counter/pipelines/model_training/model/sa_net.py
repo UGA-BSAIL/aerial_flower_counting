@@ -140,14 +140,13 @@ def _build_count_classification_head(
         The layer representing the categorical count logits.
 
     """
-    count_conv_1 = layers.Conv2D(
-        num_classes, 1, activation="softmax", name="activation_maps"
-    )(model_top)
-    count_pool_1 = layers.GlobalAveragePooling2D(name="discrete_count")(
-        count_conv_1
+    count_conv_1 = layers.Conv2D(num_classes, 1, name="activation_maps")(
+        model_top
     )
+    count_pool_1 = layers.GlobalAveragePooling2D()(count_conv_1)
+    count_softmax = layers.Softmax(name="discrete_count")(count_pool_1)
 
-    return count_pool_1
+    return count_softmax
 
 
 def build_model(
