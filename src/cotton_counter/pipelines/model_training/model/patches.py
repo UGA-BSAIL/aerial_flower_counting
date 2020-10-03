@@ -160,17 +160,28 @@ def extract_standard_patches(
     # Combine them to get patch coordinates in frame fractions.
     patch_coords = _cartesian_product(vertical_spacing, horizontal_spacing)
 
-    # Resize everything so we extract every patch for every item in the batch.
-    patch_coords = tf.tile(patch_coords, [batch_size, 1])
-    images = K.repeat_elements(images, rep=num_patches, axis=0)
-    density_maps = K.repeat_elements(density_maps, rep=num_patches, axis=0)
+    # Crop each patch from each image in the batch.
+    image_patch_batches = []
+    density_patch_batches = []
+    for i in range(num_patches):
+        this_patch_coords = tf.expand_dims(patch_coords[i], axis=0)
+        # Expand so we can use it trivially with _crop_image_batch().
+        this_patch_coords = tf.tile(this_patch_coords, [batch_size, 1])
 
-    # Extract all the patches.
-    image_patches = _crop_image_batch(
-        images, corner_points=patch_coords, patch_scale=patch_scale
-    )
-    density_patches = _crop_image_batch(
-        density_maps, corner_points=patch_coords, patch_scale=patch_scale
-    )
+        image_patch_batch = _crop_image_batch(
+            images, corner_points=this_patch_coords, patch_scale=patch_scale
+        )
+        density_patch_batch = _crop_image_batch(
+            density_maps,
+            corner_points=this_patch_coords,
+            patch_scale=patch_scale,
+        )
+
+        image_patch_batches.append(image_patch_batch)
+        density_patch_batches.append(density_patch_batch)
+
+    # Stitch the patches back together.
+    image_patches = tf.concat(image_patch_batches, 0)
+    density_patches = tf.concat(density_patch_batches, 0)
 
     return tf.data.Dataset.from_tensor_slices((image_patches, density_patches))
