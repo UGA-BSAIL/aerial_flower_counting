@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Union
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.callbacks as callbacks
+import tensorflow.keras.layers as layers
 from loguru import logger
 
 from ..type_helpers import DatasetOutput
@@ -212,8 +213,12 @@ class LogClassActivations(_ImageLoggingCallback):
         # Create a dummy model for extracting activations.
         activation_layer = self._model.get_layer("activation_maps")
         activation_output = activation_layer.get_output_at(0)
+        # This output will go through softmax after global average pooling
+        # anyway, so applying softmax here should give us a reasonable
+        # visualization of the activation.
+        activation_softmax = layers.Softmax()(activation_output)
         self.__extractor = tf.keras.Model(
-            inputs=self._model.inputs, outputs=[activation_output]
+            inputs=self._model.inputs, outputs=[activation_softmax]
         )
 
     def _log_batch(
