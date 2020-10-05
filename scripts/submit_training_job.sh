@@ -53,5 +53,9 @@ ml Python/3.7.4-GCCcore-8.3.0
 ml CUDA/10.0.130
 ml cuDNN/7.6.5.32-CUDA-10.0.130
 
+# Set this for deterministic runs. For more info, see
+# https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development
+export PYTHONHASHSEED=0
+
 # Run the training.
 poetry run kedro run --pipeline model_training -e sapelo -e categorical "$@"

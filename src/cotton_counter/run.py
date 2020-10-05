@@ -2,9 +2,12 @@
 Application entry point.
 """
 
+import random
 from pathlib import Path
 from typing import Dict
 
+import numpy as np
+import tensorflow as tf
 from kedro.framework.context import KedroContext, load_package_context
 from kedro.pipeline import Pipeline
 
@@ -29,7 +32,20 @@ class ProjectContext(KedroContext):
         return create_pipelines()
 
 
+def _set_seeds() -> None:
+    """
+    Sets deterministic seeds for random number generation to make multiple
+    runs more deterministic.
+
+    """
+    np.random.seed(1337)
+    random.seed(1337)
+    tf.random.set_seed(1337)
+
+
 def run_package():
+    _set_seeds()
+
     # Entry point for running a Kedro project packaged with `kedro package`
     # using `python -m <project_package>.run` command.
     project_context = load_package_context(
