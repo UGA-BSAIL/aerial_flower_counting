@@ -17,10 +17,10 @@ def _mse(
         true: The true values.
         predicted: The predicted values.
         normalize: If true, the squares will be divided by the true values
-            before taking the mean.
+            before taking the mean, effectively making this the NSE.
 
     Returns:
-        The normalized MSE value for the entire batch.
+        The MSE value for the entire batch.
 
     """
 
@@ -49,6 +49,7 @@ class CountAccuracy(losses.Loss):
     def call(
         self, true_count: tf.Tensor, predicted_count: tf.Tensor
     ) -> tf.Tensor:
+        true_count = tf.cast(true_count, tf.float32)
         true_non_zero_mask = true_count > tf.constant(0.001)
         true_non_zero = true_count[true_non_zero_mask]
         predicted_non_zero = predicted_count[true_non_zero_mask]

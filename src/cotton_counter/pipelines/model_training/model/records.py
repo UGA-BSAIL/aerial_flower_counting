@@ -6,13 +6,13 @@ Represents model input and output data in a standard form.
 import tensorflow as tf
 from pydantic.dataclasses import dataclass
 
-from ..type_helpers import ArbitraryTypesConfig
+from ..type_helpers import ArbitraryTypesConfig, MaybeRaggedTensor
 
 
-@dataclass(frozen=True, config=ArbitraryTypesConfig)
+@dataclass(config=ArbitraryTypesConfig)
 class Annotations:
     """
-    Represents annotations for a batch.
+    Represents annotations for a set of images.
 
     Attributes:
         frame_numbers: The vector of frame numbers in the batch.
@@ -20,9 +20,9 @@ class Annotations:
         y_values: The vector of y-values for the annotations.
     """
 
-    frame_numbers: tf.RaggedTensor
-    x_values: tf.RaggedTensor
-    y_values: tf.RaggedTensor
+    frame_numbers: MaybeRaggedTensor
+    x_values: MaybeRaggedTensor
+    y_values: MaybeRaggedTensor
 
 
 @dataclass(frozen=True, config=ArbitraryTypesConfig)

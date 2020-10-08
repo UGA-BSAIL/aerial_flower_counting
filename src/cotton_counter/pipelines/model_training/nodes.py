@@ -59,6 +59,8 @@ def pre_process_dataset(
     num_prefetch_batches: int,
     allow_randomized: bool,
     bucket_min_values: List[float],
+    balance_counts: bool = False,
+    balanced_dataset_size: int = 0,
 ) -> tf.data.Dataset:
     """
     Generates the `Datasets` containing pre-processed data to use for
@@ -85,12 +87,21 @@ def pre_process_dataset(
             each discrete count bucket. Note that the highest bucket will
             contain anything that falls between the largest minimum value and
             infinity.
+        balance_counts: Whether we want to try to balance the distribution of
+            counts through oversampling.
+        balanced_dataset_size: The size to use for our oversampled dataset if
+            that is enabled. Ideally, this should be >= the size of the
+            original dataset.
 
     Returns:
        A new `Dataset` containing pre-processed data that is ready to use as
        model input.
 
     """
+    use_balanced_size = None
+    if balance_counts:
+        use_balanced_size = balanced_dataset_size
+
     extraction_kwargs = dict(
         map_shape=(map_height, map_width),
         sigma=sigma,
@@ -100,6 +111,7 @@ def pre_process_dataset(
         patch_scale=patch_scale,
         random_patches=allow_randomized,
         shuffle=allow_randomized,
+        balanced_size=use_balanced_size,
     )
     return extract_model_input(raw_dataset, **extraction_kwargs)
 

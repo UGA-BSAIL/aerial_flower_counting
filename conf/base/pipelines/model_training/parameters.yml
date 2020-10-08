@@ -4,7 +4,8 @@ input_height: 3456
 # The scale factor to apply for the patches we extract.
 patch_scale: 0.25
 
-# The shape of the density maps to use.
+# The shape of the density maps to use. Note that this is derived only from the input
+# dimensions, and the effects of patching are ignored.
 # (These are derived from the expected input dimensions, down-sampled by a factor of 8).
 density_map_width: 576
 density_map_height: 432
@@ -33,6 +34,12 @@ classify_counts: False
 # count bucket. Note that the highest bucket will contain anything
 # that falls between the largest minimum value and infinity.
 bucket_min_values: []
+# Whether we want to try to balance the distribution of counts
+# through oversampling our training dataset.
+balance_counts: False
+# The size to use for our oversampled dataset if that is enabled.
+# Ideally, this should be >= the size of the original dataset.
+balanced_dataset_size: 0
 
 # Learning phases to use for training the base model.
 base_learning_phases:

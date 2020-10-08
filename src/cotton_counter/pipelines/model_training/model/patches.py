@@ -3,11 +3,10 @@ Utilities for handling input patching.
 """
 
 
-from typing import Tuple
-
 import tensorflow as tf
-import tensorflow.keras.backend as K
 from loguru import logger
+
+from .records import Annotations
 
 
 def _crop_image_batch(
@@ -20,7 +19,7 @@ def _crop_image_batch(
     Args:
         images: The batch of images, of the shape (N, height, width, channels).
         corner_points: The top left corner points for each crop, of the shape
-            (N, 2).
+            (N, 2). The column order should be x, y.
         patch_scale: The scaling factor to use for the extracted patches. (It
             will maintain the same aspect ratio.)
 
@@ -38,12 +37,11 @@ def _crop_image_batch(
     )
     patch_shape_pixels = tf.cast(patch_shape_pixels, tf.int32)
 
-    # Acceptable pixel values for the corner points are chosen to make sure that
-    # the final patches aren't out-of-bounds.
-    max_corner_pixels = single_image_shape - patch_shape_pixels
+    # Corner points are in the form (w, h) so we reverse them to get (h, w).
+    corner_points = corner_points[:, ::-1]
     # Convert to pixels.
     corner_points_pixels = corner_points * tf.cast(
-        max_corner_pixels, tf.float32
+        single_image_shape, tf.float32
     )
     corner_points_pixels = tf.cast(corner_points_pixels, tf.int32)
 
@@ -67,37 +65,130 @@ def _crop_image_batch(
     )
 
 
-def extract_random_patches(
-    *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
-) -> Tuple[tf.Tensor, tf.Tensor]:
+def _get_annotations_in_box(
+    annotations: Annotations, *, top_left: tf.Tensor, bottom_right: tf.Tensor,
+) -> Annotations:
     """
-    Extracts random patches from an image batch with the equivalent random
-    patches the density maps.
+    Extracts only the 2D points from an array that are within a specific
+    bounding box.
 
     Args:
-        images: The batch of images to extract the patch from.
-        density_maps: The corresponding batch of density maps.
+        annotations: The annotations that we are filtering.
+        top_left: The top left point of the bounding box.
+        bottom_right: The bottom right point of the bounding box.
+
+    Returns:
+        New annotations that are within the bounding box.
+
+    """
+    # Convert annotations to a matrix for easy comparison.
+    points = tf.stack((annotations.x_values, annotations.y_values), axis=1)
+
+    # Make masks for all conditions.
+    x_y_not_too_low = points >= top_left
+    x_y_not_too_high = points <= bottom_right
+
+    # Convert to vectors, where all coordinates have to be valid for the
+    # whole point to be valid.
+    x_y_not_too_low = tf.reduce_all(x_y_not_too_low, axis=1)
+    x_y_not_too_high = tf.reduce_all(x_y_not_too_high, axis=1)
+    # Finally, the points are only valid if all conditions are true.
+    points_valid = tf.math.logical_and(x_y_not_too_low, x_y_not_too_high)
+
+    # Mask out the invalid points.
+    new_x = tf.boolean_mask(annotations.x_values, points_valid)
+    new_y = tf.boolean_mask(annotations.y_values, points_valid)
+    new_frames = tf.boolean_mask(annotations.frame_numbers, points_valid)
+
+    return Annotations(
+        x_values=new_x, y_values=new_y, frame_numbers=new_frames
+    )
+
+
+def _extract_specific_patch(
+    image: tf.Tensor,
+    *,
+    annotations: Annotations,
+    top_left: tf.Tensor,
+    patch_scale: float,
+) -> tf.data.Dataset:
+    """
+    Extracts a specific patch from a single image.
+
+    Args:
+        image: The image to extract the patch from.
+        annotations: The corresponding annotations for the image. The
+            annotations that fall within this patch will be extracted.
+        top_left: The top left point of the patch bounding box.
         patch_scale: The scaling factor to use for the extracted patches. (It
             will maintain the same aspect ratio.)
 
     Returns:
-        The extracted patches from the image and density map.
+        The extracted patch from the image and the annotations that fall
+        within it, as a new dataset. The new dataset will have an "image" key,
+        containing the extracted patch, as well as "annotation_x",
+        "annotation_y", and "frame_numbers" keys for the annotations.
 
     """
-    image_shape = tf.shape(images)
-    batch_size = image_shape[0]
+    # Extract only the annotations that are within the patches.
+    annotations_within = _get_annotations_in_box(
+        annotations,
+        top_left=top_left[0],
+        bottom_right=top_left[0] + patch_scale,
+    )
 
+    # Re-reference the annotations to the patch instead of the full image.
+    annotations_within.x_values -= top_left[0][0]
+    annotations_within.y_values -= top_left[0][1]
+    annotations_within.x_values /= patch_scale
+    annotations_within.y_values /= patch_scale
+
+    # Perform the crop.
+    image_expanded = tf.expand_dims(image, axis=0)
+    image_patch = _crop_image_batch(
+        image_expanded, corner_points=top_left, patch_scale=patch_scale
+    )[0]
+    return tf.data.Dataset.from_tensors(
+        dict(
+            image=image_patch,
+            annotation_x=annotations_within.x_values,
+            annotation_y=annotations_within.y_values,
+            frame_numbers=annotations_within.frame_numbers,
+        )
+    )
+
+
+def extract_random_patch(
+    *, image: tf.Tensor, annotations: Annotations, patch_scale: float
+) -> tf.data.Dataset:
+    """
+    Extracts a random patch from an image, as well as the corresponding
+    annotations that fall within that patch.
+
+    Args:
+        image: The image to extract the patch from.
+        annotations: The corresponding annotation points for the image.
+        patch_scale: The scaling factor to use for the extracted patches. (It
+            will maintain the same aspect ratio.)
+
+    Returns:
+        The extracted patch from the image and the annotations that fall
+        within it, as a new dataset. The new dataset will have an "image" key,
+        containing the extracted patch, as well as "annotation_x",
+        "annotation_y", and "frame_numbers" keys for the annotations.
+
+    """
     # Determine corner points for the patches in terms of frame fractions.
-    corner_points = tf.random.uniform((batch_size, 2), name="random_patch")
+    top_left = tf.random.uniform((1, 2), name="random_patch")
+    # Make sure we can't go off the edge of the frame.
+    top_left *= 1.0 - patch_scale
 
-    # Perform the crops.
-    image_patches = _crop_image_batch(
-        images, corner_points=corner_points, patch_scale=patch_scale
+    return _extract_specific_patch(
+        image,
+        annotations=annotations,
+        top_left=top_left,
+        patch_scale=patch_scale,
     )
-    density_patches = _crop_image_batch(
-        density_maps, corner_points=corner_points, patch_scale=patch_scale
-    )
-    return image_patches, density_patches
 
 
 def _cartesian_product(a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
@@ -123,7 +214,7 @@ def _cartesian_product(a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
 
 
 def extract_standard_patches(
-    *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
+    *, image: tf.Tensor, annotations: Annotations, patch_scale: float
 ) -> tf.data.Dataset:
     """
     Extracts a standard set of patches from an image batch with the
@@ -132,8 +223,8 @@ def extract_standard_patches(
     different runs.
 
     Args:
-        images: The batch of images to extract patches from.
-        density_maps: The corresponding batch of density maps.
+        image: The image to extract the patches from.
+        annotations: The corresponding annotation points for the image.
         patch_scale: The scaling factor to use for the extracted patches. (It
             will maintain the same aspect ratio.)
 
@@ -143,45 +234,30 @@ def extract_standard_patches(
         that of the input.
 
     """
-    image_shape = tf.shape(images)
-    batch_size = image_shape[0]
-
     # Determine the patch spacing.
     num_patches_1_dim = int(1.0 / patch_scale)
     num_patches = num_patches_1_dim ** 2
     logger.debug("Using {} patches on each side.", num_patches_1_dim)
 
-    vertical_spacing = tf.linspace(
-        tf.constant(0.0), tf.constant(1.0), num_patches_1_dim
-    )
-    horizontal_spacing = tf.linspace(
-        tf.constant(0.0), tf.constant(1.0), num_patches_1_dim
+    spacing_1d = tf.linspace(
+        tf.constant(0.0), tf.constant(1.0 - patch_scale), num_patches_1_dim
     )
     # Combine them to get patch coordinates in frame fractions.
-    patch_coords = _cartesian_product(vertical_spacing, horizontal_spacing)
+    patch_coords = _cartesian_product(spacing_1d, spacing_1d)
 
     # Crop each patch from each image in the batch.
-    image_patch_batches = []
-    density_patch_batches = []
+    patch_datasets = []
     for i in range(num_patches):
         this_patch_coords = tf.expand_dims(patch_coords[i], axis=0)
-        # Expand so we can use it trivially with _crop_image_batch().
-        this_patch_coords = tf.tile(this_patch_coords, [batch_size, 1])
 
-        image_patch_batch = _crop_image_batch(
-            images, corner_points=this_patch_coords, patch_scale=patch_scale
-        )
-        density_patch_batch = _crop_image_batch(
-            density_maps,
-            corner_points=this_patch_coords,
+        patch_dataset = _extract_specific_patch(
+            image,
+            annotations=annotations,
+            top_left=this_patch_coords,
             patch_scale=patch_scale,
         )
+        patch_datasets.append(patch_dataset)
 
-        image_patch_batches.append(image_patch_batch)
-        density_patch_batches.append(density_patch_batch)
-
-    # Stitch the patches back together.
-    image_patches = tf.concat(image_patch_batches, 0)
-    density_patches = tf.concat(density_patch_batches, 0)
-
-    return tf.data.Dataset.from_tensor_slices((image_patches, density_patches))
+    # Combine the datasets for each patch into a single one.
+    choices = tf.data.Dataset.range(len(patch_datasets))
+    return tf.data.experimental.choose_from_datasets(patch_datasets, choices)

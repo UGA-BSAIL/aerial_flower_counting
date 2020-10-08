@@ -3,7 +3,8 @@ Layer that creates density maps from a set of annotations.
 """
 
 
-from typing import Iterable, Tuple
+from functools import singledispatch
+from typing import Any, Iterable, NoReturn, Tuple, Union
 
 import tensorflow as tf
 from loguru import logger
@@ -13,7 +14,9 @@ from .filters import gaussian_blur
 from .records import Annotations
 
 
-def _normalize_frame_numbers(frame_numbers: tf.Tensor) -> tf.Tensor:
+def _normalize_frame_numbers(
+    frame_numbers: tf.Tensor, skip_indices: tf.Tensor = tf.constant([])
+) -> tf.Tensor:
     """
     The frame numbers provided with the annotations are essentially arbitrary
     IDs. However, when creating density maps, we want to be able to use them
@@ -29,11 +32,16 @@ def _normalize_frame_numbers(frame_numbers: tf.Tensor) -> tf.Tensor:
 
     Args:
         frame_numbers: The raw frame numbers to normalize.
+        skip_indices: An optional 1D tensor specifying a list of normalized
+            values that should be skipped in our output. This is primarily
+            useful for handling frames that have no annotations.
 
     Returns:
         The normalized frame numbers.
 
     """
+    frame_numbers = tf.cast(frame_numbers, tf.int64)
+    skip_indices = tf.cast(skip_indices, tf.int64)
 
     def map_to_normal(
         frame_index: tf.Tensor,
@@ -63,11 +71,25 @@ def _normalize_frame_numbers(frame_numbers: tf.Tensor) -> tf.Tensor:
             false_fn=lambda: normed_value + tf.constant(1, dtype=tf.int64),
         )
 
-        return (
-            frame_index + tf.constant(1),
-            next_normed,
-            next_frame_num,
-            tf.concat([normed_so_far, [next_normed]], 0),
+        should_skip = tf.reduce_any(tf.equal(skip_indices, next_normed))
+        return tf.cond(
+            should_skip,
+            # If this index should be skipped, we run another iteration of
+            # the loop without modifying anything but the normed value.
+            true_fn=lambda: (
+                frame_index,
+                next_normed,
+                last_frame_num,
+                normed_so_far,
+            ),
+            # Otherwise, we update the state variables as normal and move on
+            # to the next frame number.
+            false_fn=lambda: (
+                frame_index + tf.constant(1),
+                next_normed,
+                next_frame_num,
+                tf.concat([normed_so_far, [next_normed]], 0),
+            ),
         )
 
     # Set initial values for the loop variables.
@@ -84,7 +106,7 @@ def _normalize_frame_numbers(frame_numbers: tf.Tensor) -> tf.Tensor:
         tf.TensorShape([None]),
     )
 
-    num_annotations = tf.shape(frame_numbers)[0]
+    num_annotations = tf.size(frame_numbers)
 
     _, _, _, normed_frame_nums = tf.while_loop(
         lambda i, _1, _2, _3: i < num_annotations,
@@ -118,28 +140,55 @@ def _flatten_annotations(
     return flat_annotations
 
 
+@singledispatch
 def _make_point_annotation_maps(
-    annotations: Annotations, *, map_shape: Vector2I
-) -> tf.Tensor:
+    x_values: Any,
+    y_values: Any,
+    frame_numbers: Any,
+    *,
+    map_shape: Vector2I,
+    batch_size: tf.Tensor,
+) -> NoReturn:
     """
     Converts a set of sparse point annotations into images where each
     annotation is notated by a pixel with the value 1. All other pixels will
     be zeroed.
 
+    It works with both normal and ragged tensors as input. If the former,
+    it expects the input to be 1D. If the latter, it expects it to be 2D,
+    with the first dimension being the batch.
+
     Args:
-        annotations: The sparse annotations.
+        x_values: The x-coordinates of the annotations.
+        y_values: The y-coordinates of the annotations.
+        frame_numbers: The corresponding frame numbers of the annotations.
         map_shape: The shape of the output density maps to generate, in the
             form (height, width). The samples dimension will be inferred.
+        batch_size: The size of the batch of images that we are creating
+            annotations for.
 
     Returns:
         A corresponding tensor of dense annotation maps, of shape
         (samples, height, width, 1).
 
     """
-    # Flatten the annotations.
-    x_values, y_values, frame_numbers = _flatten_annotations(
-        (annotations.x_values, annotations.y_values, annotations.frame_numbers)
+    raise NotImplementedError(
+        f"_make_point_annotation_maps() is not implemented for input of type "
+        f"{type(x_values)}."
     )
+
+
+@_make_point_annotation_maps.register
+def _(
+    x_values: tf.Tensor,
+    y_values: tf.Tensor,
+    frame_numbers: tf.Tensor,
+    *,
+    map_shape: Vector2I,
+    batch_size: tf.Tensor,
+) -> tf.Tensor:
+    batch_size = tf.ensure_shape(batch_size, ())
+    batch_size = tf.cast(batch_size, tf.int64)
 
     # Quantize the annotations to convert from frame fractions to actual
     # pixel values.
@@ -153,15 +202,13 @@ def _make_point_annotation_maps(
     pixel_annotations_x = tf.cast(pixel_annotations_x, tf.dtypes.int64)
     pixel_annotations_y = tf.cast(pixel_annotations_y, tf.dtypes.int64)
     # Combine into one matrix.
-    normed_frame_nums = _normalize_frame_numbers(frame_numbers)
     pixel_annotations = tf.stack(
-        [normed_frame_nums, pixel_annotations_y, pixel_annotations_x], axis=1
+        [frame_numbers, pixel_annotations_y, pixel_annotations_x], axis=1
     )
 
     # Compute the total number of samples (frames).
-    num_frames = normed_frame_nums[-1] + 1
     map_shape_with_samples = tf.stack(
-        [num_frames, map_height, map_width], axis=0,
+        [batch_size, map_height, map_width], axis=0,
     )
 
     # Generate the output maps.
@@ -185,16 +232,93 @@ def _make_point_annotation_maps(
     return tf.expand_dims(dense, 3)
 
 
-def make_density_maps(
-    annotations: Annotations, *, map_shape: Vector2I, sigma: float
+@_make_point_annotation_maps.register
+def _(
+    x_values: tf.RaggedTensor,
+    y_values: tf.RaggedTensor,
+    frame_numbers: tf.RaggedTensor,
+    *,
+    map_shape: Vector2I,
+    batch_size: tf.Tensor,
+) -> tf.Tensor:
+    # Flatten the annotations.
+    x_values, y_values, frame_numbers = _flatten_annotations(
+        (x_values, y_values, frame_numbers)
+    )
+
+    # The frame numbers must be normalized going into this function. In order
+    # for that to work, we need to specify which frames should be blank, which
+    # should correspond to any row with no annotations.
+    row_lengths = frame_numbers.row_lengths()
+    empty_rows_mask = tf.equal(row_lengths, 0)
+    empty_row_indices = tf.range(tf.size(empty_rows_mask))[empty_rows_mask]
+    normed_frame_nums = _normalize_frame_numbers(
+        frame_numbers, skip_indices=empty_row_indices
+    )
+
+    return _make_point_annotation_maps(
+        x_values,
+        y_values,
+        normed_frame_nums,
+        map_shape=map_shape,
+        batch_size=batch_size,
+    )
+
+
+def make_density_map(
+    annotations_x: tf.Tensor,
+    annotations_y: tf.Tensor,
+    *,
+    map_shape: Vector2I,
+    sigma: float,
 ) -> tf.Tensor:
     """
-    Creates a set of density maps from a set of annotations.
+    Creates a set of density maps from a set of annotations for a single frame.
+
+    Args:
+        annotations_x: A 1D tensor of the x-values of the annotation points.
+        annotations_y: A 1D tensor of the y-values of the annotation points.
+        map_shape: The shape of the output density maps to generate, in the
+            form (height, width). The samples dimension will be inferred.
+        sigma:
+            The standard deviation in pixels to use for the applied gaussian
+            filter.
+
+    Returns:
+        A tensor containing density maps, of the shape
+        (height, width, 1)
+
+    """
+    # Our frame numbers are all going to be the same, since we only have one
+    # image.
+    frame_numbers = tf.zeros_like(annotations_x, dtype=tf.int64)
+
+    annotations = Annotations(
+        x_values=annotations_x,
+        y_values=annotations_y,
+        frame_numbers=frame_numbers,
+    )
+    return make_density_maps_batch(
+        annotations, map_shape=map_shape, sigma=sigma, batch_size=1
+    )[0]
+
+
+def make_density_maps_batch(
+    annotations: Annotations,
+    *,
+    map_shape: Vector2I,
+    batch_size: Union[tf.Tensor, int],
+    sigma: float,
+) -> tf.Tensor:
+    """
+    Creates a set of density maps from a set of annotations for a batch of
+    images.
 
     Args:
         annotations: The sparse annotations.
         map_shape: The shape of the output density maps to generate, in the
             form (height, width). The samples dimension will be inferred.
+        batch_size: The size of the batch that we are creating annotations for.
         sigma:
             The standard deviation in pixels to use for the applied gaussian
             filter.
@@ -204,6 +328,8 @@ def make_density_maps(
         (samples, height, width, 1)
 
     """
+    batch_size = tf.convert_to_tensor(batch_size)
+
     # Compute our filter size so that it's odd and has sigma pixels on either
     # side.
     kernel_size = int(1 + 6 * sigma)
@@ -211,7 +337,11 @@ def make_density_maps(
 
     # Obtain initial point annotations.
     dense_annotations = _make_point_annotation_maps(
-        annotations, map_shape=map_shape
+        annotations.x_values,
+        annotations.y_values,
+        annotations.frame_numbers,
+        map_shape=map_shape,
+        batch_size=batch_size,
     )
 
     return gaussian_blur(

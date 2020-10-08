@@ -77,7 +77,12 @@ def create_pipeline(**kwargs: Any):
             # Pre-process the data.
             node(
                 pre_process_node_training,
-                dict(raw_dataset="tfrecord_train", **pre_process_params),
+                dict(
+                    raw_dataset="tfrecord_train",
+                    balance_counts="params:balance_counts",
+                    balanced_dataset_size="params:balanced_dataset_size",
+                    **pre_process_params
+                ),
                 "training_data",
                 tags={PRE_PROCESS_TAG},
             ),

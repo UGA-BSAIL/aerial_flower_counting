@@ -15,6 +15,10 @@ DatasetOutput = Union[tf.Tensor, Collection[tf.Tensor], Dict[str, tf.Tensor]]
 """
 Represents the type of objects that can be produced by `tf.data.Dataset`.
 """
+MaybeRaggedTensor = Union[tf.Tensor, tf.RaggedTensor]
+"""
+Represents the type of a potentially ragged Tensor.
+"""
 
 
 class ArbitraryTypesConfig:
