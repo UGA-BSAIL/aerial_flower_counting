@@ -14,6 +14,7 @@ from ..type_helpers import Vector2I
 from .density_maps import make_density_map
 from .patches import extract_random_patch, extract_standard_patches
 from .records import Annotations
+from .resampling import balance_distribution
 
 _FEATURE_DESCRIPTION = {
     "image": tf.io.FixedLenFeature([1], tf.dtypes.string),
@@ -252,23 +253,19 @@ def _balance_dataset(
         computed count and discrete count values.
 
     """
-    # Filter into separate datasets based on the density category.
-    category_datasets = []
-    for i in range(len(bucket_min_values)):
-        single_density_data = features_with_counts.filter(
-            lambda f: f["discrete_count"] == i
-        )
-        category_datasets.append(single_density_data)
+    # The basic method here is rather simple: We repeat the input dataset
+    # infinitely and simply use rejection resampling until we reach our
+    # desired dataset size.
+    infinite_features = features_with_counts.repeat()
 
-    # Make an infinite dataset that samples each category evenly.
-    infinite_category_datasets = [d.repeat() for d in category_datasets]
-    sampled_dataset = tf.data.experimental.sample_from_datasets(
-        infinite_category_datasets
+    # Create the rejection resampling transformation.
+    resampled_features = balance_distribution(
+        infinite_features,
+        classify=lambda f: f["discrete_count"],
+        num_classes=len(bucket_min_values),
     )
-    # Limit it to the size we specified.
-    sampled_dataset = sampled_dataset.take(dataset_size)
 
-    return sampled_dataset
+    return resampled_features.take(dataset_size)
 
 
 def _extract_from_feature_dict(

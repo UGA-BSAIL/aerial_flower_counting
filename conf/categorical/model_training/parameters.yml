@@ -15,7 +15,7 @@ bucket_min_values: [0.0, 1.0]
 balance_counts: true
 # The size to use for our oversampled dataset if that is enabled.
 # Ideally, this should be >= the size of the original dataset.
-balanced_dataset_size: 120
+balanced_dataset_size: 80
 
 # Learning phases to use for training the base model.
 base_learning_phases:
@@ -26,7 +26,7 @@ base_learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 40
+      decay_steps: 50
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
