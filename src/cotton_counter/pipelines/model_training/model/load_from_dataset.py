@@ -4,6 +4,7 @@ Tensorflow `Dataset`.
 """
 
 from functools import partial
+from multiprocessing import cpu_count
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -25,6 +26,9 @@ _FEATURE_DESCRIPTION = {
 """
 Descriptions of the features found in our dataset.
 """
+
+
+NUM_THREADS = cpu_count()
 
 
 def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
@@ -125,7 +129,7 @@ def _transform_to_patches(
         )
 
     return feature_dataset.interleave(
-        patch_extractor, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        patch_extractor, num_parallel_calls=NUM_THREADS
     )
 
 
@@ -326,7 +330,7 @@ def _extract_from_feature_dict(
         return feature_dict
 
     features_with_counts = feature_dataset.map(
-        add_counts, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        add_counts, num_parallel_calls=NUM_THREADS
     )
 
     # Stage 2: Balance the dataset if necessary.
@@ -356,7 +360,7 @@ def _extract_from_feature_dict(
         return dict(density_map=density_map, **feature_dict)
 
     features_counts_density = features_with_counts.map(
-        add_density_maps, num_parallel_calls=tf.data.experimental.AUTOTUNE
+        add_density_maps, num_parallel_calls=NUM_THREADS
     )
 
     def split_inputs_and_targets(
@@ -383,8 +387,7 @@ def _extract_from_feature_dict(
         return inputs, targets
 
     with_correct_schema = features_counts_density.map(
-        split_inputs_and_targets,
-        num_parallel_calls=tf.data.experimental.AUTOTUNE,
+        split_inputs_and_targets, num_parallel_calls=NUM_THREADS,
     )
 
     return with_correct_schema.batch(batch_size)
@@ -443,7 +446,9 @@ def extract_model_input(
     logger.debug("Using patched map shape of {}.", map_shape)
 
     # Deserialize it.
-    feature_dataset = raw_dataset.map(_parse_example)
+    feature_dataset = raw_dataset.map(
+        _parse_example, num_parallel_calls=NUM_THREADS
+    )
 
     # Shuffle the data so we get different batches every time.
     if shuffle:

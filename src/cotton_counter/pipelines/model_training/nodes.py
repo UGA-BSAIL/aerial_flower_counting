@@ -171,7 +171,7 @@ def _make_losses(
         The loss dictionary that it created.
 
     """
-    losses = {"density_map": "mse", "count": CountAccuracy()}
+    losses = {"density_map": "mse", "count": "mean_absolute_error"}
     if classify_counts:
         # Use cross-entropy for classification.
         losses["discrete_count"] = "sparse_categorical_crossentropy"
