@@ -9,7 +9,7 @@ classify_counts: true
 # A list of the minimum count values that will go in each discrete
 # count bucket. Note that the highest bucket will contain anything
 # that falls between the largest minimum value and infinity.
-bucket_min_values: [0.0, 1.0]
+bucket_min_values: [0.0, 1.0, 2.0]
 # Whether we want to try to balance the distribution of counts
 # through oversampling our training dataset.
 balance_counts: true
