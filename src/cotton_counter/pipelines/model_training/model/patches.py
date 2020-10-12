@@ -3,11 +3,13 @@ Utilities for handling input patching.
 """
 
 
+from multiprocessing import cpu_count
 from typing import Tuple
 
 import tensorflow as tf
-import tensorflow.keras.backend as K
 from loguru import logger
+
+_NUM_THREADS = cpu_count()
 
 
 def _crop_image_batch(
@@ -64,6 +66,7 @@ def _crop_image_batch(
             crop_width_px,
         ),
         dtype=images.dtype,
+        parallel_iterations=_NUM_THREADS,
     )
 
 

@@ -57,6 +57,7 @@ def create_pipeline(**kwargs: Any):
         testing_data="testing_data",
         classify_counts="params:classify_counts",
         callbacks="callbacks",
+        validation_frequency="params:validation_frequency",
     )
     # Common parameters shared by evaluation nodes.
     eval_params = dict(

@@ -4,6 +4,7 @@ Tensorflow `Dataset`.
 """
 
 import functools
+from multiprocessing import cpu_count
 from typing import Dict, List, Tuple
 
 import tensorflow as tf
@@ -23,6 +24,8 @@ _FEATURE_DESCRIPTION = {
 Descriptions of the features found in our dataset.
 """
 
+_NUM_THREADS = cpu_count()
+
 
 def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
     """
@@ -37,7 +40,10 @@ def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
     """
     # This is going to have a batch dimension, so we need to map it.
     return tf.map_fn(
-        lambda j: tf.io.decode_jpeg(j[0]), jpeg_batch, dtype=tf.dtypes.uint8,
+        lambda j: tf.io.decode_jpeg(j[0]),
+        jpeg_batch,
+        dtype=tf.dtypes.uint8,
+        parallel_iterations=_NUM_THREADS,
     )
 
 
@@ -217,7 +223,9 @@ def extract_model_input(
 
     """
     # Deserialize it.
-    feature_dataset = raw_dataset.map(_parse_example)
+    feature_dataset = raw_dataset.map(
+        _parse_example, num_parallel_calls=_NUM_THREADS
+    )
 
     # Shuffle the data so we get different batches every time.
     if shuffle:
@@ -230,20 +238,24 @@ def extract_model_input(
     density_dataset = batched.map(
         functools.partial(
             _load_from_feature_dict, map_shape=map_shape, sigma=sigma
-        )
+        ),
+        num_parallel_calls=_NUM_THREADS,
     )
     # Extract patches.
     if random_patches:
         patched_dataset = density_dataset.map(
             lambda i, d: extract_random_patches(
                 images=i, density_maps=d, patch_scale=patch_scale
-            )
+            ),
+            num_parallel_calls=_NUM_THREADS,
         )
     else:
-        patched_dataset = density_dataset.flat_map(
+        patched_dataset = density_dataset.interleave(
             lambda i, d: extract_standard_patches(
                 images=i, density_maps=d, patch_scale=patch_scale
-            )
+            ),
+            cycle_length=_NUM_THREADS,
+            num_parallel_calls=_NUM_THREADS,
         )
         # This effectively removed the batching, so we need to re-batch.
         patched_dataset = patched_dataset.batch(batch_size)
@@ -251,7 +263,8 @@ def extract_model_input(
     patches_with_counts = patched_dataset.map(
         lambda i, d: _add_counts(
             images=i, density_maps=d, bucket_min_values=bucket_min_values
-        )
+        ),
+        num_parallel_calls=_NUM_THREADS,
     )
 
     # Prefetch the batches.

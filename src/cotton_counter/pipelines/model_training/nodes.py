@@ -266,6 +266,7 @@ def train_model(
     learning_phases: List[Dict[str, Any]],
     classify_counts: bool,
     callbacks: List[keras.callbacks.Callback] = [],
+    validation_frequency: int,
 ) -> keras.Model:
     """
     Trains a model.
@@ -279,6 +280,8 @@ def train_model(
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
         callbacks: The callbacks to use when training.
+        validation_frequency: Number of training epochs after which to run
+            validation.
 
     Returns:
         The trained model.
@@ -311,9 +314,9 @@ def train_model(
         model.fit(
             training_data,
             validation_data=testing_data,
-            validation_steps=2,
             epochs=phase["num_epochs"],
             callbacks=callbacks,
+            validation_freq=validation_frequency,
         )
 
     return model
