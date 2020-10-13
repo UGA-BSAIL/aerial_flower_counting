@@ -4,6 +4,11 @@ patch_scale: 0.125
 # Batch size to use for training.
 batch_size: 16
 
+# Frequency at which to generate histograms for Tensorboard output.
+histogram_frequency: 1
+# Every time this many epochs elapse, it will generate new density map visualizations.
+visualization_period: 6
+
 # Whether we want to classify counts instead of regressing them.
 classify_counts: True
 # A list of the minimum count values that will go in each discrete
@@ -37,7 +42,7 @@ base_learning_phases:
     # The loss weight for count categorization.
     discrete_count_loss_weight: 1.0
     # Number of epochs to train for in this phase.
-    num_epochs: 70
+    num_epochs: 30
 
 # Learning phases to use for training the refined model.
 refined_learning_phases: []
