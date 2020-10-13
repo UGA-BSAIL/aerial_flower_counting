@@ -8,6 +8,7 @@ from multiprocessing import cpu_count
 from typing import Dict, List, Tuple
 
 import tensorflow as tf
+from loguru import logger
 
 from ..type_helpers import Vector2I
 from .density_maps import make_density_maps
@@ -181,6 +182,33 @@ def _add_counts(
     )
 
 
+def _repeat_patches(
+    dataset: tf.data.Dataset, *, patch_scale: float
+) -> tf.data.Dataset:
+    """
+    Repeats a dataset to account for the increased number of items due to
+    patching. The intuition behind this is that patches effectively increase
+    the size of the dataset by a certain amount, so what we're calling an
+    "epoch" should be longer to account for the various patch permutations.
+
+    Args:
+        dataset: The dataset that we want to repeat.
+        patch_scale: The patch scale that we used when extracting patches.
+
+    Returns:
+        The repeated dataset.
+
+    """
+    # Figure out how many times to repeat.
+    num_patches_1d = int(1.0 / patch_scale)
+    num_patches_2d = num_patches_1d ** 2
+    logger.debug(
+        "Repeating dataset {} times to account for patches.", num_patches_2d
+    )
+
+    return dataset.repeat(num_patches_2d)
+
+
 def extract_model_input(
     raw_dataset: tf.data.Dataset,
     *,
@@ -267,5 +295,11 @@ def extract_model_input(
         num_parallel_calls=_NUM_THREADS,
     )
 
+    if random_patches:
+        # For random patches, repeat the dataset to account for the large
+        # number of possible patches.
+        patches_with_counts = _repeat_patches(
+            patches_with_counts, patch_scale=patch_scale
+        )
     # Prefetch the batches.
     return patches_with_counts.prefetch(num_prefetch_batches)

@@ -20,7 +20,8 @@ base_learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 40
+      # (320 steps per epoch)
+      decay_steps: 3200
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
@@ -36,7 +37,7 @@ base_learning_phases:
     # The loss weight for count categorization.
     discrete_count_loss_weight: 1.0
     # Number of epochs to train for in this phase.
-    num_epochs: 630
+    num_epochs: 70
 
 # Learning phases to use for training the refined model.
 refined_learning_phases: []
