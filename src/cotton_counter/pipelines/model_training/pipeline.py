@@ -20,13 +20,9 @@ PRE_PROCESS_TAG = "pre_process"
 """
 Marks nodes that are part of the pre-processing steps.
 """
-INITIAL_TRAIN_TAG = "initial_train"
+TRAIN_TAG = "train_tag"
 """
-Marks nodes that are part of the initial training phase.
-"""
-FINE_TUNING_TAG = "fine_tuning"
-"""
-Marks nodes that are part of the fine-tuning phase.
+Marks nodes that are part of the training phase.
 """
 EVAL_TAG = "evaluation"
 """
@@ -124,27 +120,16 @@ def create_pipeline(**kwargs: Any):
                 "callbacks",
                 tags={PRE_PROCESS_TAG},
             ),
-            # Train initially with just the density map loss.
+            # Train the model.
             node(
                 train_model,
                 dict(
                     model="initial_model",
-                    learning_phases="params:base_learning_phases",
-                    **training_params
-                ),
-                "base_model",
-                tags={INITIAL_TRAIN_TAG},
-            ),
-            # Train again with the count loss as well.
-            node(
-                train_model,
-                dict(
-                    model="base_model",
-                    learning_phases="params:refined_learning_phases",
+                    learning_phases="params:learning_phases",
                     **training_params
                 ),
                 "trained_model",
-                tags={FINE_TUNING_TAG},
+                tags={TRAIN_TAG},
             ),
             # Evaluate model on all datasets.
             node(

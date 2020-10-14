@@ -16,8 +16,8 @@ classify_counts: True
 # that falls between the largest minimum value and infinity.
 bucket_min_values: [0.0, 1.0]
 
-# Learning phases to use for training the base model.
-base_learning_phases:
+# Learning phases to use for training the model.
+learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
@@ -43,7 +43,3 @@ base_learning_phases:
     discrete_count_loss_weight: 1.0
     # Number of epochs to train for in this phase.
     num_epochs: 30
-
-# Learning phases to use for training the refined model.
-refined_learning_phases: []
-# No additional phases for now...

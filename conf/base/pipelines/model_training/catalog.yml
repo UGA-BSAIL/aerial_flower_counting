@@ -30,11 +30,6 @@ _model_args: &model_args
     save_format: h5
   versioned: True
 
-# Saved model, produced after training with only the density map loss.
-base_model:
-  filepath: data/06_models/base_trained.hd5
-  << : *model_args
-
 # Saved model, produced at the end of training.
 trained_model:
   filepath: ${output_data_dir}/06_models/fully_trained.hd5
