@@ -58,6 +58,7 @@ def create_pipeline(**kwargs: Any):
         classify_counts="params:classify_counts",
         callbacks="callbacks",
         validation_frequency="params:validation_frequency",
+        tensorboard_output_dir="params:tensorboard_output_dir",
     )
     # Common parameters shared by evaluation nodes.
     eval_params = dict(

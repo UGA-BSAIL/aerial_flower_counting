@@ -16,10 +16,11 @@ from .model.callbacks import LogClassActivations, LogDensityMaps
 from .model.load_from_dataset import extract_model_input
 from .model.losses import CountAccuracy
 from .model.sa_net import build_model
+from .model.schedules import LoggingWrapper
 
 
 def _make_learning_rate(
-    config: Dict[str, Any]
+    config: Dict[str, Any], *, log_dir: Path
 ) -> Union[float, schedules.LearningRateSchedule]:
     """
     Creates the learning rate to use for optimization, based on the user
@@ -27,6 +28,8 @@ def _make_learning_rate(
 
     Args:
         config: The configuration for the learning rate.
+        log_dir: The location that we want to write
+            tensorboard logs to.
 
     Returns:
         Either a float for a fixed learning rate, or a `LearningRateSchedule`.
@@ -39,13 +42,17 @@ def _make_learning_rate(
         return initial_rate
 
     logger.debug("Using decaying learning rate.")
-    return keras.experimental.CosineDecayRestarts(
+    schedule = keras.experimental.CosineDecayRestarts(
         initial_rate,
         config["decay_steps"],
         t_mul=config["t_mul"],
         m_mul=config["m_mul"],
         alpha=config["min_learning_rate"],
     )
+
+    # Create a new directory for Tensorboard logs.
+    schedule_log_dir = log_dir / "learning_rate"
+    return LoggingWrapper(schedule, log_dir=schedule_log_dir)
 
 
 def pre_process_dataset(
@@ -267,6 +274,7 @@ def train_model(
     classify_counts: bool,
     callbacks: List[keras.callbacks.Callback] = [],
     validation_frequency: int,
+    tensorboard_output_dir: str,
 ) -> keras.Model:
     """
     Trains a model.
@@ -282,6 +290,8 @@ def train_model(
         callbacks: The callbacks to use when training.
         validation_frequency: Number of training epochs after which to run
             validation.
+        tensorboard_output_dir: The directory to use for storing Tensorboard
+            logs.
 
     Returns:
         The trained model.
@@ -297,7 +307,9 @@ def train_model(
         )
 
         optimizer = keras.optimizers.SGD(
-            learning_rate=_make_learning_rate(phase["learning_rate"]),
+            learning_rate=_make_learning_rate(
+                phase["learning_rate"], log_dir=Path(tensorboard_output_dir)
+            ),
             momentum=phase["momentum"],
             nesterov=True,
         )
