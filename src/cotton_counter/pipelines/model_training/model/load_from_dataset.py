@@ -182,6 +182,67 @@ def _add_counts(
     )
 
 
+def _extract_patches(
+    image_dataset: tf.data.Dataset,
+    *,
+    patch_scale: float,
+    random_patches: bool,
+    batch_size: int,
+    image_shape: Vector2I,
+    map_shape: Vector2I,
+) -> tf.data.Dataset:
+    """
+    Extracts patches from input images and density maps.
+
+    Args:
+        image_dataset: An input dataset where each element contains a raw image
+            and a corresponding density map.
+        patch_scale: Scale of the patches to extract from each image.
+        random_patches: Whether to extract random patches from the input. If
+            false, it will instead extract a set of standardized patches.
+        batch_size: The size of the batches in the input dataset.
+        image_shape: The shape of the input images, in the form
+            (height, width).
+        map_shape: The shape of the output density maps to generate, in the
+            form (height, width).
+
+    Returns:
+        A new dataset containing the patches from the raw images and density
+        maps.
+
+    """
+    # Compute full static shapes for each batch. (We can't specify the batch
+    # size statically because the last one might be smaller.)
+    full_image_shape = (None,) + image_shape + (3,)
+    full_density_shape = (None,) + map_shape + (1,)
+    images_with_shapes = image_dataset.map(
+        lambda i, d: (
+            tf.ensure_shape(i, full_image_shape),
+            tf.ensure_shape(d, full_density_shape),
+        )
+    )
+
+    if random_patches:
+        patched_dataset = images_with_shapes.map(
+            lambda i, d: extract_random_patches(
+                images=i, density_maps=d, patch_scale=patch_scale
+            ),
+            num_parallel_calls=_NUM_THREADS,
+        )
+    else:
+        patched_dataset = images_with_shapes.interleave(
+            lambda i, d: extract_standard_patches(
+                images=i, density_maps=d, patch_scale=patch_scale
+            ),
+            cycle_length=_NUM_THREADS,
+            num_parallel_calls=_NUM_THREADS,
+        )
+        # This effectively removed the batching, so we need to re-batch.
+        patched_dataset = patched_dataset.batch(batch_size)
+
+    return patched_dataset
+
+
 def _repeat_patches(
     dataset: tf.data.Dataset, *, patch_scale: float
 ) -> tf.data.Dataset:
@@ -212,6 +273,7 @@ def _repeat_patches(
 def extract_model_input(
     raw_dataset: tf.data.Dataset,
     *,
+    image_shape: Vector2I,
     map_shape: Vector2I,
     sigma: float,
     bucket_min_values: List[float],
@@ -227,6 +289,8 @@ def extract_model_input(
 
     Args:
         raw_dataset: The raw dataset, containing serialized data.
+        image_shape: The shape of the input images, in the form
+            (height, width).
         map_shape: The shape of the output density maps to generate, in the
             form (height, width). The samples dimension will be inferred.
         sigma:
@@ -270,23 +334,14 @@ def extract_model_input(
         num_parallel_calls=_NUM_THREADS,
     )
     # Extract patches.
-    if random_patches:
-        patched_dataset = density_dataset.map(
-            lambda i, d: extract_random_patches(
-                images=i, density_maps=d, patch_scale=patch_scale
-            ),
-            num_parallel_calls=_NUM_THREADS,
-        )
-    else:
-        patched_dataset = density_dataset.interleave(
-            lambda i, d: extract_standard_patches(
-                images=i, density_maps=d, patch_scale=patch_scale
-            ),
-            cycle_length=_NUM_THREADS,
-            num_parallel_calls=_NUM_THREADS,
-        )
-        # This effectively removed the batching, so we need to re-batch.
-        patched_dataset = patched_dataset.batch(batch_size)
+    patched_dataset = _extract_patches(
+        density_dataset,
+        patch_scale=patch_scale,
+        random_patches=random_patches,
+        batch_size=batch_size,
+        image_shape=image_shape,
+        map_shape=map_shape,
+    )
     # Compute total counts.
     patches_with_counts = patched_dataset.map(
         lambda i, d: _add_counts(

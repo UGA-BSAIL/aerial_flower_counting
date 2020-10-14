@@ -4,10 +4,11 @@ Utilities for handling input patching.
 
 
 from multiprocessing import cpu_count
-from typing import Tuple
+from typing import Optional, Tuple
 
+import numpy as np
 import tensorflow as tf
-from loguru import logger
+
 
 _NUM_THREADS = cpu_count()
 
@@ -70,6 +71,62 @@ def _crop_image_batch(
     )
 
 
+def _extract_patches(
+    images: tf.Tensor, *, patch_scale: float, patch_stride: float,
+) -> tf.Tensor:
+    """
+    Extracts a number of patches from each image in the input.
+
+    Args:
+        images: The images to extract patches from.
+        patch_scale: The scale factor for each patch, in frame fractions.
+        patch_stride: The stride for each patch, in frame fractions.
+
+    Returns:
+        A batch of all extracted patches.
+
+    """
+    # A static shape for the images must be available to use extract_patches.
+    image_shape = images.shape[1:]
+    if None in image_shape:
+        # We need this shape to be known at compile time.
+        raise ValueError(
+            f"The shape of the images to extract patches from "
+            f"must be known statically, but it is {image_shape}."
+        )
+    image_shape = np.array(image_shape)
+    image_size = image_shape[0:2]
+    image_channels = image_shape[2]
+
+    # Convert to pixels.
+    patch_scale_px = image_size * patch_scale
+    patch_scale_px = patch_scale_px.astype(np.int32)
+    patch_stride_px = image_size * patch_stride
+    patch_stride_px = patch_stride_px.astype(np.int32)
+
+    # Put into a form that we can use for patch extraction.
+    kernel_size = [1] + patch_scale_px.tolist() + [1]
+    kernel_strides = [1] + patch_stride_px.tolist() + [1]
+    # Perform the extraction.
+    flat_patches = tf.image.extract_patches(
+        images=images,
+        sizes=kernel_size,
+        strides=kernel_strides,
+        rates=[1, 1, 1, 1],
+        padding="VALID",
+    )
+
+    # Collapse the first three dimensions into a single index.
+    num_patch_pixels = tf.shape(flat_patches)[-1]
+    flat_patches = tf.reshape(flat_patches, (-1, num_patch_pixels))
+    # The patches are flattened in the last dimension, so as a last step we
+    # expand them into their own batch.
+    return tf.reshape(
+        flat_patches,
+        (-1, patch_scale_px[0], patch_scale_px[1], image_channels),
+    )
+
+
 def extract_random_patches(
     *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
 ) -> Tuple[tf.Tensor, tf.Tensor]:
@@ -103,30 +160,12 @@ def extract_random_patches(
     return image_patches, density_patches
 
 
-def _cartesian_product(a: tf.Tensor, b: tf.Tensor) -> tf.Tensor:
-    """
-    Computes the cartesian product of 2 1D tensors. Taken from this SO answer:
-    https://stackoverflow.com/a/47133461
-
-    Args:
-        a: The first 1D tensor.
-        b: The second 1D tensor.
-
-    Returns:
-        A 2D tensor containing the cartesian product.
-
-    """
-    tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0]])
-    tile_a = tf.expand_dims(tile_a, 2)
-    tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1])
-    tile_b = tf.expand_dims(tile_b, 2)
-
-    product = tf.concat([tile_a, tile_b], axis=2)
-    return tf.reshape(product, [-1, 2])
-
-
 def extract_standard_patches(
-    *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
+    *,
+    images: tf.Tensor,
+    density_maps: tf.Tensor,
+    patch_scale: float,
+    patch_stride: Optional[float] = None,
 ) -> tf.data.Dataset:
     """
     Extracts a standard set of patches from an image batch with the
@@ -135,10 +174,17 @@ def extract_standard_patches(
     different runs.
 
     Args:
-        images: The batch of images to extract patches from.
-        density_maps: The corresponding batch of density maps.
+        images: The batch of images to extract patches from. Note that `images`
+            must have a static shape defined for all dimensions except the
+            batch.
+        density_maps: The corresponding batch of density maps. Note that
+            `density_maps` must have a static shape defined for all
+            dimensions except the batch.
         patch_scale: The scaling factor to use for the extracted patches. (It
             will maintain the same aspect ratio.)
+        patch_stride: The stride to use when sampling patches. By default,
+            this is the same as the scale, but if you want overlapping
+            patches, you can set it to a smaller number.
 
     Returns:
         The extracted patches from the image and density map, as a new Dataset.
@@ -146,45 +192,15 @@ def extract_standard_patches(
         that of the input.
 
     """
-    image_shape = tf.shape(images)
-    batch_size = image_shape[0]
+    if patch_stride is None:
+        # Use non-overlapping patches by default.
+        patch_stride = patch_scale
 
-    # Determine the patch spacing.
-    num_patches_1_dim = int(1.0 / patch_scale)
-    num_patches = num_patches_1_dim ** 2
-    logger.debug("Using {} patches on each side.", num_patches_1_dim)
-
-    vertical_spacing = tf.linspace(
-        tf.constant(0.0), tf.constant(1.0), num_patches_1_dim
+    image_patches = _extract_patches(
+        images, patch_scale=patch_scale, patch_stride=patch_stride
     )
-    horizontal_spacing = tf.linspace(
-        tf.constant(0.0), tf.constant(1.0), num_patches_1_dim
+    density_patches = _extract_patches(
+        density_maps, patch_scale=patch_scale, patch_stride=patch_stride
     )
-    # Combine them to get patch coordinates in frame fractions.
-    patch_coords = _cartesian_product(vertical_spacing, horizontal_spacing)
-
-    # Crop each patch from each image in the batch.
-    image_patch_batches = []
-    density_patch_batches = []
-    for i in range(num_patches):
-        this_patch_coords = tf.expand_dims(patch_coords[i], axis=0)
-        # Expand so we can use it trivially with _crop_image_batch().
-        this_patch_coords = tf.tile(this_patch_coords, [batch_size, 1])
-
-        image_patch_batch = _crop_image_batch(
-            images, corner_points=this_patch_coords, patch_scale=patch_scale
-        )
-        density_patch_batch = _crop_image_batch(
-            density_maps,
-            corner_points=this_patch_coords,
-            patch_scale=patch_scale,
-        )
-
-        image_patch_batches.append(image_patch_batch)
-        density_patch_batches.append(density_patch_batch)
-
-    # Stitch the patches back together.
-    image_patches = tf.concat(image_patch_batches, 0)
-    density_patches = tf.concat(density_patch_batches, 0)
 
     return tf.data.Dataset.from_tensor_slices((image_patches, density_patches))

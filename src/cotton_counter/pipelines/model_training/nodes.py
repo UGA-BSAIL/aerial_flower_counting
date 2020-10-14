@@ -59,6 +59,8 @@ def pre_process_dataset(
     raw_dataset: tf.data.Dataset,
     *,
     patch_scale: float,
+    input_height: int,
+    input_width: int,
     map_height: int,
     map_width: int,
     sigma: int,
@@ -75,6 +77,8 @@ def pre_process_dataset(
         raw_dataset: The `Dataset` containing raw data that needs to be
             converted to a form usable by the model.
         patch_scale: The scale factor to apply for the patches we extract.
+        input_height: The height of the raw input images.
+        input_width: The width of the raw input images.
         map_height: The height of the density maps to create, in px.
         map_width: The width of the density maps to created, ix px.
         sigma:
@@ -99,6 +103,7 @@ def pre_process_dataset(
 
     """
     extraction_kwargs = dict(
+        image_shape=(input_height, input_width),
         map_shape=(map_height, map_width),
         sigma=sigma,
         bucket_min_values=bucket_min_values,

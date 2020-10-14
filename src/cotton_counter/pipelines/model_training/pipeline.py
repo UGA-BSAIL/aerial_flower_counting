@@ -40,6 +40,8 @@ def create_pipeline(**kwargs: Any):
     # Common parameters shared by pre-processing nodes.
     pre_process_params = dict(
         patch_scale="params:patch_scale",
+        input_height="params:input_height",
+        input_width="params:input_width",
         map_height="params:density_map_height",
         map_width="params:density_map_width",
         sigma="params:density_map_sigma",
