@@ -97,6 +97,14 @@ version = "0.2.0"
 
 [[package]]
 category = "main"
+description = "cached_property() - computed once per instance, cached as attribute"
+name = "backports.cached-property"
+optional = false
+python-versions = ">=3.6.0"
+version = "1.0.0.post2"
+
+[[package]]
+category = "main"
 description = "Ultra-lightweight pure Python package to check if a file is binary or text."
 name = "binaryornot"
 optional = false
@@ -125,14 +133,6 @@ typed-ast = ">=1.4.0"
 
 [package.extras]
 d = ["aiohttp (>=3.3.2)", "aiohttp-cors"]
-
-[[package]]
-category = "main"
-description = "A decorator for caching properties in classes."
-name = "cached-property"
-optional = false
-python-versions = "*"
-version = "1.5.2"
 
 [[package]]
 category = "main"
@@ -1172,10 +1172,10 @@ description = ""
 name = "pycvat"
 optional = false
 python-versions = "~3.7"
-version = "0.3.0"
+version = "0.3.2"
 
 [package.dependencies]
-cached-property = "^1.5.1"
+"backports.cached-property" = "^1.0.0"
 datumaro = "tag v0.1.0"
 kedro = "^0.16.4"
 loguru = "^0.5.1"
@@ -1188,7 +1188,7 @@ pydantic = "^1.6.1"
 requests = "^2.24.0"
 
 [package.source]
-reference = "348f462ed6de1c5192b7f5c68b9bcddad77f51da"
+reference = "0ae4d99abbcf7d6dbd23a326f29363ecb17c0690"
 type = "git"
 url = "git@github.com:UGA-BSAIL/pycvat.git"
 [[package]]
@@ -1806,7 +1806,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pytest-cov", "jaraco.test (>=3.2.0)", "jaraco.itertools", "func-timeout", "pytest-black (>=0.3.7)", "pytest-mypy"]
 
 [metadata]
-content-hash = "8b75c2deaa5a8fffcad6bfce3ae75f7530626120fe944e9e56b61a926b1adb72"
+content-hash = "2f392ac013dde9bfbb235adffd24ab9a12b5509e84609f61438b90e0ada67117"
 lock-version = "1.0"
 python-versions = "~3.7"
 
@@ -1847,6 +1847,10 @@ backcall = [
     {file = "backcall-0.2.0-py2.py3-none-any.whl", hash = "sha256:fbbce6a29f263178a1f7915c1940bde0ec2b2a967566fe1c65c1dfb7422bd255"},
     {file = "backcall-0.2.0.tar.gz", hash = "sha256:5cbdbf27be5e7cfadb448baf0aa95508f91f2bbc6c6437cd9cd06e2a4c215e1e"},
 ]
+"backports.cached-property" = [
+    {file = "backports.cached-property-1.0.0.post2.tar.gz", hash = "sha256:74d525451ff39a069701ed81247e708498a387eeb35043070d008e1c25ed1b0c"},
+    {file = "backports.cached_property-1.0.0.post2-py3-none-any.whl", hash = "sha256:268eb9a5c6bb74d567038d574d7c2abfdadb481522ed8c5f230c13a898472673"},
+]
 binaryornot = [
     {file = "binaryornot-0.4.4-py2.py3-none-any.whl", hash = "sha256:b8b71173c917bddcd2c16070412e369c3ed7f0528926f70cac18a6c97fd563e4"},
     {file = "binaryornot-0.4.4.tar.gz", hash = "sha256:359501dfc9d40632edc9fac890e19542db1a287bbcfa58175b66658392018061"},
@@ -1854,10 +1858,6 @@ binaryornot = [
 black = [
     {file = "black-19.10b0-py36-none-any.whl", hash = "sha256:1b30e59be925fafc1ee4565e5e08abef6b03fe455102883820fe5ee2e4734e0b"},
     {file = "black-19.10b0.tar.gz", hash = "sha256:c2edb73a08e9e0e6f65a0e6af18b059b8b1cdd5bef997d7a0b181df93dc81539"},
-]
-cached-property = [
-    {file = "cached-property-1.5.2.tar.gz", hash = "sha256:9fa5755838eecbb2d234c3aa390bd80fbd3ac6b6869109bfc1b499f7bd89a130"},
-    {file = "cached_property-1.5.2-py2.py3-none-any.whl", hash = "sha256:df4f613cf7ad9a588cc381aaf4a512d26265ecebd5eb9e1ba12f1319eb85a6a0"},
 ]
 cachetools = [
     {file = "cachetools-4.1.1-py3-none-any.whl", hash = "sha256:513d4ff98dd27f85743a8dc0e92f55ddb1b49e060c2d5961512855cda2c01a98"},

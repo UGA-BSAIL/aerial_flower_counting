@@ -9,7 +9,7 @@ license = "MIT"
 python = "~3.7"
 # TODO (daniel) Switch to official Kedro release after my PR gets merged.
 kedro = {git = "https://github.com/djpetti/kedro.git", rev = "2e10246"}
-pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "348f462"}
+pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "0ae4d99a"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"

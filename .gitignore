@@ -155,3 +155,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# This is created by running jobs.
+output_data/
