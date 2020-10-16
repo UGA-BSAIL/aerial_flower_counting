@@ -3,6 +3,8 @@ Custom Keras losses.
 """
 
 
+from typing import Dict, Union
+
 import tensorflow as tf
 import tensorflow.keras.losses as losses
 
@@ -81,3 +83,24 @@ class SparseMse(losses.Loss):
         non_zero_loss = _mse(true_non_zero, predicted_non_zero)
 
         return non_zero_loss + zero_loss * tf.constant(1.0)
+
+
+def make_losses(
+    classify_counts: bool = False,
+) -> Dict[str, Union[str, losses.Loss]]:
+    """
+    Creates the loss dictionary to use when compiling a model.
+
+    Args:
+        classify_counts: Whether we are using the classification count output.
+
+    Returns:
+        The loss dictionary that it created.
+
+    """
+    loss_dict = {"density_map": "mse", "count": CountAccuracy()}
+    if classify_counts:
+        # Use cross-entropy for classification.
+        loss_dict["discrete_count"] = "sparse_categorical_crossentropy"
+
+    return loss_dict

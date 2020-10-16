@@ -58,4 +58,4 @@ ml cuDNN/7.6.5.32-CUDA-10.0.130
 export PYTHONHASHSEED=0
 
 # Run the training.
-poetry run kedro run --pipeline model_training -e sapelo -e categorical "$@"
+poetry run kedro run -e categorical "$@"

@@ -6,7 +6,7 @@ Represents model input and output data in a standard form.
 import tensorflow as tf
 from pydantic.dataclasses import dataclass
 
-from ..type_helpers import ArbitraryTypesConfig
+from src.cotton_counter.type_helpers import ArbitraryTypesConfig
 
 
 @dataclass(frozen=True, config=ArbitraryTypesConfig)

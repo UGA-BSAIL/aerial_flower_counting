@@ -8,7 +8,8 @@ from typing import Iterable, Tuple
 import tensorflow as tf
 from loguru import logger
 
-from ..type_helpers import Vector2I
+from src.cotton_counter.type_helpers import Vector2I
+
 from .filters import gaussian_blur
 from .records import Annotations
 

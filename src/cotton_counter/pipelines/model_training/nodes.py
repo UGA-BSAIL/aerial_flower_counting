@@ -10,13 +10,12 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.optimizers.schedules as schedules
 from loguru import logger
-from tabulate import tabulate
 
-from .model.callbacks import LogClassActivations, LogDensityMaps
-from .model.load_from_dataset import extract_model_input
-from .model.losses import CountAccuracy
-from .model.sa_net import build_model
-from .model.schedules import LoggingWrapper
+from ...model.callbacks import LogClassActivations, LogDensityMaps
+from ...model.losses import make_losses
+from ...model.metrics import make_metrics
+from ...model.sa_net import build_model
+from ...model.schedules import LoggingWrapper
 
 
 def _make_learning_rate(
@@ -53,67 +52,6 @@ def _make_learning_rate(
     # Create a new directory for Tensorboard logs.
     schedule_log_dir = log_dir / "learning_rate"
     return LoggingWrapper(schedule, log_dir=schedule_log_dir)
-
-
-def pre_process_dataset(
-    raw_dataset: tf.data.Dataset,
-    *,
-    patch_scale: float,
-    input_height: int,
-    input_width: int,
-    map_height: int,
-    map_width: int,
-    sigma: int,
-    batch_size: int,
-    num_prefetch_batches: int,
-    allow_randomized: bool,
-    bucket_min_values: List[float],
-) -> tf.data.Dataset:
-    """
-    Generates the `Datasets` containing pre-processed data to use for
-    training the model.
-
-    Args:
-        raw_dataset: The `Dataset` containing raw data that needs to be
-            converted to a form usable by the model.
-        patch_scale: The scale factor to apply for the patches we extract.
-        input_height: The height of the raw input images.
-        input_width: The width of the raw input images.
-        map_height: The height of the density maps to create, in px.
-        map_width: The width of the density maps to created, ix px.
-        sigma:
-            The standard deviation in pixels to use for the applied gaussian
-            filter.
-        batch_size: The size of the batches that we generate.
-        num_prefetch_batches: The number of batches to prefetch into memory.
-            Increasing this can increase performance at the expense of memory
-            usage.
-        allow_randomized: Whether to allow randomized transformations on this
-            dataset that make the output non-deterministic. This includes the
-            extraction of random patches as well as the random shuffling of
-            data.
-        bucket_min_values: A list of the minimum count values that will go in
-            each discrete count bucket. Note that the highest bucket will
-            contain anything that falls between the largest minimum value and
-            infinity.
-
-    Returns:
-       A new `Dataset` containing pre-processed data that is ready to use as
-       model input.
-
-    """
-    extraction_kwargs = dict(
-        image_shape=(input_height, input_width),
-        map_shape=(map_height, map_width),
-        sigma=sigma,
-        bucket_min_values=bucket_min_values,
-        batch_size=batch_size,
-        num_prefetch_batches=num_prefetch_batches,
-        patch_scale=patch_scale,
-        random_patches=allow_randomized,
-        shuffle=allow_randomized,
-    )
-    return extract_model_input(raw_dataset, **extraction_kwargs)
 
 
 def create_model(
@@ -156,49 +94,6 @@ def create_model(
     logger.info("Model has {} parameters.", model.count_params())
 
     return model
-
-
-def _make_losses(
-    classify_counts: bool = False,
-) -> Dict[str, Union[str, keras.losses.Loss]]:
-    """
-    Creates the loss dictionary to use when compiling a model.
-
-    Args:
-        classify_counts: Whether we are using the classification count output.
-
-    Returns:
-        The loss dictionary that it created.
-
-    """
-    losses = {"density_map": "mse", "count": CountAccuracy()}
-    if classify_counts:
-        # Use cross-entropy for classification.
-        losses["discrete_count"] = "sparse_categorical_crossentropy"
-
-    return losses
-
-
-def _make_metrics(
-    classify_counts: bool = False,
-) -> Dict[str, Union[str, keras.metrics.Metric]]:
-    """
-    Creates the metrics dictionary to use when compiling a model.
-
-    Args:
-        classify_counts: Whether we are using the classification count output.
-
-    Returns:
-        The metrics dictionary that it created.
-
-    """
-    metrics = {"count": "mean_absolute_error"}
-
-    if classify_counts:
-        # Add a standard accuracy metric for the classification.
-        metrics["discrete_count"] = "sparse_categorical_accuracy"
-
-    return metrics
 
 
 def make_callbacks(
@@ -320,13 +215,13 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss=_make_losses(classify_counts=classify_counts),
+            loss=make_losses(classify_counts=classify_counts),
             loss_weights={
                 "density_map": phase["density_map_loss_weight"],
                 "count": phase["count_loss_weight"],
                 "discrete_count": discrete_count_loss_weight,
             },
-            metrics=_make_metrics(classify_counts=classify_counts),
+            metrics=make_metrics(classify_counts=classify_counts),
         )
         model.fit(
             training_data,
@@ -337,35 +232,3 @@ def train_model(
         )
 
     return model
-
-
-def evaluate_model(
-    model: keras.Model, *, eval_data: tf.data.Dataset, classify_counts: bool
-) -> str:
-    """
-    Evaluates a model and generates a text report.
-
-    Args:
-        model: The model to evaluate.
-        eval_data: The data to evaluate the model on.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
-
-    Returns:
-        A human-readable report of the evaluation results.
-
-    """
-    model.compile(
-        loss=_make_losses(classify_counts=classify_counts),
-        metrics=_make_metrics(classify_counts=classify_counts),
-    )
-
-    # Evaluate the model.
-    results = model.evaluate(eval_data)
-
-    # Create the report.
-    table_rows = []
-    for metric_name, metric_value in zip(model.metrics_names, results):
-        table_rows.append((metric_name, metric_value))
-
-    return f"Evaluation Results:\n{tabulate(table_rows)}"

@@ -2,7 +2,7 @@
 Implements the SaNet model architecture.
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -10,8 +10,9 @@ import tensorflow.keras.backend as K
 import tensorflow.keras.layers as layers
 from loguru import logger
 
+from src.cotton_counter.type_helpers import Vector2I
+
 from ..model.layers import MlpConv
-from ..type_helpers import Vector2I
 
 
 def _build_image_input(*, input_size: Vector2I) -> keras.Input:

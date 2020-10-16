@@ -9,7 +9,6 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-
 _NUM_THREADS = cpu_count()
 
 
@@ -71,7 +70,40 @@ def _crop_image_batch(
     )
 
 
-def _extract_patches(
+def extract_random_patches(
+    *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
+) -> Tuple[tf.Tensor, tf.Tensor]:
+    """
+    Extracts random patches from an image batch with the equivalent random
+    patches the density maps.
+
+    Args:
+        images: The batch of images to extract the patch from.
+        density_maps: The corresponding batch of density maps.
+        patch_scale: The scaling factor to use for the extracted patches. (It
+            will maintain the same aspect ratio.)
+
+    Returns:
+        The extracted patches from the image and density map.
+
+    """
+    image_shape = tf.shape(images)
+    batch_size = image_shape[0]
+
+    # Determine corner points for the patches in terms of frame fractions.
+    corner_points = tf.random.uniform((batch_size, 2), name="random_patch")
+
+    # Perform the crops.
+    image_patches = _crop_image_batch(
+        images, corner_points=corner_points, patch_scale=patch_scale
+    )
+    density_patches = _crop_image_batch(
+        density_maps, corner_points=corner_points, patch_scale=patch_scale
+    )
+    return image_patches, density_patches
+
+
+def extract_standard_patches(
     images: tf.Tensor, *, patch_scale: float, patch_stride: float,
 ) -> tf.Tensor:
     """
@@ -127,40 +159,7 @@ def _extract_patches(
     )
 
 
-def extract_random_patches(
-    *, images: tf.Tensor, density_maps: tf.Tensor, patch_scale: float
-) -> Tuple[tf.Tensor, tf.Tensor]:
-    """
-    Extracts random patches from an image batch with the equivalent random
-    patches the density maps.
-
-    Args:
-        images: The batch of images to extract the patch from.
-        density_maps: The corresponding batch of density maps.
-        patch_scale: The scaling factor to use for the extracted patches. (It
-            will maintain the same aspect ratio.)
-
-    Returns:
-        The extracted patches from the image and density map.
-
-    """
-    image_shape = tf.shape(images)
-    batch_size = image_shape[0]
-
-    # Determine corner points for the patches in terms of frame fractions.
-    corner_points = tf.random.uniform((batch_size, 2), name="random_patch")
-
-    # Perform the crops.
-    image_patches = _crop_image_batch(
-        images, corner_points=corner_points, patch_scale=patch_scale
-    )
-    density_patches = _crop_image_batch(
-        density_maps, corner_points=corner_points, patch_scale=patch_scale
-    )
-    return image_patches, density_patches
-
-
-def extract_standard_patches(
+def extract_standard_patches_from_dataset(
     *,
     images: tf.Tensor,
     density_maps: tf.Tensor,
@@ -173,6 +172,10 @@ def extract_standard_patches(
     be used for evaluation so we can make a direct comparison between
     different runs.
 
+    This function is provided mostly as a convenience wrapper around
+    `extract_standard_patches`, and is meant to be used as a target for
+    `Dataset.flat_map()` or `Dataset.interleave()`.
+
     Args:
         images: The batch of images to extract patches from. Note that `images`
             must have a static shape defined for all dimensions except the
@@ -184,7 +187,7 @@ def extract_standard_patches(
             will maintain the same aspect ratio.)
         patch_stride: The stride to use when sampling patches. By default,
             this is the same as the scale, but if you want overlapping
-            patches, you can set it to a smaller number.
+            or dilated patches, you can set it to a different number.
 
     Returns:
         The extracted patches from the image and density map, as a new Dataset.
@@ -196,10 +199,10 @@ def extract_standard_patches(
         # Use non-overlapping patches by default.
         patch_stride = patch_scale
 
-    image_patches = _extract_patches(
+    image_patches = extract_standard_patches(
         images, patch_scale=patch_scale, patch_stride=patch_stride
     )
-    density_patches = _extract_patches(
+    density_patches = extract_standard_patches(
         density_maps, patch_scale=patch_scale, patch_stride=patch_stride
     )
 

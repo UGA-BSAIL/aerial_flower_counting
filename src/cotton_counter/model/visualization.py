@@ -41,10 +41,7 @@ def _colorize_heat_maps(
 
 
 def visualize_heat_maps(
-    *,
-    images: tf.Tensor,
-    features: tf.Tensor,
-    max_color_threshold: float = 0.02
+    *, images: tf.Tensor, features: tf.Tensor, max_color_threshold: float = 1.0
 ) -> tf.Tensor:
     """
     Generates a nice visualization for density maps or feature maps that
@@ -60,6 +57,9 @@ def visualize_heat_maps(
         A 4D tensor containing heatmap visualizations.
 
     """
+    images = tf.convert_to_tensor(images)
+    features = tf.convert_to_tensor(features)
+
     # Get the colorized density maps.
     colored_maps = _colorize_heat_maps(
         features, max_color_threshold=max_color_threshold

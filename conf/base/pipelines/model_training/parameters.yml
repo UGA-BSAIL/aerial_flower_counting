@@ -1,18 +1,16 @@
-# The expected input image dimensions.
+# The expected input image height and width.
+input_image_shape: [3456, 4608]
 input_width: 4608
 input_height: 3456
 # The scale factor to apply for the patches we extract.
 patch_scale: 0.25
 
-# The shape of the density maps to use.
+# The height and width of the density maps to use.
 # (These are derived from the expected input dimensions, down-sampled by a factor of 8).
-density_map_width: 576
-density_map_height: 432
+density_map_shape: [432, 576]
 # The standard deviation to use for the gaussian kernel when creating density maps.
 density_map_sigma: 1
 
-# Batch size to use for training.
-batch_size: 8
 # Number of batches to pre-fetch into memory.
 # (Increasing this can increase training performance at the expense of memory usage.)
 num_prefetch_batches: 10
@@ -29,8 +27,6 @@ visualization_period: 100
 # threshold will show up as the maximum density color.
 max_density_threshold: 0.02
 
-# Whether we want to classify counts instead of regressing them.
-classify_counts: False
 # A list of the minimum count values that will go in each discrete
 # count bucket. Note that the highest bucket will contain anything
 # that falls between the largest minimum value and infinity.

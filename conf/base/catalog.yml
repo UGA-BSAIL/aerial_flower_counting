@@ -28,3 +28,35 @@ tfrecord_validate:
   type: cotton_counter.data_sets.TfRecordsDataSet
   filepath: data/05_model_input/validate.tfrecord
   versioned: True
+
+# Intermediate TF Datasets containing pre-processed data.
+training_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+testing_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+validation_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# A dataset containing validation data but with no patches extracted.
+validation_data_no_patches:
+  type: MemoryDataSet
+  copy_mode: assign
+
+_model_args: &model_args
+  type: tensorflow.TensorFlowModelDataset
+  load_args:
+    # Compiling during loading doesn't work with custom loss functions.
+    compile: False
+  save_args:
+    save_format: h5
+  versioned: True
+
+# Saved model, produced at the end of training.
+trained_model:
+  filepath: ${output_data_dir}/06_models/fully_trained.hd5
+  << : *model_args

@@ -1,15 +1,4 @@
-# Intermediate TF Datasets containing pre-processed data.
-training_data:
-  type: MemoryDataSet
-  copy_mode: assign
 
-testing_data:
-  type: MemoryDataSet
-  copy_mode: assign
-
-validation_data:
-  type: MemoryDataSet
-  copy_mode: assign
 
 # Callbacks to use for training.
 callbacks:
@@ -20,33 +9,3 @@ callbacks:
 initial_model:
   type: MemoryDataSet
   copy_mode: assign
-
-_model_args: &model_args
-  type: tensorflow.TensorFlowModelDataset
-  load_args:
-    # Compiling during loading doesn't work with custom loss functions.
-    compile: False
-  save_args:
-    save_format: h5
-  versioned: True
-
-# Saved model, produced at the end of training.
-trained_model:
-  filepath: ${output_data_dir}/06_models/fully_trained.hd5
-  << : *model_args
-
-# Evaluation reports for the model.
-model_report_train:
-  type: text.TextDataSet
-  filepath: ${output_data_dir}/08_reporting/model_reports/train_results.txt
-  versioned: True
-
-model_report_test:
-  type: text.TextDataSet
-  filepath: ${output_data_dir}/08_reporting/model_reports/test_results.txt
-  versioned: True
-
-model_report_validate:
-  type: text.TextDataSet
-  filepath: ${output_data_dir}/08_reporting/model_reports/validation_results.txt
-  versioned: True

@@ -12,7 +12,10 @@ from loguru import logger
 
 from ..type_helpers import Vector2I
 from .density_maps import make_density_maps
-from .patches import extract_random_patches, extract_standard_patches
+from .patches import (
+    extract_random_patches,
+    extract_standard_patches_from_dataset,
+)
 from .records import Annotations
 
 _FEATURE_DESCRIPTION = {
@@ -213,6 +216,8 @@ def _extract_patches(
     """
     # Compute full static shapes for each batch. (We can't specify the batch
     # size statically because the last one might be smaller.)
+    image_shape = tuple(image_shape)
+    map_shape = tuple(map_shape)
     full_image_shape = (None,) + image_shape + (3,)
     full_density_shape = (None,) + map_shape + (1,)
     images_with_shapes = image_dataset.map(
@@ -231,7 +236,7 @@ def _extract_patches(
         )
     else:
         patched_dataset = images_with_shapes.interleave(
-            lambda i, d: extract_standard_patches(
+            lambda i, d: extract_standard_patches_from_dataset(
                 images=i, density_maps=d, patch_scale=patch_scale
             ),
             cycle_length=_NUM_THREADS,
