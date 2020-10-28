@@ -3,6 +3,7 @@ Contains node definitions for the `build_tfrecords_patches` pipeline.
 """
 
 
+import enum
 from typing import Any, Iterable
 
 import numpy as np
@@ -11,6 +12,26 @@ from loguru import logger
 from pycvat import Task
 
 from ..tfrecords_utils import bytes_feature, int_feature
+
+
+@enum.unique
+class AnnotationFilter(enum.IntEnum):
+    """
+    Specifies types of filtering that we can perform for annotations.
+    """
+
+    KEEP_POSITIVE = enum.auto()
+    """
+    Keep only positive examples.
+    """
+    KEEP_NEGATIVE = enum.auto()
+    """
+    Keep only negative examples.
+    """
+    KEEP_ALL = enum.auto()
+    """
+    Keep all examples.
+    """
 
 
 def _make_example(
@@ -38,7 +59,12 @@ def _make_example(
 
 
 def _generate_examples_from_task(
-    task: Task, *, frame_offset: int, label_name: str, job_num: int = 0
+    task: Task,
+    *,
+    frame_offset: int,
+    label_name: str,
+    job_num: int = 0,
+    keep_examples: AnnotationFilter = AnnotationFilter.KEEP_ALL
 ) -> Iterable[tf.train.Example]:
     """
     Generates TFRecord examples from a CVAT task.
@@ -49,6 +75,8 @@ def _generate_examples_from_task(
         label_name: The name of the label that indicates whether we have a
             flower or not.
         job_num: The job number within that task to source annotations from.
+        keep_examples: Specifies what filtering to perform on the
+            annotations, if any.
 
     Yields:
         Each example that it produced.
@@ -61,8 +89,6 @@ def _generate_examples_from_task(
     flower_label = task.find_label(label_name)
 
     for frame_num in range(job.start_frame, job.end_frame + 1):
-        image = task.get_image(frame_num, compressed=True)
-
         # Get the annotations and filter to the relevant ones.
         annotations = job.annotations_for_frame(frame_num)
         flower_tags = list(
@@ -75,6 +101,17 @@ def _generate_examples_from_task(
                 frame_num,
                 task.id,
             )
+        has_flower = len(flower_tags) > 0
+
+        if (
+            has_flower and keep_examples == AnnotationFilter.KEEP_NEGATIVE
+        ) or (
+            not has_flower and keep_examples == AnnotationFilter.KEEP_POSITIVE
+        ):
+            # We should filter out this annotation.
+            continue
+
+        image = task.get_image(frame_num, compressed=True)
 
         yield _make_example(
             image=image,
@@ -84,7 +121,10 @@ def _generate_examples_from_task(
 
 
 def generate_tf_records(
-    *, flower_label_name: str, **tasks: Any
+    *,
+    flower_label_name: str,
+    keep_examples: AnnotationFilter = AnnotationFilter.KEEP_ALL,
+    **tasks: Any
 ) -> Iterable[tf.train.Example]:
     """
     Generates TFRecord examples from multiple tasks on CVAT containing
@@ -93,6 +133,8 @@ def generate_tf_records(
     Args:
         flower_label_name: The name of the label that indicates that a patch
             contains at least one flower.
+        keep_examples: Specifies what filtering to perform on the
+            annotations, if any.
         **tasks: The various CVAT tasks to aggregate data from. The names used
             for these keyword arguments do not matter.
 
@@ -105,7 +147,10 @@ def generate_tf_records(
     for name, task in tasks.items():
         logger.info("Generating examples from {} (task {})...", name, task.id)
         task_examples = _generate_examples_from_task(
-            task, frame_offset=frame_counter, label_name=flower_label_name
+            task,
+            frame_offset=frame_counter,
+            label_name=flower_label_name,
+            keep_examples=keep_examples,
         )
 
         for example in task_examples:

@@ -75,18 +75,28 @@ def create_pipeline(**kwargs):
             node(
                 inputs_and_targets_from_patch_dataset,
                 dict(
-                    raw_dataset="tfrecord_tagged_patches",
+                    raw_dataset="tfrecord_tagged_patches_positive",
                     **pre_process_params_tagged_patches,
                 ),
-                "tagged_patch_data",
+                "tagged_patch_data_positive",
+            ),
+            node(
+                inputs_and_targets_from_patch_dataset,
+                dict(
+                    raw_dataset="tfrecord_tagged_patches_negative",
+                    **pre_process_params_tagged_patches,
+                ),
+                "tagged_patch_data_negative",
             ),
             # Pre-process the tag dataset.
             node(
                 combine_point_and_tag_datasets,
                 dict(
                     point_dataset="training_data",
-                    tag_dataset="tagged_patch_data",
+                    tag_dataset_positive="tagged_patch_data_positive",
+                    tag_dataset_negative="tagged_patch_data_negative",
                     tag_fraction="params:tag_fraction",
+                    positive_repetitions="params:positive_example_repetitions",
                 ),
                 "combined_training_data",
             ),

@@ -40,10 +40,17 @@ tfrecord_validate:
   filepath: data/05_model_input/validate.tfrecord
   versioned: True
 
-# TFRecord dataset of tag-annotated patches.
-tfrecord_tagged_patches:
+# TFRecord dataset of tag-annotated patches. It's split
+# into separate datasets for negative and positive examples,
+# to make class balancing easy.
+tfrecord_tagged_patches_positive:
   type: cotton_counter.data_sets.TfRecordsDataSet
-  filepath: data/05_model_input/patches.tfrecord
+  filepath: data/05_model_input/positive_patches.tfrecord
+  versioned: True
+
+tfrecord_tagged_patches_negative:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/negative_patches.tfrecord
   versioned: True
 
 # Intermediate TF Datasets containing pre-processed data.
@@ -59,7 +66,11 @@ validation_data:
   type: MemoryDataSet
   copy_mode: assign
 
-tagged_patch_data:
+tagged_patch_data_positive:
+  type: MemoryDataSet
+  copy_mode: assign
+
+tagged_patch_data_negative:
   type: MemoryDataSet
   copy_mode: assign
 
