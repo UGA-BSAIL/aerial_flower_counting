@@ -65,7 +65,8 @@ def create_model(
     Builds the model to use.
 
     Args:
-        input_image_shape: The expected height and width of input images, in px.
+        input_image_shape: The shape of the input images, in the form
+        (height, width)
         patch_scale: The scale factor to apply for the patches we extract.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
@@ -216,11 +217,7 @@ def train_model(
         model.compile(
             optimizer=optimizer,
             loss=make_losses(classify_counts=classify_counts),
-            loss_weights={
-                "density_map": phase["density_map_loss_weight"],
-                "count": phase["count_loss_weight"],
-                "discrete_count": discrete_count_loss_weight,
-            },
+            loss_weights={"discrete_count": discrete_count_loss_weight},
             metrics=make_metrics(classify_counts=classify_counts),
         )
         model.fit(

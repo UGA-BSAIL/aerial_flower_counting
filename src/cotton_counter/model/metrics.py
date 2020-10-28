@@ -21,7 +21,7 @@ def make_metrics(
         The metrics dictionary that it created.
 
     """
-    metrics = {"count": "mean_absolute_error"}
+    metrics = {}
 
     if classify_counts:
         # Add a standard accuracy metric for the classification.

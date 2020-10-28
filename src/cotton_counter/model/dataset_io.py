@@ -21,17 +21,29 @@ from .patches import (
 )
 from .records import Annotations
 
-_FEATURE_DESCRIPTION = {
+_POINTS_FEATURE_DESCRIPTION = {
     "image": tf.io.FixedLenFeature([1], tf.dtypes.string),
     "frame_numbers": tf.io.VarLenFeature(tf.dtypes.int64),
     "annotation_x": tf.io.VarLenFeature(tf.dtypes.float32),
     "annotation_y": tf.io.VarLenFeature(tf.dtypes.float32),
 }
 """
-Descriptions of the features found in our dataset.
+Descriptions of the features found in datasets containing point annotations.
+"""
+
+_TAG_FEATURE_DESCRIPTION = {
+    "image": tf.io.FixedLenFeature([1], tf.dtypes.string),
+    "frame_number": tf.io.FixedLenFeature([1], tf.dtypes.int64),
+    "has_flower": tf.io.FixedLenFeature([1], tf.dtypes.int64),
+}
+"""
+Description of the features found in datasets containing tag annotations.
 """
 
 _NUM_THREADS = cpu_count()
+"""
+Number of threads to use for multi-threaded operations.
+"""
 
 
 def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
@@ -54,27 +66,30 @@ def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
     )
 
 
-def _parse_example(serialized: tf.Tensor) -> Dict[str, tf.Tensor]:
+def _parse_example(
+    serialized: tf.Tensor,
+    feature_schema: Dict[str, Any] = _POINTS_FEATURE_DESCRIPTION,
+) -> Dict[str, tf.Tensor]:
     """
     Deserializes a set of serialized examples.
 
     Args:
         serialized: The tensor containing a serialized example.
-
+        feature_schema: The schema to use when extracting features.
 
     Returns:
         The parsed feature dictionary.
 
     """
-    return tf.io.parse_single_example(serialized, _FEATURE_DESCRIPTION)
+    return tf.io.parse_single_example(serialized, feature_schema)
 
 
-def _load_from_feature_dict(
+def _load_from_points_feature_dict(
     feature_dict: Dict[str, tf.Tensor], *, map_shape: Vector2I, sigma: float
 ) -> Tuple[tf.Tensor, tf.Tensor]:
     """
-    Wrangles the data from a parsed feature dictionary into images and density
-    maps.
+    Wrangles the data from a parsed feature dictionary for points annotations
+    into images and density maps.
 
     Args:
         feature_dict: The parsed feature dictionary.
@@ -105,6 +120,39 @@ def _load_from_feature_dict(
     )
 
     return images, density_maps
+
+
+def _load_from_tag_feature_dict(
+    feature_dict: Dict[str, tf.Tensor]
+) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
+    """
+    Wrangles the data from a parsed feature dictionary for tag annotations
+    into images and discrete counts.
+
+    Args:
+        feature_dict: The parsed feature dictionary.
+
+    Returns:
+        The images from the batch as well as the generated discrete count
+        vector. This is produced as two feature dictionaries, containing
+        model inputs and targets.
+
+    """
+    # Decode the JPEG images.
+    images = _decode_jpeg(feature_dict["image"])
+    # Assume the images have three channels.
+    images = tf.ensure_shape(images, (None, None, None, 3))
+
+    # For discrete counts, class 0 is actually the positive class, so we just
+    # have to flip the tag annotations around.
+    discrete_counts = (
+        tf.constant(1, dtype=tf.int64) - feature_dict["has_flower"]
+    )
+    # Coerce into the form that Keras likes.
+    discrete_counts = discrete_counts[:, 0]
+    discrete_counts = tf.cast(discrete_counts, tf.int32)
+
+    return {"image": images}, {"discrete_count": discrete_counts}
 
 
 def _discretize_counts(
@@ -326,8 +374,8 @@ def inputs_and_targets_from_dataset(
     shuffle: bool = True,
 ) -> tf.data.Dataset:
     """
-    Deserializes raw data from a `Dataset`, and coerces it into the form
-    used by the model.
+    Deserializes raw data from a `Dataset` containing full images and point
+    annotations, and coerces it into the form used by the model.
 
     Args:
         raw_dataset: The raw dataset, containing serialized data.
@@ -371,7 +419,7 @@ def inputs_and_targets_from_dataset(
     batched = feature_dataset.batch(batch_size)
     density_dataset = batched.map(
         functools.partial(
-            _load_from_feature_dict, map_shape=map_shape, sigma=sigma
+            _load_from_points_feature_dict, map_shape=map_shape, sigma=sigma
         ),
         num_parallel_calls=_NUM_THREADS,
     )
@@ -400,6 +448,54 @@ def inputs_and_targets_from_dataset(
         )
     # Prefetch the batches.
     return patches_with_counts.prefetch(num_prefetch_batches)
+
+
+def inputs_and_targets_from_patch_dataset(
+    raw_dataset: tf.data.Dataset,
+    *,
+    batch_size: int = 32,
+    num_prefetch_batches: int = 5,
+    shuffle: bool = True,
+) -> tf.data.Dataset:
+    """
+    Deserializes raw data from a `Dataset` containing patches and tag
+    annotations, and coerces it into the form used by the model.
+
+    Args:
+        raw_dataset: The raw dataset, containing serialized data.
+        batch_size: The size of the batches that we generate.
+        num_prefetch_batches: The number of batches to prefetch into memory.
+            Increasing this can increase performance at the expense of memory
+            usage.
+        shuffle: If true, it will shuffle the data in the dataset randomly.
+            Disable if you want the output to always be deterministic.
+
+    Returns:
+        A dataset that produces input images and a flag indicating whether
+        the image contains at least one flower.
+
+    """
+    # Deserialize it.
+    feature_dataset = raw_dataset.map(
+        lambda x: _parse_example(x, feature_schema=_TAG_FEATURE_DESCRIPTION),
+        num_parallel_calls=_NUM_THREADS,
+    )
+
+    # Shuffle the data so we get different batches every time.
+    if shuffle:
+        feature_dataset = feature_dataset.shuffle(
+            batch_size * num_prefetch_batches, reshuffle_each_iteration=True
+        )
+
+    # Batch and wrangle it.
+    batched = feature_dataset.batch(batch_size)
+    discrete_count_dataset = batched.map(
+        functools.partial(_load_from_tag_feature_dict),
+        num_parallel_calls=_NUM_THREADS,
+    )
+
+    # Prefetch the batches.
+    return discrete_count_dataset.prefetch(num_prefetch_batches)
 
 
 def save_images_to_disk(

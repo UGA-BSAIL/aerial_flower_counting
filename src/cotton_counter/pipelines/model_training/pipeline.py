@@ -32,7 +32,7 @@ def create_pipeline(**kwargs: Any):
     """
     # Common parameters shared by training nodes.
     training_params = dict(
-        training_data="training_data",
+        training_data="combined_training_data",
         testing_data="testing_data",
         classify_counts="params:classify_counts",
         callbacks="callbacks",

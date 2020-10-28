@@ -1,0 +1,4 @@
+# Fraction of training examples to draw from the tagged
+# patch dataset instead of the point-annotated data.
+# Derived from the relative sizes of both datasets.
+tag_fraction: 0.1

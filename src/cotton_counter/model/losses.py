@@ -98,7 +98,7 @@ def make_losses(
         The loss dictionary that it created.
 
     """
-    loss_dict = {"density_map": "mse", "count": CountAccuracy()}
+    loss_dict = {}
     if classify_counts:
         # Use cross-entropy for classification.
         loss_dict["discrete_count"] = "sparse_categorical_crossentropy"

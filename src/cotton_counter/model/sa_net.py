@@ -168,6 +168,7 @@ def build_model(
     count = _build_count_regression_head(density_head=density_map)
     model_outputs["count"] = count
 
+    model_outputs = {}
     if num_classes is not None:
         # Use the classification head.
         discrete_count = _build_count_classification_head(
