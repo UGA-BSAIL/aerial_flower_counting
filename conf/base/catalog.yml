@@ -2,10 +2,18 @@ _cvat_credentials: &cvat_credentials
   host: "http://localhost:8080/api/v1"
   credentials: dev_cvat
 
-# Cotton counting dataset from CVAT.
+# Cotton counting dataset from CVAT containing full images
+# with point annotations.
 cotton_images:
   type: pycvat.CvatDataSet
   task_id: 2
+  << : *cvat_credentials
+
+# Cotton counting datasets from CVAT containing image patches with
+# image-level annotations.
+cotton_patches_1:
+  type: pycvat.CvatDataSet
+  task_id: 110
   << : *cvat_credentials
 
 # Cotton counting dataset annotations, stored locally.
@@ -30,6 +38,12 @@ tfrecord_test:
 tfrecord_validate:
   type: cotton_counter.data_sets.TfRecordsDataSet
   filepath: data/05_model_input/validate.tfrecord
+  versioned: True
+
+# TFRecord dataset of tag-annotated patches.
+tfrecord_tagged_patches:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/patches.tfrecord
   versioned: True
 
 # Intermediate TF Datasets containing pre-processed data.

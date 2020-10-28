@@ -1,0 +1,3 @@
+# The name of the label indicating that there is at least one
+# flower in an image.
+flower_label_name: has_flower

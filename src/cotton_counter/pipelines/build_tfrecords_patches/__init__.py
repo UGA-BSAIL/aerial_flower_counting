@@ -26,7 +26,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This is a boilerplate pipeline 'data_engineering'
+This is a boilerplate pipeline 'build_tfrecords_patches'
 generated using Kedro 0.16.4
 """
 

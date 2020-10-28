@@ -109,7 +109,7 @@ def get_frame_sizes(
     """
     # Get the frame sizes.
     frame_sizes = [
-        cvat_task.get_frame_size(n) for n in annotations_frame["frame_num"]
+        cvat_task.get_image_size(n) for n in annotations_frame["frame_num"]
     ]
     # Coerce into its own data frame.
     return pd.DataFrame(

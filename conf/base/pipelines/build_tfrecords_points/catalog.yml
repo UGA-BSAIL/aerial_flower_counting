@@ -1,4 +1,4 @@
-# This is a boilerplate catalog config generated for pipeline 'data_engineering'
+# This is a boilerplate catalog config generated for pipeline 'build_tfrecords_points'
 # using Kedro 0.16.4.
 #
 # Documentation for this file format can be found in "The Data Catalog"

@@ -8,8 +8,9 @@ from kedro.pipeline import Pipeline
 
 from .pipelines import (
     auto_annotation,
+    build_tfrecords_patches,
+    build_tfrecords_points,
     data_cleaning,
-    data_engineering,
     eda,
     model_data_load,
     model_evaluation,
@@ -29,7 +30,8 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
     """
     cleaning_pipeline = data_cleaning.create_pipeline()
     eda_pipeline = eda.create_pipeline()
-    engineering_pipeline = data_engineering.create_pipeline()
+    points_pipeline = build_tfrecords_points.create_pipeline()
+    patches_pipeline = build_tfrecords_patches.create_pipeline()
     training_pipeline = model_training.create_pipeline()
     evaluation_pipeline = model_evaluation.create_pipeline()
     data_loading_pipeline = model_data_load.create_pipeline()
@@ -41,7 +43,9 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
         "auto_annotation": auto_annotation_pipeline,
         "prepare_data": cleaning_pipeline
         + eda_pipeline
-        + engineering_pipeline,
+        + points_pipeline
+        + patches_pipeline,
+        "prepare_patches": patches_pipeline,
         "__default__": data_loading_pipeline
         + training_pipeline
         + evaluation_pipeline,

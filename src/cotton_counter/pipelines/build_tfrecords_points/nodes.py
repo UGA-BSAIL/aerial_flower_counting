@@ -1,15 +1,17 @@
 """
-Contains node definitions for the `data_engineering` pipeline.
+Contains node definitions for the `build_tfrecords_points` pipeline.
 """
 
 
-from typing import Iterable, Tuple, Union
+from typing import Iterable, Tuple
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
 from pycvat import Task
+
+from ..tfrecords_utils import bytes_feature, float_feature, int_feature
 
 
 def make_splits(
@@ -79,60 +81,6 @@ def shuffle(annotations: pd.DataFrame) -> pd.DataFrame:
     return annotations.sample(frac=1)
 
 
-def _bytes_feature(
-    feature_bytes: Union[Iterable[np.uint8], bytes]
-) -> tf.train.Feature:
-    """
-    Converts binary data to a Tensorflow feature.
-
-    Args:
-        feature_bytes: The input binary data.
-
-    Returns:
-        The resulting feature.
-
-    """
-    if isinstance(feature_bytes, np.ndarray):
-        # Convert to Python bytes.
-        feature_bytes = feature_bytes.tobytes()
-
-    return tf.train.Feature(
-        bytes_list=tf.train.BytesList(value=[feature_bytes])
-    )
-
-
-def _float_feature(feature_floats: Iterable[float]):
-    """
-    Converts float data to a Tensorflow feature.
-
-    Args:
-        feature_floats: The input float data.
-
-    Returns:
-        The resulting feature.
-
-    """
-    return tf.train.Feature(
-        float_list=tf.train.FloatList(value=list(feature_floats))
-    )
-
-
-def _int_feature(feature_ints: Iterable[int]):
-    """
-    Converts integer data to a Tensorflow feature.
-
-    Args:
-        feature_ints: The input float data.
-
-    Returns:
-        The resulting feature.
-
-    """
-    return tf.train.Feature(
-        int64_list=tf.train.Int64List(value=list(feature_ints))
-    )
-
-
 def _make_example(
     *,
     image: np.ndarray,
@@ -158,10 +106,10 @@ def _make_example(
     frame_numbers[:] = frame_num
 
     features = dict(
-        image=_bytes_feature(image),
-        annotation_x=_float_feature(annotation_x),
-        annotation_y=_float_feature(annotation_y),
-        frame_numbers=_int_feature(frame_numbers),
+        image=bytes_feature(image),
+        annotation_x=float_feature(annotation_x),
+        annotation_y=float_feature(annotation_y),
+        frame_numbers=int_feature(frame_numbers),
     )
     return tf.train.Example(features=tf.train.Features(feature=features))
 

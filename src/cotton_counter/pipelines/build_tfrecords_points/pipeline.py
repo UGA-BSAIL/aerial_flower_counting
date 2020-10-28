@@ -1,5 +1,5 @@
 """
-Pipeline for data engineering tasks.
+Pipeline for generating TFRecords from point-annotated data.
 """
 
 
