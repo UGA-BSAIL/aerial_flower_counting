@@ -9,7 +9,7 @@ from functools import partial
 
 from kedro.pipeline import Pipeline, node
 
-from ...model.load_from_dataset import extract_model_input
+from ...model.dataset_io import inputs_and_targets_from_dataset
 
 
 def create_pipeline(**kwargs):
@@ -29,10 +29,10 @@ def create_pipeline(**kwargs):
     # Training datasets should use random patches, but testing and validation
     # datasets shouldn't.
     pre_process_node_training = partial(
-        extract_model_input, random_patches=True, shuffle=True
+        inputs_and_targets_from_dataset, random_patches=True, shuffle=True
     )
     pre_process_node_not_training = partial(
-        extract_model_input, random_patches=False, shuffle=False
+        inputs_and_targets_from_dataset, random_patches=False, shuffle=False
     )
 
     return Pipeline(

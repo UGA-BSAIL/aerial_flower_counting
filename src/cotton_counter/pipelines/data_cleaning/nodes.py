@@ -9,25 +9,30 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from loguru import logger
-from pycvat.dataset import CvatHandle
+from pycvat import Task
+
+from ...cvat_utils import get_main_job
 
 
-def remove_unannotated(cvat_data: CvatHandle) -> List[Tuple[int, List]]:
+def remove_unannotated(cvat_task: Task) -> List[Tuple[int, List]]:
     """
     Filters out data that has no annotations.
 
     Args:
-        cvat_data: The raw CVAT dataset to filter.
+        cvat_task: The raw CVAT task to filter data from.
 
     Returns:
         List of tuples of the frame number in the raw CVAT data and the
         corresponding annotations for that frame.
 
     """
-    logger.debug("Have {} raw examples in dataset.", cvat_data.num_frames)
+    job = get_main_job(cvat_task)
+    logger.debug(
+        "Have {} raw examples in dataset.", job.end_frame - job.start_frame
+    )
 
     filtered_annotations = []
-    for count, annotations in enumerate(cvat_data.iter_annotations()):
+    for count, annotations in enumerate(job.iter_annotations()):
         if len(annotations) != 0:
             # We have annotations.
             filtered_annotations.append((count, annotations))
@@ -87,7 +92,7 @@ def annotations_as_dataframe(
 
 
 def get_frame_sizes(
-    annotations_frame: pd.DataFrame, cvat_data: CvatHandle
+    annotations_frame: pd.DataFrame, cvat_task: Task
 ) -> pd.DataFrame:
     """
     Gets a `DataFrame` containing the sizes in pixels of each frame. Each row
@@ -95,7 +100,7 @@ def get_frame_sizes(
 
     Args:
         annotations_frame: The `DataFrame` containing annotations.
-        cvat_data: The raw CVAT data handle.
+        cvat_task: The raw CVAT task handle.
 
     Returns:
         A `DataFrame` containing columns for the width and height of each
@@ -104,7 +109,7 @@ def get_frame_sizes(
     """
     # Get the frame sizes.
     frame_sizes = [
-        cvat_data.get_frame_size(n) for n in annotations_frame["frame_num"]
+        cvat_task.get_frame_size(n) for n in annotations_frame["frame_num"]
     ]
     # Coerce into its own data frame.
     return pd.DataFrame(

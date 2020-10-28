@@ -9,7 +9,7 @@ license = "MIT"
 python = "~3.7"
 # TODO (daniel) Switch to official Kedro release after my PR gets merged.
 kedro = {git = "https://github.com/djpetti/kedro.git", rev = "2e10246"}
-pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "0ae4d99a"}
+pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "a18efde9"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"
@@ -23,6 +23,7 @@ tensorflow-estimator = "==2.0.0"
 opencv-python = "^4.4.0"
 tabulate = "^0.8.7"
 Pillow = "^7.2.0"
+tenacity = "^6.2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

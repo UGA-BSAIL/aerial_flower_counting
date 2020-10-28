@@ -5,8 +5,10 @@ Tensorflow `Dataset`.
 
 import functools
 from multiprocessing import cpu_count
-from typing import Dict, List, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+import numpy as np
 import tensorflow as tf
 from loguru import logger
 
@@ -14,6 +16,7 @@ from ..type_helpers import Vector2I
 from .density_maps import make_density_maps
 from .patches import (
     extract_random_patches,
+    extract_standard_patches,
     extract_standard_patches_from_dataset,
 )
 from .records import Annotations
@@ -275,7 +278,41 @@ def _repeat_patches(
     return dataset.repeat(num_patches_2d)
 
 
-def extract_model_input(
+def _write_to_file(
+    data: tf.Tensor,
+    *,
+    index: tf.Tensor,
+    save_dir: Path,
+    extension: str = ".jpg",
+) -> tf.Tensor:
+    """
+    Saves data to files on the disk without otherwise changing it.
+
+    Args:
+        data: The raw data to save.
+        save_dir: The directory to write files to.
+        index: Unique index for this item in the dataset. It will be used to
+            generate the file name.
+        extension: The file extension to use for saved data.
+
+    Returns:
+        The path to the file where these data are stored.
+
+    """
+    tf.assert_rank(index, 0)
+
+    # Generate the path to the file.
+    string_index = tf.strings.as_string(index)
+    file_name = tf.strings.join(["element_", string_index, extension])
+    file_path = tf.strings.join([save_dir.as_posix(), "/", file_name])
+
+    # Save the file.
+    tf.io.write_file(file_path, data)
+
+    return file_path
+
+
+def inputs_and_targets_from_dataset(
     raw_dataset: tf.data.Dataset,
     *,
     image_shape: Vector2I,
@@ -363,3 +400,112 @@ def extract_model_input(
         )
     # Prefetch the batches.
     return patches_with_counts.prefetch(num_prefetch_batches)
+
+
+def save_images_to_disk(
+    images: tf.data.Dataset, *, save_dir: Path
+) -> tf.data.Dataset:
+    """
+    Saves images contained in a `Dataset` to files on the disk.
+
+    Args:
+        images: The `Dataset` containing images. The images should be in raw
+            form, and it expects each element to be a dictionary, where the
+            image data is under the "image" key.
+        save_dir:
+            The directory in which to create the image files.
+
+    Returns:
+        A new `Dataset` that contains dictionaries with two keys. The
+        "image" key refers to the original images. The "path" key refers to
+        the path that this image is saved at.
+
+    """
+    # We need unique indices for each image.
+    numbered_images = images.enumerate()
+
+    def encode_and_write(
+        element: Dict[str, tf.Tensor], **kwargs: Any
+    ) -> Dict[str, tf.Tensor]:
+        # Encode the image.
+        image = element["image"]
+        encoded = tf.io.encode_jpeg(image)
+
+        # Save the image.
+        image_path = _write_to_file(encoded, **kwargs)
+        return dict(image=image, path=image_path)
+
+    return numbered_images.map(
+        lambda i, e: encode_and_write(
+            e, index=i, save_dir=save_dir, extension=".jpg"
+        )
+    )
+
+
+def inputs_from_generator(
+    image_source: Callable[[], Iterable[np.ndarray]],
+    *,
+    image_shape: Vector2I,
+    batch_size: int = 32,
+    num_prefetch_batches: int = 5,
+    patch_scale: float = 1.0,
+    patch_stride: Optional[float] = None,
+    extract_jpegs: bool = False,
+) -> tf.data.Dataset:
+    """
+    Produces a model input dataset from a dataset containing raw images.
+
+    Args:
+        image_source: A generator that yields the raw RGB images that we want
+           to use as input.
+        image_shape: The shape of the input images, in the form
+            (height, width).
+        batch_size: The size of the batches that we generate.
+        num_prefetch_batches: The number of batches to prefetch into memory.
+            Increasing this can increase performance at the expense of memory
+            usage.
+        patch_scale: Scale of the patches to extract from each image.
+        patch_stride: The stride to use for extracted patches. If not
+            specified, it will be the same as the patch scale, which produces
+            patches that don't overlap.
+        extract_jpegs: If true, it expects the input images to be JPEGs, and
+            will extract them as part of the loading procedure. Otherwise, it
+            expects them to be raw images.
+
+    Returns:
+        A dataset containing the model input.
+
+    """
+    raw_images = tf.data.Dataset.from_generator(image_source, tf.string)
+    # Decode JPEGS if necessary.
+    if extract_jpegs:
+        raw_images = raw_images.map(tf.image.decode_jpeg)
+
+    # Set static shapes for the images. We assume that each image has 3
+    # channels.
+    raw_images = raw_images.map(
+        lambda i: tf.ensure_shape(i, tuple(image_shape) + (3,)),
+    )
+
+    # Combine images into batches.
+    raw_images_batched = raw_images.batch(batch_size)
+
+    # Extract standard patches from each image.
+    patches = raw_images_batched.flat_map(
+        lambda i: tf.data.Dataset.from_tensor_slices(
+            extract_standard_patches(
+                i, patch_scale=patch_scale, patch_stride=patch_stride
+            )
+        ),
+    )
+    # Patch extraction removed the batching, so we need to re-batch.
+    patches = patches.batch(batch_size)
+
+    # Impose the proper schema.
+    def transform_schema(image: tf.Tensor) -> Dict[str, tf.Tensor]:
+        return {"image": image}
+
+    patches = patches.map(transform_schema)
+
+    # Prefetch the batches.
+    return patches.prefetch(num_prefetch_batches)

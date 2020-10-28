@@ -5,7 +5,6 @@ Pipeline that handles evaluating a trained model.
 
 from kedro.pipeline import Pipeline, node
 
-from ...model.load_from_dataset import extract_model_input
 from .nodes import evaluate_model, make_example_density_map
 
 

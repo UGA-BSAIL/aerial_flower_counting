@@ -2,3 +2,6 @@
 classify_counts: False
 # Batch size to use for training.
 batch_size: 8
+# Number of batches to pre-fetch into memory.
+# (Increasing this can increase training performance at the expense of memory usage.)
+num_prefetch_batches: 10

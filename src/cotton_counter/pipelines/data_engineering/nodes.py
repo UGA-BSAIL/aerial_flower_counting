@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
-from pycvat.dataset import CvatHandle
+from pycvat import Task
 
 
 def make_splits(
@@ -167,14 +167,14 @@ def _make_example(
 
 
 def generate_tf_records(
-    annotations: pd.DataFrame, cotton_images: CvatHandle
+    annotations: pd.DataFrame, cotton_images: Task
 ) -> Iterable[tf.train.Example]:
     """
     Generates TFRecord examples from the data.
 
     Args:
         annotations: The cleaned annotation data, as a Pandas `DataFrame`.
-        cotton_images: The CVAT handle to use for retrieving image data.
+        cotton_images: The CVAT task handle to use for retrieving image data.
 
     Yields:
         Each example that it produced.
@@ -191,10 +191,10 @@ def generate_tf_records(
         annotation_y = frame_annotations["y"].to_numpy()
 
         # Get the corresponding image.
-        frame_image = cotton_images.get_frame(frame_num, compressed=True)
+        frame_image = cotton_images.get_image(frame_num, compressed=True)
 
         # Normalize points to the shape of the image.
-        frame_width, frame_height = cotton_images.get_frame_size(frame_num)
+        frame_width, frame_height = cotton_images.get_image_size(frame_num)
         annotation_x /= frame_width - 1
         annotation_y /= frame_height - 1
 

@@ -1,0 +1,20 @@
+# Automatically-generated annotations.
+auto_patch_annotations:
+  type: pandas.ParquetDataSet
+  filepath: ${output_data_dir}/07_model_output/patch_annotations.parquet
+  versioned: True
+
+# A dataset containing unannotated patches.
+unannotated_patch_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# A dataset containing unannotated patches and file names.
+unannotated_saved_patch_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Temporary directory containing our saved image patches.
+saved_image_dir:
+  type: MemoryDataSet
+  copy_mode: assign
