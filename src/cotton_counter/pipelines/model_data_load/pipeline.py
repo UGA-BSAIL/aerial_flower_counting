@@ -97,6 +97,7 @@ def create_pipeline(**kwargs):
                     tag_dataset_negative="tagged_patch_data_negative",
                     tag_fraction="params:tag_fraction",
                     positive_repetitions="params:positive_example_repetitions",
+                    batch_size="params:batch_size",
                 ),
                 "combined_training_data",
             ),
