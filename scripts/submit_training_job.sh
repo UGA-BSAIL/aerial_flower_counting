@@ -6,32 +6,33 @@
 # It expects that a valid virtualenv has already been created with
 # `poetry install`.
 
-#PBS -S /bin/bash
-#PBS -q patterli_q
-#PBS -N cotton_count_model_train
-#PBS -l nodes=1:ppn=10:gpus=1
-#PBS -l walltime=8:00:00
-#PBS -l mem=12gb
-#PBS -M daniel.petti@uga.edu
-#PBS -m ae
+#SBATCH --partition=patterli_p
+#SBATCH -J cotton_count_model_train
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=10
+#SBATCH --gres=gpu:1
+#SBATCH --time=8:00:00
+#SBATCH --mem=12gb
+#SBATCH --mail-user=daniel.petti@uga.edu
+#SBATCH --mail-type=END,FAIL
 
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/scratch/${PBS_O_LOGNAME}"
+OUTPUT_BASE_DIR="/scratch/${SLURM_JOB_USER}"
 # Directory where our data and venv are located.
 LARGE_FILES_DIR="/work/cylilab/cotton_counter"
 
 function prepare_environment() {
   # Create the working directory for this job.
-  job_dir="${OUTPUT_BASE_DIR}/job_${PBS_JOBID}"
+  job_dir="${OUTPUT_BASE_DIR}/job_${SLURM_JOB_ID}"
   mkdir "${job_dir}"
   echo "Job directory is ${job_dir}."
 
   # Copy the code.
-  cp -Rd "${PBS_O_WORKDIR}/"* "${job_dir}/"
+  cp -Rd "${SLURM_SUBMIT_DIR}/"* "${job_dir}/"
   # Manually copy the config file too.
-  cp "${PBS_O_WORKDIR}/.kedro.yml" "${job_dir}/"
+  cp "${SLURM_SUBMIT_DIR}/.kedro.yml" "${job_dir}/"
 
   # Link to the input data directory and venv.
   rm -rf "${job_dir}/data"
