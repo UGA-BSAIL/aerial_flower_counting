@@ -12,14 +12,13 @@ fi
 # The job ID to collect artifacts from.
 JOB_ID=$1
 # Split the job ID on the dot.
-IFS=. read -r job_number cluster_name <<<"${JOB_ID}"
-job_dir="/scratch/$(whoami)/job_${job_number}.${cluster_name}"
+job_dir="/scratch/$(whoami)/job_${JOB_ID}"
 
 function package_artifacts() {
   mkdir artifacts
 
   # Grab the job output.
-  zip artifacts/output.zip cotton_count_model_train.*"${job_number}"
+  zip artifacts/output.zip cotton_count_model_train."${JOB_ID}".*
 
   # Grab the models and reports
   zip -r artifacts/models.zip "${job_dir}/output_data/06_models/"
@@ -33,7 +32,7 @@ function clean_artifacts() {
   # Remove old job data.
   rm -rf "${job_dir}"
   # Remove old job output.
-  rm cotton_count_model_train.*"${job_number}"
+  rm cotton_count_model_train."${JOB_ID}".*
 }
 
 package_artifacts
