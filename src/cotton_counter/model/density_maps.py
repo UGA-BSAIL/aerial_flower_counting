@@ -6,11 +6,11 @@ Layer that creates density maps from a set of annotations.
 from typing import Iterable, Tuple
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 from loguru import logger
 
 from src.cotton_counter.type_helpers import Vector2I
 
-from .filters import gaussian_blur
 from .records import Annotations
 
 
@@ -215,6 +215,6 @@ def make_density_maps(
         annotations, map_shape=map_shape
     )
 
-    return gaussian_blur(
-        dense_annotations, kernel_size=kernel_size, sigma=sigma,
+    return tfa.image.gaussian_filter2d(
+        dense_annotations, filter_shape=kernel_size, sigma=sigma,
     )
