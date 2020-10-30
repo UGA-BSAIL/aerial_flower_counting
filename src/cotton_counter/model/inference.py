@@ -120,9 +120,9 @@ def _classes_to_counts(predictions: List[np.ndarray]) -> np.ndarray:
         The estimated counts.
 
     """
-    # The discrete counts are the third output. (I'm not sure why
+    # The discrete counts are the first output. (I'm not sure why
     # `predict_on_batch` produces a dictionary but `predict` produces a list.)
-    discrete_y_hat = predictions[2]
+    discrete_y_hat = predictions[0]
     # Convert from the softmax distribution to actual classes.
     discrete_classes = np.argmax(discrete_y_hat, axis=1)
 
