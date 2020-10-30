@@ -16,6 +16,8 @@
 #SBATCH --mem=16gb
 #SBATCH --mail-user=daniel.petti@uga.edu
 #SBATCH --mail-type=END,FAIL
+#SBATCH --output=cotton_count_model_train.%j.out    # Standard output log
+#SBATCH --error=cotton_count_model_train.%j.err     # Standard error log
 
 set -e
 
