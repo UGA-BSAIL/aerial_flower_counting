@@ -45,10 +45,8 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
 
     """
     # Normalize the images before putting them through the model.
-    float_images = K.cast(image_input, K.floatx())
-    normalized = layers.Lambda(tf.image.per_image_standardization)(
-        float_images
-    )
+    float_images = tf.cast(image_input, K.floatx())
+    normalized = tf.image.per_image_standardization(float_images)
 
     # Main convolution layers.
     conv1_1 = layers.Conv2D(48, 3, padding="same", activation="relu")(
@@ -160,13 +158,6 @@ def build_model(
     """
     image_input = _build_image_input(input_size=input_size)
     backbone = _build_model_backbone(image_input=image_input)
-
-    density_map = _build_density_map_head(backbone)
-    model_outputs = {"density_map": density_map}
-
-    # Build the regression head.
-    count = _build_count_regression_head(density_head=density_map)
-    model_outputs["count"] = count
 
     model_outputs = {}
     if num_classes is not None:

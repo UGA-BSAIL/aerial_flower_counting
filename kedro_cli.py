@@ -42,6 +42,7 @@ from kedro.framework.cli.project import project_group
 from kedro.framework.cli.utils import KedroCliError, env_option, split_string
 from kedro.framework.context import load_context
 from kedro.utils import load_obj
+from loguru import logger
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -162,6 +163,7 @@ def cli():
     """Command line tools for manipulating a Kedro project."""
 
 
+@logger.catch
 @cli.command()
 @click.option(
     "--from-inputs",

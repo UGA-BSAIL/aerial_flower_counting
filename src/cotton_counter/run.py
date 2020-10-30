@@ -10,6 +10,7 @@ import numpy as np
 import tensorflow as tf
 from kedro.framework.context import KedroContext, load_package_context
 from kedro.pipeline import Pipeline
+from loguru import logger
 
 from .hooks import ProjectHooks
 from .pipeline import create_pipelines
@@ -43,6 +44,7 @@ def _set_seeds() -> None:
     tf.random.set_seed(1337)
 
 
+@logger.catch
 def run_package():
     _set_seeds()
 
