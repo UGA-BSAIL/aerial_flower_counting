@@ -46,8 +46,7 @@ def create_pipeline(**kwargs: Any):
             node(
                 create_model,
                 dict(
-                    input_width="params:input_width",
-                    input_height="params:input_height",
+                    input_image_shape="params:input_image_shape",
                     patch_scale="params:patch_scale",
                     classify_counts="params:classify_counts",
                     bucket_min_values="params:bucket_min_values",

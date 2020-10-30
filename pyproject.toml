@@ -6,20 +6,17 @@ authors = ["Daniel Petti <djpetti@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "~3.7"
+python = "~3.8"
 # TODO (daniel) Switch to official Kedro release after my PR gets merged.
 kedro = {git = "https://github.com/djpetti/kedro.git", rev = "2e10246"}
-pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "a18efde9"}
+pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "ed6d8134"}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"
 pandas = "^1.1.1"
 pyarrow = "^1.0.1"
-# TODO (daniel) Upgrade tensorflow after Sapelo2 upgrade.
-tensorflow = "~2.0.0"
-tensorflow-gpu = "~2.0.0"
-# Temporary workaround for https://github.com/tensorflow/tensorflow/issues/37525
-tensorflow-estimator = "==2.0.0"
+tensorflow = "~2.3.0"
+tensorflow-gpu = "~2.3.0"
 opencv-python = "^4.4.0"
 tabulate = "^0.8.7"
 Pillow = "^7.2.0"

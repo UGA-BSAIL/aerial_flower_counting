@@ -16,6 +16,7 @@ from ...model.losses import make_losses
 from ...model.metrics import make_metrics
 from ...model.sa_net import build_model
 from ...model.schedules import LoggingWrapper
+from ...type_helpers import Vector2I
 
 
 def _make_learning_rate(
@@ -55,8 +56,7 @@ def _make_learning_rate(
 
 
 def create_model(
-    input_width: int,
-    input_height: int,
+    input_image_shape: Vector2I,
     patch_scale: float,
     classify_counts: bool,
     bucket_min_values: List[float],
@@ -65,8 +65,7 @@ def create_model(
     Builds the model to use.
 
     Args:
-        input_width: The expected width of the input images, in px.
-        input_height: The expected height of the input images, in px.
+        input_image_shape: The expected height and width of input images, in px.
         patch_scale: The scale factor to apply for the patches we extract.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
@@ -80,6 +79,7 @@ def create_model(
 
     """
     # Build the model.
+    input_height, input_width = input_image_shape
     patch_width = int(input_width * patch_scale)
     patch_height = int(input_height * patch_scale)
 
