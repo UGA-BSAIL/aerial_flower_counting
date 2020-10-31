@@ -1,7 +1,7 @@
 # Fraction of training examples to draw from the tagged
 # patch dataset instead of the point-annotated data.
 # Derived from the relative sizes of both datasets.
-tag_fraction: 0.1
+tag_fraction: 0.3
 # Number of times to repeat the positive examples in our tag
 # dataset such that the positive and negative are
 # approximately balanced. I choose 4 here because empirically,

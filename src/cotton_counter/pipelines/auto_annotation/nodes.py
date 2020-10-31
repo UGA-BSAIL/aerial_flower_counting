@@ -122,7 +122,7 @@ def predict_patches(
     model_with_path = tf.keras.Model(
         inputs=model.inputs + [path_input],
         # We only care about the discrete count output here.
-        outputs=model.outputs[2:] + [path_input],
+        outputs=model.outputs + [path_input],
     )
 
     # Predict on the patches.
