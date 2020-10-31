@@ -3,7 +3,7 @@ Helpers for performing inference.
 """
 
 
-from typing import List, Optional
+from typing import Dict, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -109,7 +109,7 @@ def _make_density_map(
     return np.expand_dims(density_map, axis=2)
 
 
-def _classes_to_counts(predictions: List[np.ndarray]) -> np.ndarray:
+def _classes_to_counts(predictions: Dict[str, np.ndarray]) -> np.ndarray:
     """
     Converts raw predictions from the model to count estimates.
 
@@ -120,9 +120,7 @@ def _classes_to_counts(predictions: List[np.ndarray]) -> np.ndarray:
         The estimated counts.
 
     """
-    # The discrete counts are the first output. (I'm not sure why
-    # `predict_on_batch` produces a dictionary but `predict` produces a list.)
-    discrete_y_hat = predictions[0]
+    discrete_y_hat = predictions["discrete_count"]
     # Convert from the softmax distribution to actual classes.
     discrete_classes = np.argmax(discrete_y_hat, axis=1)
 
