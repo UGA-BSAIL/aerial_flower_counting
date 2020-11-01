@@ -21,7 +21,7 @@ learning_phases:
       decay: true
       # Number of steps to decay over.
       # (628 steps per epoch)
-      decay_steps: 1256
+      decay_steps: 1884
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
@@ -37,4 +37,4 @@ learning_phases:
     # The loss weight for count categorization.
     discrete_count_loss_weight: 1.0
     # Number of epochs to train for in this phase.
-    num_epochs: 30
+    num_epochs: 45
