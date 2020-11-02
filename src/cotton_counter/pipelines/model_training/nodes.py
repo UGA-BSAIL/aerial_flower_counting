@@ -107,6 +107,7 @@ def make_callbacks(
     max_density_threshold: float,
     bucket_min_values: List[float],
     classify_counts: bool,
+    num_per_batch_to_visualize: int,
 ) -> List[keras.callbacks.Callback]:
     """
     Creates callbacks to use when training the model.
@@ -129,6 +130,8 @@ def make_callbacks(
             infinity.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
+        num_per_batch_to_visualize: Number of images to visualize from each
+            batch.
 
     Returns:
         The list of callbacks.
@@ -150,6 +153,7 @@ def make_callbacks(
             dataset=testing_data,
             log_period=visualization_period,
             max_density_threshold=max_density_threshold,
+            num_images_per_batch=num_per_batch_to_visualize,
         )
         callbacks.append(density_map_callback)
     else:
@@ -160,6 +164,7 @@ def make_callbacks(
             dataset=testing_data,
             log_period=visualization_period,
             num_classes=len(bucket_min_values),
+            num_images_per_batch=num_per_batch_to_visualize,
         )
         callbacks.append(activation_callback)
 

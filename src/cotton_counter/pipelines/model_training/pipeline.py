@@ -66,6 +66,8 @@ def create_pipeline(**kwargs: Any):
                     max_density_threshold="params:max_density_threshold",
                     bucket_min_values="params:bucket_min_values",
                     classify_counts="params:classify_counts",
+                    num_per_batch_to_visualize="params"
+                    ":num_per_batch_to_visualize",
                 ),
                 "callbacks",
                 tags={PRE_PROCESS_TAG},

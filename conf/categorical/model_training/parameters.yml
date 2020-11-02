@@ -4,7 +4,9 @@ patch_scale: 0.125
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 1
 # Every time this many epochs elapse, it will generate new density map visualizations.
-visualization_period: 6
+visualization_period: 10
+# How many images from each batch to visualize.
+num_per_batch_to_visualize: 1
 
 # A list of the minimum count values that will go in each discrete
 # count bucket. Note that the highest bucket will contain anything
@@ -37,4 +39,4 @@ learning_phases:
     # The loss weight for count categorization.
     discrete_count_loss_weight: 1.0
     # Number of epochs to train for in this phase.
-    num_epochs: 45
+    num_epochs: 30
