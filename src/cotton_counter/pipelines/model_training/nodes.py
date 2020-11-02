@@ -12,9 +12,9 @@ import tensorflow.keras.optimizers.schedules as schedules
 from loguru import logger
 
 from ...model.callbacks import LogClassActivations, LogDensityMaps
+from ...model.counting_model import build_model
 from ...model.losses import make_losses
 from ...model.metrics import make_metrics
-from ...model.sa_net import build_model
 from ...model.schedules import LoggingWrapper
 from ...type_helpers import Vector2I
 
