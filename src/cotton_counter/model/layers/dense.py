@@ -49,127 +49,27 @@ class _CompositeFunction(layers.Layer):
         )
         self._reduce_memory = reduce_memory
 
-        # Weights for the bottleneck batchnorm.
-        self._bottleneck_gamma = None
-        self._bottleneck_beta = None
-        # Weights for the bottleneck convolution.
-        self._bottleneck_conv_kernel = None
-        self._bottleneck_conv_bias = None
-        # Weights for the standard batchnorm.
-        self._gamma = None
-        self._beta = None
-        # Weights for the standard convolution.
-        self._conv_kernel = None
-        self._conv_bias = None
-
-    @staticmethod
-    def _batch_norm(
-        inputs: tf.Tensor, *, gamma: tf.Tensor, beta: tf.Tensor
-    ) -> tf.Tensor:
-        """
-        Performs batch normalization on an input. Note that, unlike the Keras
-        layer, this does not do any fancy moving averages.
-
-        Args:
-            inputs: The inputs to normalize.
-            gamma: The learnable scale.
-            beta: The learnable offset.
-
-        Returns:
-            The normalized outputs.
-
-        """
-        mean, variance = tf.nn.moments(inputs, axes=[0])
-        return tf.nn.batch_normalization(
-            inputs,
-            mean,
-            variance,
-            offset=beta,
-            scale=gamma,
-            variance_epsilon=0.0001,
-        )
-
-    def _add_weights(self, input_shape: Tuple[int, ...]) -> None:
-        """
-        Creates the necessary weights for this layer.
-
-        Args:
-            input_shape: The shape of the layer input.
-
-        """
-        _, input_height, input_width, input_channels = input_shape
-        normal_conv_input_filters = input_channels
-
-        if self._use_bottleneck:
-            # Add the bottleneck batchnorm weights.
-            self._bottleneck_gamma = self.add_weight(
-                name="bottleneck_gamma", shape=(input_channels,)
-            )
-            self._bottleneck_beta = self.add_weight(
-                name="bottleneck_beta", shape=(input_channels,)
-            )
-
-            # Add the bottleneck convolution weights.
-            self._bottleneck_conv_kernel = self.add_weight(
-                name="bottleneck_conv_kernel",
-                shape=(1, 1, input_channels, self._num_bottleneck_filters),
-            )
-            self._bottleneck_conv_bias = self.add_weight(
-                name="bottleneck_conv_bias",
-                shape=(self._num_bottleneck_filters,),
-            )
-
-            # Determine number of input filters for the normal convolution.
-            normal_conv_input_filters = self._num_bottleneck_filters
-
-        # Add the standard batchnorm weights.
-        self._gamma = self.add_weight(
-            name="gamma", shape=(normal_conv_input_filters,)
-        )
-        self._beta = self.add_weight(
-            name="beta", shape=(normal_conv_input_filters,)
-        )
-
-        # Add the standard convolution weights.
-        self._conv_kernel = self.add_weight(
-            name="conv_kernel",
-            shape=(3, 3, normal_conv_input_filters, self._growth_rate),
-        )
-        self._conv_bias = self.add_weight(
-            name="conv_bias", shape=(self._growth_rate,)
-        )
-
-    def build(self, input_shape: Tuple[int, ...]) -> None:
-        self._add_weights(input_shape)
-        super().build(input_shape)
+        # We initialize layers here, because it turns out that using the usual
+        # sub-model strategy breaks recompute_grad in exciting ways.
+        # Batch normalization layers.
+        self._bottleneck_norm = layers.BatchNormalization()
+        self._norm = layers.BatchNormalization()
+        # Convolutional layers.
+        self._bottleneck_conv = layers.Conv2D(self._num_bottleneck_filters, 1)
+        self._conv = layers.Conv2D(self._growth_rate, 3, padding="same")
 
     def call(self, inputs: tf.Tensor, **kwargs: Any):
         def _apply_layer(_inputs: tf.Tensor) -> tf.Tensor:
             # Add the layer operations.
             if self._use_bottleneck:
                 # Add the bottleneck layer as well.
-                normalized_bn = self._batch_norm(
-                    _inputs,
-                    gamma=self._bottleneck_gamma,
-                    beta=self._bottleneck_beta,
-                )
-                relu_bn = tf.nn.relu(normalized_bn)
-                conv_bn = tf.nn.conv2d(
-                    relu_bn,
-                    self._bottleneck_conv_kernel,
-                    strides=1,
-                    padding="SAME",
-                )
-                _inputs = tf.nn.bias_add(conv_bn, self._bottleneck_conv_bias)
+                normalized_bn = self._bottleneck_norm(_inputs)
+                relu_bn = layers.ReLU()(normalized_bn)
+                _inputs = self._bottleneck_conv(relu_bn)
 
-            normalized = self._batch_norm(
-                _inputs, gamma=self._gamma, beta=self._beta
-            )
-            relu = tf.nn.relu(normalized)
-            conv = tf.nn.conv2d(
-                relu, self._conv_kernel, strides=1, padding="SAME"
-            )
-            return tf.nn.bias_add(conv, self._conv_bias)
+            normalized = self._norm(_inputs)
+            relu = layers.ReLU()(normalized)
+            return self._conv(relu)
 
         if self._reduce_memory:
             # Force gradient checkpointing.
