@@ -49,21 +49,31 @@ class _CompositeFunction(layers.Layer):
         )
         self._reduce_memory = reduce_memory
 
+        # Weights for the bottleneck batchnorm.
+        self._bottleneck_gamma = None
+        self._bottleneck_beta = None
         # Weights for the bottleneck convolution.
         self._bottleneck_conv_kernel = None
         self._bottleneck_conv_bias = None
+        # Weights for the standard batchnorm.
+        self._gamma = None
+        self._beta = None
         # Weights for the standard convolution.
         self._conv_kernel = None
         self._conv_bias = None
 
     @staticmethod
-    def _batch_norm(inputs: tf.Tensor) -> tf.Tensor:
+    def _batch_norm(
+        inputs: tf.Tensor, *, gamma: tf.Tensor, beta: tf.Tensor
+    ) -> tf.Tensor:
         """
         Performs batch normalization on an input. Note that, unlike the Keras
         layer, this does not do any fancy moving averages.
 
         Args:
             inputs: The inputs to normalize.
+            gamma: The learnable scale.
+            beta: The learnable offset.
 
         Returns:
             The normalized outputs.
@@ -74,8 +84,8 @@ class _CompositeFunction(layers.Layer):
             inputs,
             mean,
             variance,
-            offset=None,
-            scale=None,
+            offset=beta,
+            scale=gamma,
             variance_epsilon=0.0001,
         )
 
@@ -91,6 +101,14 @@ class _CompositeFunction(layers.Layer):
         normal_conv_input_filters = input_channels
 
         if self._use_bottleneck:
+            # Add the bottleneck batchnorm weights.
+            self._bottleneck_gamma = self.add_weight(
+                name="bottleneck_gamma", shape=(input_channels,)
+            )
+            self._bottleneck_beta = self.add_weight(
+                name="bottleneck_beta", shape=(input_channels,)
+            )
+
             # Add the bottleneck convolution weights.
             self._bottleneck_conv_kernel = self.add_weight(
                 name="bottleneck_conv_kernel",
@@ -104,6 +122,15 @@ class _CompositeFunction(layers.Layer):
             # Determine number of input filters for the normal convolution.
             normal_conv_input_filters = self._num_bottleneck_filters
 
+        # Add the standard batchnorm weights.
+        self._gamma = self.add_weight(
+            name="gamma", shape=(normal_conv_input_filters,)
+        )
+        self._beta = self.add_weight(
+            name="beta", shape=(normal_conv_input_filters,)
+        )
+
+        # Add the standard convolution weights.
         self._conv_kernel = self.add_weight(
             name="conv_kernel",
             shape=(3, 3, normal_conv_input_filters, self._growth_rate),
@@ -121,7 +148,11 @@ class _CompositeFunction(layers.Layer):
             # Add the layer operations.
             if self._use_bottleneck:
                 # Add the bottleneck layer as well.
-                normalized_bn = self._batch_norm(_inputs)
+                normalized_bn = self._batch_norm(
+                    _inputs,
+                    gamma=self._bottleneck_gamma,
+                    beta=self._bottleneck_beta,
+                )
                 relu_bn = tf.nn.relu(normalized_bn)
                 conv_bn = tf.nn.conv2d(
                     relu_bn,
@@ -131,7 +162,9 @@ class _CompositeFunction(layers.Layer):
                 )
                 _inputs = tf.nn.bias_add(conv_bn, self._bottleneck_conv_bias)
 
-            normalized = self._batch_norm(_inputs)
+            normalized = self._batch_norm(
+                _inputs, gamma=self._gamma, beta=self._beta
+            )
             relu = tf.nn.relu(normalized)
             conv = tf.nn.conv2d(
                 relu, self._conv_kernel, strides=1, padding="SAME"
