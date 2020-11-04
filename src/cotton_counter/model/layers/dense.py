@@ -103,34 +103,24 @@ class DenseBlock(layers.Layer):
         # Autograph issues with mangled names.
         self._num_layers = num_layers
         self._kwargs = kwargs
-        self._composite_function = partial(_CompositeFunction, **kwargs)
 
-        # We have to separate the layer creation from the application of these
-        # layers. In order to facilitate this, we use a sub-model.
-        self._model = None
+        # Pre-create the composite function layers.
+        composite_function = partial(_CompositeFunction, **kwargs)
+        self._composite_function_layers = [
+            composite_function() for _ in range(num_layers)
+        ]
 
-    def build(self, input_shape: Tuple[int, ...]) -> None:
-        # The input shape will include the batch size, which we need to pass
-        # separately.
-        inputs = layers.Input(shape=input_shape[1:], batch_size=input_shape[0])
-
+    def call(self, inputs: tf.Tensor, **kwargs: Any) -> tf.Tensor:
         # Create the dense connections.
         next_input = inputs
         previous_output_features = [inputs]
         next_output = next_input
-        for _ in range(self._num_layers):
-            next_output = self._composite_function()(next_input)
+        for composite_function_layer in self._composite_function_layers:
+            next_output = composite_function_layer(next_input)
             previous_output_features.append(next_output)
             next_input = layers.Concatenate()(previous_output_features)
 
-        # Create the model.
-        self._model = tf.keras.Model(inputs=inputs, outputs=next_output)
-
-        super().build(input_shape)
-
-    def call(self, inputs: tf.Tensor, **kwargs: Any) -> tf.Tensor:
-        # Apply the sub-model to the inputs.
-        return self._model(inputs)
+        return next_output
 
     def get_config(self) -> Dict[str, Any]:
         return dict(num_layers=self._num_layers, **self._kwargs)
@@ -154,9 +144,10 @@ class TransitionLayer(layers.Layer):
         # Autograph issues with mangled names.
         self._compression_factor = compression_factor
 
-        # We have to separate the layer creation from the application of these
-        # layers. In order to facilitate this, we use a sub-model.
-        self._model = None
+        # Pre-create the sub-layers.
+        self._norm = layers.BatchNormalization()
+        # Can't be initialized until we know the input shape.
+        self._conv = None
 
     def _get_num_output_filters(self, input_shape: Tuple[int, ...]) -> int:
         """
@@ -180,25 +171,17 @@ class TransitionLayer(layers.Layer):
         return num_output_filters
 
     def build(self, input_shape: Tuple[int, ...]) -> None:
-        # The input shape will include the batch size, which we need to pass
-        # separately.
-        inputs = layers.Input(shape=input_shape[1:], batch_size=input_shape[0])
-
-        normalized = layers.BatchNormalization()(inputs)
+        # Calculate the number of filters and use it to initialize the
+        # convolution layer.
         num_filters = self._get_num_output_filters(input_shape)
-        compressed = layers.Conv2D(num_filters, 1, activation="relu")(
-            normalized
-        )
-        pooled = layers.MaxPool2D()(compressed)
-
-        # Create the sub-model.
-        self._model = tf.keras.Model(inputs=inputs, outputs=pooled)
+        self._conv = layers.Conv2D(num_filters, 1, activation="relu")
 
         super().build(input_shape)
 
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-        # Apply the sub-model to the inputs.
-        return self._model(inputs)
+        normalized = self._norm(inputs)
+        compressed = self._conv(normalized)
+        return layers.MaxPool2D()(compressed)
 
     def get_config(self) -> Dict[str, Any]:
         return dict(compression_factor=self._compression_factor)
