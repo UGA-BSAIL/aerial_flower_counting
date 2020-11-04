@@ -5,7 +5,7 @@ https://arxiv.org/pdf/1608.06993.pdf
 
 
 from functools import partial
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import tensorflow as tf
 from loguru import logger
@@ -58,16 +58,18 @@ class _CompositeFunction(layers.Layer):
         self._bottleneck_conv = layers.Conv2D(self._num_bottleneck_filters, 1)
         self._conv = layers.Conv2D(self._growth_rate, 3, padding="same")
 
-    def call(self, inputs: tf.Tensor, **kwargs: Any):
+    def call(self, inputs: tf.Tensor, training: Optional[bool] = None):
         def _apply_layer(_inputs: tf.Tensor) -> tf.Tensor:
             # Add the layer operations.
             if self._use_bottleneck:
                 # Add the bottleneck layer as well.
-                normalized_bn = self._bottleneck_norm(_inputs)
+                normalized_bn = self._bottleneck_norm(
+                    _inputs, training=training
+                )
                 relu_bn = layers.ReLU()(normalized_bn)
                 _inputs = self._bottleneck_conv(relu_bn)
 
-            normalized = self._norm(_inputs)
+            normalized = self._norm(_inputs, training=training)
             relu = layers.ReLU()(normalized)
             return self._conv(relu)
 
@@ -110,13 +112,17 @@ class DenseBlock(layers.Layer):
             composite_function() for _ in range(num_layers)
         ]
 
-    def call(self, inputs: tf.Tensor, **kwargs: Any) -> tf.Tensor:
+    def call(
+        self, inputs: tf.Tensor, training: Optional[bool] = None
+    ) -> tf.Tensor:
         # Create the dense connections.
         next_input = inputs
         previous_output_features = [inputs]
         next_output = next_input
         for composite_function_layer in self._composite_function_layers:
-            next_output = composite_function_layer(next_input)
+            next_output = composite_function_layer(
+                next_input, training=training
+            )
             previous_output_features.append(next_output)
             next_input = layers.Concatenate()(previous_output_features)
 
@@ -178,8 +184,10 @@ class TransitionLayer(layers.Layer):
 
         super().build(input_shape)
 
-    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
-        normalized = self._norm(inputs)
+    def call(
+        self, inputs: tf.Tensor, training: Optional[bool] = None
+    ) -> tf.Tensor:
+        normalized = self._norm(inputs, training=training)
         compressed = self._conv(normalized)
         return layers.MaxPool2D()(compressed)
 
