@@ -16,8 +16,8 @@ from tenacity import (
 
 @retry(
     retry=retry_if_exception_type(IOError),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=1, max=20),
+    stop=stop_after_attempt(10),
     after=after_log(logger, "WARNING"),
 )
 def get_main_job(task: Task) -> Job:
