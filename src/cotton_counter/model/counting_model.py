@@ -1,5 +1,5 @@
 """
-Implements the SaNet model architecture.
+Implements the model architecture.
 """
 
 from typing import Optional
@@ -12,7 +12,7 @@ from loguru import logger
 
 from src.cotton_counter.type_helpers import Vector2I
 
-from ..model.layers import MlpConv
+from ..model.layers import DenseBlock, TransitionLayer
 
 
 def _build_image_input(*, input_size: Vector2I) -> keras.Input:
@@ -48,39 +48,29 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
     float_images = tf.cast(image_input, K.floatx())
     normalized = tf.image.per_image_standardization(float_images)
 
-    # Main convolution layers.
+    # Input convolution layers.
     conv1_1 = layers.Conv2D(48, 3, padding="same", activation="relu")(
         normalized
     )
     norm1_1 = layers.BatchNormalization()(conv1_1)
     conv1_2 = layers.Conv2D(48, 3, padding="same", activation="relu")(norm1_1)
-    norm1_2 = layers.BatchNormalization()(conv1_2)
-    pool1 = layers.MaxPool2D()(norm1_2)
+    # No normalization needed here because dense blocks normalize internally.
+    pool1 = layers.MaxPool2D()(conv1_2)
 
-    conv2_1 = MlpConv(96, 3, padding="same", activation="relu")(pool1)
-    norm2_1 = layers.BatchNormalization()(conv2_1)
-    conv2_2 = MlpConv(96, 3, padding="same", activation="relu")(norm2_1)
-    norm2_2 = layers.BatchNormalization()(conv2_2)
-    pool2 = layers.MaxPool2D()(norm2_2)
+    # Dense blocks.
+    dense1 = DenseBlock(6, growth_rate=12)(pool1)
+    transition1 = TransitionLayer()(dense1)
 
-    conv3_1 = MlpConv(192, 3, padding="same", activation="relu")(pool2)
-    norm3_1 = layers.BatchNormalization()(conv3_1)
-    conv3_2 = MlpConv(192, 3, padding="same", activation="relu")(norm3_1)
-    norm3_2 = layers.BatchNormalization()(conv3_2)
-    conv3_3 = MlpConv(192, 3, padding="same", activation="relu")(norm3_2)
-    norm3_3 = layers.BatchNormalization()(conv3_3)
-    conv3_4 = MlpConv(192, 3, padding="same", activation="relu")(norm3_3)
-    norm3_4 = layers.BatchNormalization()(conv3_4)
-    pool3 = layers.MaxPool2D()(norm3_4)
+    dense2 = DenseBlock(12, growth_rate=12)(transition1)
+    transition2 = TransitionLayer()(dense2)
 
-    conv4_1 = MlpConv(384, 3, padding="same", activation="relu")(pool3)
-    norm4_1 = layers.BatchNormalization()(conv4_1)
-    conv4_2 = MlpConv(
-        384, 3, padding="same", activation="relu", num_mlp_neurons=128
-    )(norm4_1)
-    norm4_2 = layers.BatchNormalization()(conv4_2)
+    dense3 = DenseBlock(24, growth_rate=12)(transition2)
+    transition3 = TransitionLayer()(dense3)
 
-    return norm4_2
+    dense4 = DenseBlock(16, growth_rate=12)(transition3)
+    transition4 = TransitionLayer()(dense4)
+
+    return transition4
 
 
 def _build_density_map_head(model_top: layers.Layer) -> layers.Layer:

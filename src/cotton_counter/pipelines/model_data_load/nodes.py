@@ -6,13 +6,55 @@ Nodes for the `model_data_load` pipeline.
 import tensorflow as tf
 
 
+def _make_balanced_tag_dataset(
+    *,
+    tag_dataset_positive: tf.data.Dataset,
+    tag_dataset_negative: tf.data.Dataset,
+    num_positive_patches: int,
+    num_negative_patches: int,
+) -> tf.data.Dataset:
+    """
+    Creates a single tagged patch example dataset that is balanced between
+    the positive and negative classes. It does this by oversampling the
+    minority class.
+
+    Args:
+        tag_dataset_positive: The dataset of positive examples.
+        tag_dataset_negative: The dataset of negative examples.
+        num_positive_patches: The number of examples in the positive dataset.
+        num_negative_patches: The number of examples in the negative dataset.
+
+    Returns:
+        The combined, balanced dataset.
+
+    """
+    # Find the minority dataset.
+    minority_dataset = tag_dataset_positive
+    majority_dataset = tag_dataset_negative
+    if num_negative_patches < num_positive_patches:
+        minority_dataset = tag_dataset_negative
+        majority_dataset = tag_dataset_positive
+
+    # Repeat and cut the minority dataset so it is the same length as the
+    # majority.
+    majority_size = max(num_positive_patches, num_negative_patches)
+    minority_dataset = minority_dataset.repeat()
+    minority_dataset = minority_dataset.take(majority_size)
+
+    # Combine by random sampling.
+    return tf.data.experimental.sample_from_datasets(
+        [minority_dataset, majority_dataset]
+    )
+
+
 def combine_point_and_tag_datasets(
     *,
     point_dataset: tf.data.Dataset,
     tag_dataset_positive: tf.data.Dataset,
     tag_dataset_negative: tf.data.Dataset,
     tag_fraction: float,
-    positive_repetitions: int,
+    num_positive_patches: int,
+    num_negative_patches: int,
     batch_size: int,
 ) -> tf.data.Dataset:
     """
@@ -26,9 +68,10 @@ def combine_point_and_tag_datasets(
         tag_dataset_negative: The dataset containing negative tag annotations.
         tag_fraction: The fraction of elements of the resulting dataset to
             draw from the tag dataset.
-        positive_repetitions: How many times to repeat the positive dataset
-            in order to have the positive and negative annotations be better
-            balanced.
+        num_positive_patches: The number of positive examples in the tagged
+            patch dataset.
+        num_negative_patches: The number of negative examples in the tagged
+            patch dataset.
         batch_size: The size of the batches in the datasets.
 
     Returns:
@@ -41,9 +84,11 @@ def combine_point_and_tag_datasets(
     point_dataset = point_dataset.unbatch()
 
     # Combine the positive and negative datasets into one (balanced) dataset.
-    positive_repeated = tag_dataset_positive.repeat(positive_repetitions)
-    tag_dataset = tf.data.experimental.sample_from_datasets(
-        [positive_repeated, tag_dataset_negative]
+    tag_dataset = _make_balanced_tag_dataset(
+        tag_dataset_positive=tag_dataset_positive,
+        tag_dataset_negative=tag_dataset_negative,
+        num_positive_patches=num_positive_patches,
+        num_negative_patches=num_negative_patches,
     )
 
     # Strip extraneous targets from the point dataset.
