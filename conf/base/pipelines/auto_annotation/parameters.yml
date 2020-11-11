@@ -1,5 +1,5 @@
 # The expected input image height and width of the images from CVAT.
-cvat_image_shape: [3456, 4608]
+cvat_image_shape: [3648, 5472]
 
 # The scale factor to apply for the patches we extract.
 annotation_patch_scale: 0.125
@@ -7,6 +7,6 @@ annotation_patch_scale: 0.125
 annotation_patch_stride: 0.125
 
 # How many images from the start that we want to skip annotating.
-num_initial_frames_to_skip: 115
+num_initial_frames_to_skip: 0
 # Total number of images that we want to annotate.
-num_frames_to_annotate: 80
+num_frames_to_annotate: 10

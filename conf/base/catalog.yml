@@ -2,11 +2,10 @@ _cvat_credentials: &cvat_credentials
   host: "http://localhost:8080/api/v1"
   credentials: dev_cvat
 
-# Cotton counting dataset from CVAT containing full images
-# with point annotations.
+# Cotton counting dataset from CVAT containing full images.
 cotton_images:
   type: pycvat.CvatDataSet
-  task_id: 2
+  task_id: 120
   << : *cvat_credentials
 
 # Cotton counting datasets from CVAT containing image patches with
