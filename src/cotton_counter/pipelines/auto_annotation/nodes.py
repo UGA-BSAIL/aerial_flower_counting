@@ -12,10 +12,11 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
-from pycvat import Job, Label, LabeledImage, Task
+from pycvat import Label, LabeledImage, Task
 
 from ...cvat_utils import get_main_job
 from ...model.dataset_io import inputs_from_generator, save_images_to_disk
+from ...type_helpers import Vector2I
 
 
 def unannotated_patch_dataset(
@@ -66,6 +67,72 @@ def unannotated_patch_dataset(
     return inputs_from_generator(
         iter_unannotated_images, extract_jpegs=True, **kwargs
     )
+
+
+def coerce_patch_shapes(
+    *, patches: tf.data.Dataset, desired_shape: Vector2I
+) -> tf.data.Dataset:
+    """
+    Modifies a dataset of _patches such that the images have a desired shape.
+    It will not change the aspect ratio, so this may involve cropping out the
+    edges.
+
+    Args:
+        patches: The dataset of raw _patches.
+        desired_shape: The desired shape for the _patches, in the form
+            (height, width)
+
+    Returns:
+        A new dataset containing the reshaped _patches.
+
+    """
+    desired_height, desired_width = desired_shape
+    desired_aspect_ratio = desired_width / desired_height
+
+    def _coerce_patch_shape(_patches: tf.Tensor) -> tf.Tensor:
+        """
+        Coerces the shape of a single patch.
+
+        Args:
+            _patches: The batch of patches to reshape.
+
+        Returns:
+            The reshaped patch.
+
+        """
+        input_shape = tf.shape(_patches)
+        input_height = input_shape[1]
+        input_width = input_shape[2]
+        input_aspect_ratio = tf.cast(input_width, tf.float32) / tf.cast(
+            input_height, tf.float32
+        )
+
+        # Calculate what size to rescale to, while maintaining the aspect ratio.
+        scaled_size = tf.cond(
+            input_aspect_ratio < desired_aspect_ratio,
+            # If the desired size is wider that the input, scale to the width.
+            true_fn=lambda: (
+                tf.cast(desired_width / input_aspect_ratio, tf.int32),
+                desired_width,
+            ),
+            # If the desired size is taller than the input, scale to the height.
+            false_fn=lambda: (
+                desired_height,
+                tf.cast(desired_height * input_aspect_ratio, tf.int32),
+            ),
+        )
+
+        resized = tf.image.resize(_patches, size=scaled_size, method="bicubic")
+        # Output from resize() is always float32. We clip to avoid any color
+        # artifacts.
+        resized = tf.cast(tf.clip_by_value(resized, 0, 255), tf.uint8)
+
+        # Crop away any over-sized portions of the image.
+        return tf.image.resize_with_crop_or_pad(
+            resized, desired_height, desired_width
+        )
+
+    return patches.map(lambda e: {"image": _coerce_patch_shape(e["image"])})
 
 
 def save_patches_to_disk(

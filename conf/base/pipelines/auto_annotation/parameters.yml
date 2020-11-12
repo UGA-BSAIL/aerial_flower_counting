@@ -1,5 +1,8 @@
 # The expected input image height and width of the images from CVAT.
 cvat_image_shape: [3648, 5472]
+# This is the shape that we will try to coerce the resulting patches to. It
+# will not change the aspect ratio, so this may involve cropping.
+coerced_patch_shape: [432, 576]
 
 # The scale factor to apply for the patches we extract.
 annotation_patch_scale: 0.125

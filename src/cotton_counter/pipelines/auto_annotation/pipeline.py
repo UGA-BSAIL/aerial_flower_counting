@@ -10,6 +10,7 @@ from typing import Any
 from kedro.pipeline import Pipeline, node
 
 from .nodes import (
+    coerce_patch_shapes,
     predict_patches,
     save_patches_to_disk,
     unannotated_patch_dataset,
@@ -45,11 +46,21 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 ),
                 "unannotated_patch_data",
             ),
+            # Coerce the size of the patches, so all our inputs have the same
+            # size.
+            node(
+                coerce_patch_shapes,
+                dict(
+                    patches="unannotated_patch_data",
+                    desired_shape="params:coerced_patch_shape",
+                ),
+                "unannotated_resized_patch_data",
+            ),
             # Make sure these patches get saved to the disk.
             node(
                 save_patches_to_disk,
                 dict(
-                    patches="unannotated_patch_data",
+                    patches="unannotated_resized_patch_data",
                     batch_size="params:batch_size",
                 ),
                 ["unannotated_saved_patch_data", "saved_image_dir"],
