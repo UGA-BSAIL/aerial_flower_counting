@@ -22,8 +22,8 @@ learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      # (1114 steps per epoch)
-      decay_steps: 2228
+      # (1229 steps per epoch)
+      decay_steps: 2458
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
