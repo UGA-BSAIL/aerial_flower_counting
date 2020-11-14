@@ -5,7 +5,11 @@ Pipeline that handles evaluating a trained model.
 
 from kedro.pipeline import Pipeline, node
 
-from .nodes import evaluate_model, make_example_density_map
+from .nodes import (
+    estimate_counting_accuracy,
+    evaluate_model,
+    make_example_density_map,
+)
 
 
 def create_pipeline(**kwargs):
@@ -18,6 +22,14 @@ def create_pipeline(**kwargs):
     # Common parameters shared by evaluation nodes.
     eval_params = dict(
         model="trained_model", classify_counts="params:classify_counts"
+    )
+    # Common parameters used by nodes that do inference on full images.
+    inference_params = dict(
+        model="trained_model",
+        eval_data="validation_data_no_patches",
+        patch_scale="params:eval_patch_scale",
+        patch_stride="params:eval_patch_stride",
+        batch_size="params:batch_size",
     )
 
     return Pipeline(
@@ -41,14 +53,14 @@ def create_pipeline(**kwargs):
             # Create an example density map.
             node(
                 make_example_density_map,
-                dict(
-                    model="trained_model",
-                    eval_data="validation_data_no_patches",
-                    patch_scale="params:eval_patch_scale",
-                    patch_stride="params:eval_patch_stride",
-                    batch_size="params:batch_size",
-                ),
+                inference_params,
                 "example_density_map",
+            ),
+            # Calculate overall count accuracy on the validation set.
+            node(
+                estimate_counting_accuracy,
+                inference_params,
+                "count_error_report",
             ),
         ]
     )

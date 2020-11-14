@@ -100,7 +100,9 @@ def _make_density_map(
     counts_per_pixel = np.zeros(patch_overlap_map.size, dtype=np.float32)
 
     for prediction, indices in zip(patch_predictions, patch_indices):
-        counts_per_pixel[indices] += prediction
+        patch_size = len(indices)
+        # Distribute the density evenly over the entire patch.
+        counts_per_pixel[indices] += prediction / patch_size
 
     # Compute the density map.
     counts_per_pixel = counts_per_pixel.reshape(patch_overlap_map.shape)
@@ -149,7 +151,7 @@ def count_with_patches(
         batch_size: The batch size to use for inference.
 
     Returns:
-        An approximate density maps for the images, as a 4D array.
+        Approximate density maps for the images, as a 4D array.
 
     """
     if patch_stride is None:
@@ -194,3 +196,27 @@ def count_with_patches(
         )
 
     return np.stack(density_maps, axis=0)
+
+
+def calculate_max_density(images: tf.Tensor, *, patch_scale: float) -> float:
+    """
+    Calculates the maximum value that can appear in a density map for a certain
+    image and patch scale.
+
+    Args:
+        images: The images to calculate this for.
+        patch_scale: The scale of the patches to extract.
+
+    Returns:
+        The maximum value that can appear in a density map.
+
+    """
+    # Calculate the patch shape.
+    image_batch_shape = tf.shape(images).numpy()
+    single_image_shape = image_batch_shape[1:3]
+    patch_shape = single_image_shape * patch_scale
+    logger.debug("Calculated patch shape of {}.", patch_shape)
+
+    # The maximum density is just the reciprocal, because at most we can have
+    # one flower per patch.
+    return 1.0 / np.prod(patch_shape)

@@ -199,6 +199,7 @@ def _add_counts(
     images: tf.Tensor,
     density_maps: tf.Tensor,
     bucket_min_values: List[float],
+    include_counts: bool = True,
 ) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
     """
     Adds summed count values to a `Dataset`.
@@ -210,6 +211,7 @@ def _add_counts(
             each discrete count bucket. Note that the highest bucket will
             contain anything that falls between the largest minimum value and
             infinity.
+        include_counts: If true, include the raw counts in the targets.
 
     Returns:
         A dictionary mapping model inputs to tensors and a dictionary mapping
@@ -223,10 +225,10 @@ def _add_counts(
         counts, bucket_min_values=bucket_min_values
     )
 
-    return (
-        dict(image=images),
-        dict(discrete_count=discrete_counts),
-    )
+    targets = dict(discrete_count=discrete_counts)
+    if include_counts:
+        targets["count"] = counts
+    return dict(image=images), targets
 
 
 def _extract_patches(
@@ -365,6 +367,7 @@ def inputs_and_targets_from_dataset(
     patch_scale: float = 1.0,
     random_patches: bool = True,
     shuffle: bool = True,
+    include_counts: bool = False,
 ) -> tf.data.Dataset:
     """
     Deserializes raw data from a `Dataset` containing full images and point
@@ -392,6 +395,8 @@ def inputs_and_targets_from_dataset(
             false, it will instead extract a set of standardized patches.
         shuffle: If true, it will shuffle the data in the dataset randomly.
             Disable if you want the output to always be deterministic.
+        include_counts: If true, include the raw flower count for the patch
+            in the targets under the "count" key.
 
     Returns:
         A dataset that produces input images and density maps.
@@ -428,7 +433,10 @@ def inputs_and_targets_from_dataset(
     # Compute total counts.
     patches_with_counts = patched_dataset.map(
         lambda i, d: _add_counts(
-            images=i, density_maps=d, bucket_min_values=bucket_min_values
+            images=i,
+            density_maps=d,
+            bucket_min_values=bucket_min_values,
+            include_counts=include_counts,
         ),
         num_parallel_calls=_NUM_THREADS,
     )

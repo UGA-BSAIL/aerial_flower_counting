@@ -19,3 +19,9 @@ example_density_map:
   type: pillow.ImageDataSet
   filepath: ${output_data_dir}/08_reporting/example_density_map.jpg
   versioned: True
+
+# A YAML report containing detailed counting errors for the validation set.
+count_error_report:
+  type: yaml.YAMLDataSet
+  filepath: ${output_data_dir}/08_reporting/count_error_report.yaml
+  versioned: True

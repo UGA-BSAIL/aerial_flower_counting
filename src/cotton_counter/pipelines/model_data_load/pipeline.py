@@ -43,6 +43,10 @@ def create_pipeline(**kwargs):
     pre_process_node_not_training = partial(
         inputs_and_targets_from_dataset, random_patches=False, shuffle=False
     )
+    # Sometimes we want to include raw counts.
+    pre_process_node_with_counts = partial(
+        pre_process_node_not_training, include_counts=True,
+    )
 
     return Pipeline(
         [
@@ -64,7 +68,7 @@ def create_pipeline(**kwargs):
             ),
             # Create a version of the validation dataset with no patches.
             node(
-                pre_process_node_not_training,
+                pre_process_node_with_counts,
                 dict(
                     raw_dataset="tfrecord_validate",
                     **pre_process_params_no_patch,
