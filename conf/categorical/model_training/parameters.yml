@@ -8,11 +8,6 @@ visualization_period: 10
 # How many images from each batch to visualize.
 num_per_batch_to_visualize: 1
 
-# A list of the minimum count values that will go in each discrete
-# count bucket. Note that the highest bucket will contain anything
-# that falls between the largest minimum value and infinity.
-bucket_min_values: [0.0, 1.0]
-
 # Learning phases to use for training the model.
 learning_phases:
   # The initial learning rate to use for the phase.

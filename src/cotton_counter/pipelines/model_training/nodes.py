@@ -56,10 +56,7 @@ def _make_learning_rate(
 
 
 def create_model(
-    input_image_shape: Vector2I,
-    patch_scale: float,
-    classify_counts: bool,
-    bucket_min_values: List[float],
+    input_image_shape: Vector2I, patch_scale: float, classify_counts: bool,
 ) -> keras.Model:
     """
     Builds the model to use.
@@ -70,10 +67,6 @@ def create_model(
         patch_scale: The scale factor to apply for the patches we extract.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
-        bucket_min_values: A list of the minimum count values that will go in
-            each discrete count bucket. Note that the highest bucket will
-            contain anything that falls between the largest minimum value and
-            infinity.
 
     Returns:
         The model that it created.
@@ -84,12 +77,8 @@ def create_model(
     patch_width = int(input_width * patch_scale)
     patch_height = int(input_height * patch_scale)
 
-    num_classes = None
-    if classify_counts:
-        logger.info("Using classification model.")
-        num_classes = len(bucket_min_values)
     model = build_model(
-        input_size=(patch_width, patch_height), num_classes=num_classes
+        input_size=(patch_width, patch_height), use_mil=classify_counts
     )
 
     logger.info("Model has {} parameters.", model.count_params())
@@ -105,7 +94,6 @@ def make_callbacks(
     histogram_frequency: int,
     visualization_period: int,
     max_density_threshold: float,
-    bucket_min_values: List[float],
     classify_counts: bool,
     num_per_batch_to_visualize: int,
 ) -> List[keras.callbacks.Callback]:
@@ -124,10 +112,6 @@ def make_callbacks(
         max_density_threshold: Density threshold to use for colorization.
                 Any pixel with this density or more will show up as the maximum
                 density color.
-        bucket_min_values: A list of the minimum count values that will go in
-            each discrete count bucket. Note that the highest bucket will
-            contain anything that falls between the largest minimum value and
-            infinity.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
         num_per_batch_to_visualize: Number of images to visualize from each
@@ -163,7 +147,7 @@ def make_callbacks(
             model=model,
             dataset=testing_data,
             log_period=visualization_period,
-            num_classes=len(bucket_min_values),
+            num_classes=1,
             num_images_per_batch=num_per_batch_to_visualize,
         )
         callbacks.append(activation_callback)

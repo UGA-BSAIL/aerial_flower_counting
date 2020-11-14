@@ -246,7 +246,8 @@ class LogClassActivations(_ImageLoggingCallback):
             class_visualizations = visualize_heat_maps(
                 images=image_batch,
                 features=class_activations,
-                # Softmax activation will put everything between 0 and 1.
+                # Softmax or sigmoid activation will put everything between 0
+                # and 1.
                 max_color_threshold=1.0,
             )
 

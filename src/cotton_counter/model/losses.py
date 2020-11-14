@@ -101,6 +101,6 @@ def make_losses(
     loss_dict = {}
     if classify_counts:
         # Use cross-entropy for classification.
-        loss_dict["discrete_count"] = "sparse_categorical_crossentropy"
+        loss_dict["discrete_count"] = "binary_crossentropy"
 
     return loss_dict

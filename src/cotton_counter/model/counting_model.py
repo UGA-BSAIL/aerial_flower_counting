@@ -106,41 +106,35 @@ def _build_count_regression_head(
     )(density_head)
 
 
-def _build_count_classification_head(
-    model_top: layers.Layer, *, num_classes: int
-) -> layers.Layer:
+def _build_count_classification_head(model_top: layers.Layer) -> layers.Layer:
     """
     Adds the head for classifying categorical count values.
 
     Args:
         model_top: The top model layer to build the head on.
-        num_classes: The total number of count classes we have.
 
     Returns:
         The layer representing the categorical count logits.
 
     """
-    count_conv_1 = layers.Conv2D(num_classes, 1, name="activation_maps")(
-        model_top
-    )
+    count_conv_1 = layers.Conv2D(1, 1, name="activation_maps")(model_top)
     count_pool_1 = layers.GlobalAveragePooling2D()(count_conv_1)
-    count_softmax = layers.Softmax(name="discrete_count")(count_pool_1)
+    count_sigmoid = layers.Activation("sigmoid", name="discrete_count")(
+        count_pool_1
+    )
 
-    return count_softmax
+    return count_sigmoid
 
 
-def build_model(
-    *, input_size: Vector2I, num_classes: Optional[int] = None
-) -> keras.Model:
+def build_model(*, input_size: Vector2I, use_mil: bool = False) -> keras.Model:
     """
     Creates the full SaNet model.
 
     Args:
         input_size: The size of the input images that will be provided,
             in the form (width, height).
-        num_classes: The number of classes to use if we want to use the count
-            classification output. If this is `None`, it will assume we want to
-            regress the counts directly.
+        use_mil: Whether to use a binary output for the MIL task. Otherwise,
+            it will assume that we want to regress the counts directly.
 
     Returns:
         The model that it created.
@@ -150,11 +144,9 @@ def build_model(
     backbone = _build_model_backbone(image_input=image_input)
 
     model_outputs = {}
-    if num_classes is not None:
+    if use_mil:
         # Use the classification head.
-        discrete_count = _build_count_classification_head(
-            backbone, num_classes=num_classes
-        )
+        discrete_count = _build_count_classification_head(backbone)
         model_outputs["discrete_count"] = discrete_count
 
     # Create the model.

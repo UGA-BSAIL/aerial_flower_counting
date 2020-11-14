@@ -27,7 +27,6 @@ def create_pipeline(**kwargs):
         image_shape="params:input_image_shape",
         map_shape="params:density_map_shape",
         sigma="params:density_map_sigma",
-        bucket_min_values="params:bucket_min_values",
         **pre_process_params_tagged_patches,
     )
     # Parameters for point datasets with patching.

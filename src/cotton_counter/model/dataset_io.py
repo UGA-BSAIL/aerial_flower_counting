@@ -195,11 +195,7 @@ def _discretize_counts(
 
 
 def _add_counts(
-    *,
-    images: tf.Tensor,
-    density_maps: tf.Tensor,
-    bucket_min_values: List[float],
-    include_counts: bool = True,
+    *, images: tf.Tensor, density_maps: tf.Tensor, include_counts: bool = True,
 ) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
     """
     Adds summed count values to a `Dataset`.
@@ -207,10 +203,6 @@ def _add_counts(
     Args:
         images: The input image data.
         density_maps: The corresponding density maps.
-        bucket_min_values: A list of the minimum count values that will go in
-            each discrete count bucket. Note that the highest bucket will
-            contain anything that falls between the largest minimum value and
-            infinity.
         include_counts: If true, include the raw counts in the targets.
 
     Returns:
@@ -222,7 +214,9 @@ def _add_counts(
 
     # Discretize the counts.
     discrete_counts = _discretize_counts(
-        counts, bucket_min_values=bucket_min_values
+        # Use two classes for the MIL task.
+        counts,
+        bucket_min_values=[0.0, 1.0],
     )
 
     targets = dict(discrete_count=discrete_counts)
@@ -361,7 +355,6 @@ def inputs_and_targets_from_dataset(
     image_shape: Vector2I,
     map_shape: Vector2I,
     sigma: float,
-    bucket_min_values: List[float],
     batch_size: int = 32,
     num_prefetch_batches: int = 5,
     patch_scale: float = 1.0,
@@ -382,10 +375,6 @@ def inputs_and_targets_from_dataset(
         sigma:
             The standard deviation in pixels to use for the applied gaussian
             filter.
-        bucket_min_values: A list of the minimum count values that will go in
-            each discrete count bucket. Note that the highest bucket will
-            contain anything that falls between the largest minimum value and
-            infinity.
         batch_size: The size of the batches that we generate.
         num_prefetch_batches: The number of batches to prefetch into memory.
             Increasing this can increase performance at the expense of memory
@@ -433,10 +422,7 @@ def inputs_and_targets_from_dataset(
     # Compute total counts.
     patches_with_counts = patched_dataset.map(
         lambda i, d: _add_counts(
-            images=i,
-            density_maps=d,
-            bucket_min_values=bucket_min_values,
-            include_counts=include_counts,
+            images=i, density_maps=d, include_counts=include_counts,
         ),
         num_parallel_calls=_NUM_THREADS,
     )

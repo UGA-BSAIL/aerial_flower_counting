@@ -25,6 +25,6 @@ def make_metrics(
 
     if classify_counts:
         # Add a standard accuracy metric for the classification.
-        metrics["discrete_count"] = "sparse_categorical_accuracy"
+        metrics["discrete_count"] = "binary_accuracy"
 
     return metrics

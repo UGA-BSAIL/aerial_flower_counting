@@ -49,7 +49,6 @@ def create_pipeline(**kwargs: Any):
                     input_image_shape="params:input_image_shape",
                     patch_scale="params:patch_scale",
                     classify_counts="params:classify_counts",
-                    bucket_min_values="params:bucket_min_values",
                 ),
                 "initial_model",
                 tags={PRE_PROCESS_TAG},
@@ -64,7 +63,6 @@ def create_pipeline(**kwargs: Any):
                     histogram_frequency="params:histogram_frequency",
                     visualization_period="params:visualization_period",
                     max_density_threshold="params:max_density_threshold",
-                    bucket_min_values="params:bucket_min_values",
                     classify_counts="params:classify_counts",
                     num_per_batch_to_visualize="params"
                     ":num_per_batch_to_visualize",
