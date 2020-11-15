@@ -122,14 +122,21 @@ def _make_report(*, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
         zip(y_true, y_pred, per_sample_error)
     ):
         per_sample_lines.append(
-            dict(sample=sample_num, true=true, pred=pred, error=error)
+            dict(
+                sample_num=sample_num,
+                y_true=float(true),
+                y_pred=float(pred),
+                error=float(error),
+            )
         )
 
     # Calculate overall error.
     mean_error = np.mean(per_sample_error)
     logger.info("Mean absolute count error: {}", mean_error)
 
-    return dict(mean_error=mean_error, per_sample_error=per_sample_lines)
+    return dict(
+        mean_error=mean_error.tolist(), per_sample_error=per_sample_lines
+    )
 
 
 def estimate_counting_accuracy(
