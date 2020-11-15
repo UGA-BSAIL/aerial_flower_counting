@@ -122,9 +122,10 @@ def _classes_to_counts(predictions: Dict[str, np.ndarray]) -> np.ndarray:
         The estimated counts.
 
     """
-    discrete_y_hat = predictions["discrete_count"]
-    # Convert from the softmax distribution to actual classes.
-    discrete_classes = np.argmax(discrete_y_hat, axis=1)
+    discrete_y_hat = predictions["discrete_count"].squeeze()
+    # Convert from the sigmoid distribution to actual classes.
+    discrete_classes = discrete_y_hat > 0.5
+    discrete_classes = discrete_classes.astype(np.int32)
 
     # In this case, we assume that class zero means there is one flower in the
     # image.
