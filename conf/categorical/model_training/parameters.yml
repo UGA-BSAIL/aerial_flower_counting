@@ -1,6 +1,11 @@
 # The scale factor to apply for the patches we extract.
 patch_scale: 0.125
 
+# The scale factor and stride to use for the sub-patches we extract
+# when computing the cross-scale consistency loss.
+sub_patch_scale: 0.5
+sub_patch_stride: 0.5
+
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 1
 # Every time this many epochs elapse, it will generate new density map visualizations.

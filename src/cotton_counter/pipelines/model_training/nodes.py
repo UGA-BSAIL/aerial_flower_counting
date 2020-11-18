@@ -56,7 +56,12 @@ def _make_learning_rate(
 
 
 def create_model(
-    input_image_shape: Vector2I, patch_scale: float, classify_counts: bool,
+    *,
+    input_image_shape: Vector2I,
+    patch_scale: float,
+    sub_patch_scale: float,
+    sub_patch_stride: float,
+    classify_counts: bool,
 ) -> keras.Model:
     """
     Builds the model to use.
@@ -65,6 +70,10 @@ def create_model(
         input_image_shape: The shape of the input images, in the form
         (height, width)
         patch_scale: The scale factor to apply for the patches we extract.
+        sub_patch_scale: The scale factor to use for extracting sub-patches when
+            computing the cross-scale consistency loss.
+        sub_patch_stride: The stride to use for extracting sub-patches when
+            computing the cross-scale consistency loss.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
 
@@ -78,7 +87,10 @@ def create_model(
     patch_height = int(input_height * patch_scale)
 
     model = build_model(
-        input_size=(patch_width, patch_height), use_mil=classify_counts
+        input_size=(patch_width, patch_height),
+        use_mil=classify_counts,
+        sub_patch_scale=sub_patch_scale,
+        sub_patch_stride=sub_patch_stride,
     )
 
     logger.info("Model has {} parameters.", model.count_params())
