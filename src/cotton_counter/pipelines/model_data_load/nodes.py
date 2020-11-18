@@ -105,3 +105,23 @@ def combine_point_and_tag_datasets(
     )
     # Re-batch once we've combined.
     return combined.batch(batch_size)
+
+
+def add_sub_patch_target(dataset: tf.data.Dataset) -> tf.data.Dataset:
+    """
+    Modifies a dataset to add a target for the sub-patch classes, which is
+    needed by Keras.
+
+    Args:
+        dataset: The dataset to add the sub-patch classes to.
+
+    Returns:
+        The modified dataset.
+
+    """
+    return dataset.map(
+        lambda i, t: (
+            i,
+            dict(discrete_sub_patch_count=t["discrete_count"], **t),
+        )
+    )

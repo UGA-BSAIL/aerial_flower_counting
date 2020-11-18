@@ -65,14 +65,6 @@ validation_data:
   type: MemoryDataSet
   copy_mode: assign
 
-tagged_patch_data_positive:
-  type: MemoryDataSet
-  copy_mode: assign
-
-tagged_patch_data_negative:
-  type: MemoryDataSet
-  copy_mode: assign
-
 # Intermediate TF Dataset containing patches with tag annotations.
 # It is sourced from both the training point dataset and the tagged
 # patch dataset.

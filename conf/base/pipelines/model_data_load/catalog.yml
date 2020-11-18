@@ -1,5 +1,25 @@
-# This is a boilerplate catalog config generated for pipeline 'model_data_load'
-# using Kedro 0.16.4.
-#
-# Documentation for this file format can be found in "The Data Catalog"
-# Link: https://kedro.readthedocs.io/en/stable/05_data/01_data_catalog.html
+# Intermediate TF Datasets without sub-patch target values.
+training_data_no_sub_patch_target:
+  type: MemoryDataSet
+  copy_mode: assign
+
+testing_data_no_sub_patch_target:
+  type: MemoryDataSet
+  copy_mode: assign
+
+validation_data_no_sub_patch_target:
+  type: MemoryDataSet
+  copy_mode: assign
+
+combined_training_data_no_sub_patch_target:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Intermediate datasets containing data with patch-level annotations.
+tagged_patch_data_positive:
+  type: MemoryDataSet
+  copy_mode: assign
+
+tagged_patch_data_negative:
+  type: MemoryDataSet
+  copy_mode: assign

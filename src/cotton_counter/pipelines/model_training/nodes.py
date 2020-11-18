@@ -191,10 +191,11 @@ def train_model(
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
 
-        # If not specified explicitly, the discrete count is ignored.
         discrete_count_loss_weight = phase.get(
-            "discrete_count_loss_weight", 0.0
+            "discrete_count_loss_weight", 1.0
         )
+        # If not specified explicitly, the cross-scale loss is ignored.
+        cross_scale_loss_weight = phase.get("cross_scale_loss_weight", 0.0)
 
         optimizer = keras.optimizers.SGD(
             learning_rate=_make_learning_rate(
@@ -206,7 +207,10 @@ def train_model(
         model.compile(
             optimizer=optimizer,
             loss=make_losses(classify_counts=classify_counts),
-            loss_weights={"discrete_count": discrete_count_loss_weight},
+            loss_weights={
+                "discrete_count": discrete_count_loss_weight,
+                "discrete_sub_patch_count": cross_scale_loss_weight,
+            },
             metrics=make_metrics(classify_counts=classify_counts),
         )
         model.fit(
