@@ -161,7 +161,7 @@ def _build_count_classification_head(
 
     Returns:
         The layer representing the categorical count logits, and the layer
-        representing the logits for each sub-patch.
+        representing the average activations for each sub-patch.
 
     """
     count_conv_1 = layers.Conv2D(1, 1, name="activation_maps")(model_top)
@@ -172,17 +172,18 @@ def _build_count_classification_head(
         arguments=dict(
             sub_patch_scale=sub_patch_scale, sub_patch_stride=sub_patch_stride,
         ),
+        name="discrete_sub_patch_count",
     )(count_conv_1)
-    sub_patch_sigmoid = layers.Activation(
-        "sigmoid", name="discrete_sub_patch_count"
-    )(sub_patch_pool_1)
+    # We deliberately return the raw values for the sub-patches instead of the
+    # sigmoid. This is an implementation hack to get around the fact that Keras
+    # does not allow the use of multiple outputs in a single loss function.
 
     count_pool_1 = layers.GlobalAveragePooling2D()(count_conv_1)
     count_sigmoid = layers.Activation("sigmoid", name="discrete_count")(
         count_pool_1
     )
 
-    return count_sigmoid, sub_patch_sigmoid
+    return count_sigmoid, sub_patch_pool_1
 
 
 def build_model(

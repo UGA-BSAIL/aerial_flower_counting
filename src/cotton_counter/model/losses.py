@@ -94,9 +94,10 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
     negative class overall, but still predicts the positive class for some
     sub-patches.
 
-    Note that for the predictions input, it requires the probability for each
+    Note that for the predictions input, it requires the activation for each
     sub-patch, not for the entire input. It expects this to be formatted as a 2D
-    tensor with shape (batch, sub-patch)
+    tensor with shape (batch, sub-patch). Also note that it expects the
+    sigmoid function to not yet have been applied to the predictions.
     """
 
     def __init__(
@@ -127,23 +128,26 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
         self._threshold = threshold
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        activation = tf.sigmoid
         if self._reverse_classes:
             # To make the math more intuitive, we always want to treat the
             # output as the probability of the example belonging to the
             # positive class. If the opposite is true, modify the input so
             # that this holds.
             y_true = tf.constant(1, dtype=tf.int32) - y_true
-            y_pred = tf.constant(1.0, dtype=tf.float32) - y_pred
+
+            def activation(x):
+                return 1.0 - tf.sigmoid(x)
 
         # Calculate the probability for the full input.
-        input_probability = tf.reduce_mean(y_pred, axis=1)
+        input_probability = activation(tf.reduce_mean(y_pred, axis=1))
 
         # Determine the cross-entropy loss for each sub-patch.
         sub_patch_true = tf.broadcast_to(y_true, tf.shape(y_pred))
         # This will already average across the sub-patch dimension, so there
         # is no need for any further averaging.
         input_losses = tf.keras.losses.binary_crossentropy(
-            sub_patch_true, y_pred
+            sub_patch_true, activation(y_pred)
         )
 
         # Weight by the probability of the full input being negative.
