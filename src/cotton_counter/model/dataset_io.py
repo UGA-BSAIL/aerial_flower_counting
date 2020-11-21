@@ -325,7 +325,7 @@ def _write_to_file(
     return file_path
 
 
-def _extract_from_feature_dict(
+def _extract_from_points_feature_dict(
     feature_dataset: tf.data.Dataset,
     *,
     include_counts: bool = False,
@@ -454,7 +454,7 @@ def inputs_and_targets_from_dataset(
         random_patches=random_patches,
     )
     # Re-batch and wrangle it.
-    patches_with_counts = _extract_from_feature_dict(
+    patches_with_counts = _extract_from_points_feature_dict(
         patch_dataset, include_counts=include_counts, batch_size=batch_size,
     )
 
