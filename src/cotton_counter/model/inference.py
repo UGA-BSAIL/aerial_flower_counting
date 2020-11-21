@@ -62,7 +62,7 @@ def _make_patch_overlap_map(
         image_shape: The size of the input image, in the form (height, width).
 
     Returns:
-        A 2D integer array of the same shape as `image_shape`.
+        A 2D integer array of the same shape as `image_size`.
 
     """
     image_size = np.prod(image_shape)

@@ -13,11 +13,10 @@ import tensorflow as tf
 from loguru import logger
 
 from ..type_helpers import Vector2I
-from .density_maps import make_density_maps
 from .patches import (
-    extract_random_patches,
+    extract_random_annotated_patches,
+    extract_standard_annotated_patches,
     extract_standard_patches,
-    extract_standard_patches_from_dataset,
 )
 from .records import Annotations
 
@@ -46,7 +45,7 @@ Number of threads to use for multi-threaded operations.
 """
 
 
-def _decode_jpeg(jpeg_batch: tf.Tensor) -> tf.Tensor:
+def _decode_jpegs(jpeg_batch: tf.Tensor) -> tf.Tensor:
     """
     Decodes JPEG images from a feature dictionary.
 
@@ -84,42 +83,82 @@ def _parse_example(
     return tf.io.parse_single_example(serialized, feature_schema)
 
 
-def _load_from_points_feature_dict(
-    feature_dict: Dict[str, tf.Tensor], *, map_shape: Vector2I, sigma: float
-) -> Tuple[tf.Tensor, tf.Tensor]:
+def _transform_to_patches(
+    feature_dataset: tf.data.Dataset,
+    *,
+    image_shape: Vector2I,
+    patch_scale: float,
+    random_patches: bool,
+) -> tf.data.Dataset:
     """
-    Wrangles the data from a parsed feature dictionary for points annotations
-    into images and density maps.
+    Extracts image patches from a dataset of parsed feature dictionaries.
 
     Args:
-        feature_dict: The parsed feature dictionary.
-        map_shape: The shape of the output density maps to generate, in the
-            form (height, width). The samples dimension will be inferred.
-        sigma:
-            The standard deviation in pixels to use for the applied gaussian
-            filter.
+        feature_dataset: The dataset containing parsed feature dictionaries.
+            It expects these to already be divided into batches.
+        image_shape: The shape of the input images, in the form
+            (height, width).
+        patch_scale: The scale factor to use for the patches.
+        random_patches: If true, extract random patches. Otherwise, extract
+            standardized patched.
 
     Returns:
-        The images from the batch as well as the generated density maps.
+        A dataset that is similar in structure to the input, but contains
+        patches instead of full images. Also, all batching will have been
+        removed.
 
     """
-    # Decode the JPEG images.
-    images = _decode_jpeg(feature_dict["image"])
 
-    # Convert from sparse to ragged tensors.
-    frame_numbers = tf.RaggedTensor.from_sparse(feature_dict["frame_numbers"])
-    x_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_x"])
-    y_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_y"])
+    def _process_with_annotations(
+        feature_dict: Dict[str, tf.Tensor],
+        patcher: Callable[..., tf.data.Dataset],
+    ) -> tf.data.Dataset:
+        """
+        Helper function that manipulates the annotations from a feature
+        dictionary into an `Annotations` object and extracts patches. Note
+        that it expects the images to be still encoded in JPEG form and will
+        automatically decode them.
 
-    # Create density maps.
-    annotations = Annotations(
-        frame_numbers=frame_numbers, x_values=x_values, y_values=y_values,
+        Args:
+            feature_dict: The feature dictionary.
+            patcher: The function to use for extracting patches.
+
+        Returns:
+            The extracted patches, in a new dataset.
+
+        """
+        # Convert from sparse to ragged tensors.
+        x_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_x"])
+        y_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_y"])
+
+        annotations = Annotations(x_values=x_values, y_values=y_values,)
+
+        # Decode the images.
+        images = _decode_jpegs(feature_dict["image"])
+        # Set static shapes for the images. We assume that each image has 3
+        # channels.
+        images = tf.map_fn(
+            lambda i: tf.ensure_shape(i, tuple(image_shape) + (3,)), images
+        )
+
+        return patcher(
+            images=images, annotations=annotations, patch_scale=patch_scale
+        )
+
+    # Choose the patch extraction function.
+    if random_patches:
+        patch_extractor = functools.partial(
+            _process_with_annotations, patcher=extract_random_annotated_patches
+        )
+    else:
+        patch_extractor = functools.partial(
+            _process_with_annotations,
+            patcher=extract_standard_annotated_patches,
+        )
+
+    return feature_dataset.interleave(
+        patch_extractor, num_parallel_calls=_NUM_THREADS
     )
-    density_maps = make_density_maps(
-        annotations, map_shape=map_shape, sigma=sigma
-    )
-
-    return images, density_maps
 
 
 def _load_from_tag_feature_dict(
@@ -139,7 +178,7 @@ def _load_from_tag_feature_dict(
 
     """
     # Decode the JPEG images.
-    images = _decode_jpeg(feature_dict["image"])
+    images = _decode_jpegs(feature_dict["image"])
     # Assume the images have three channels.
     images = tf.ensure_shape(images, (None, None, None, 3))
 
@@ -171,6 +210,8 @@ def _discretize_counts(
         An integer tensor containing the categorical counts.
 
     """
+    # Cast to floats for easy comparison.
+    counts = tf.cast(counts, tf.float32)
     # Make sure they're sorted from high to low.
     bucket_min_values.sort(reverse=True)
 
@@ -194,98 +235,35 @@ def _discretize_counts(
     return categorical_counts
 
 
-def _add_counts(
-    *, images: tf.Tensor, density_maps: tf.Tensor, include_counts: bool = True,
-) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
+def _counts_from_feature_dict(
+    *, feature_dict: Dict[str, tf.Tensor], include_counts: bool = True,
+) -> Dict[str, tf.Tensor]:
     """
     Adds summed count values to a `Dataset`.
 
     Args:
-        images: The input image data.
-        density_maps: The corresponding density maps.
+        feature_dict: The deserialized feature dictionary for a single frame.
         include_counts: If true, include the raw counts in the targets.
 
     Returns:
-        A dictionary mapping model inputs to tensors and a dictionary mapping
-        model outputs to tensors.
+        A dictionary mapping count and discrete count outputs to tensors.
 
     """
-    counts = tf.reduce_sum(density_maps, axis=[1, 2, 3])
+    # Find the number of annotations.
+    x_values = feature_dict["annotation_x"]
+    count = tf.size(x_values)
 
     # Discretize the counts.
     discrete_counts = _discretize_counts(
+        count,
         # Use two classes for the MIL task.
-        counts,
         bucket_min_values=[0.0, 1.0],
     )
 
     targets = dict(discrete_count=discrete_counts)
     if include_counts:
-        targets["count"] = counts
-    return dict(image=images), targets
-
-
-def _extract_patches(
-    image_dataset: tf.data.Dataset,
-    *,
-    patch_scale: float,
-    random_patches: bool,
-    batch_size: int,
-    image_shape: Vector2I,
-    map_shape: Vector2I,
-) -> tf.data.Dataset:
-    """
-    Extracts patches from input images and density maps.
-
-    Args:
-        image_dataset: An input dataset where each element contains a raw image
-            and a corresponding density map.
-        patch_scale: Scale of the patches to extract from each image.
-        random_patches: Whether to extract random patches from the input. If
-            false, it will instead extract a set of standardized patches.
-        batch_size: The size of the batches in the input dataset.
-        image_shape: The shape of the input images, in the form
-            (height, width).
-        map_shape: The shape of the output density maps to generate, in the
-            form (height, width).
-
-    Returns:
-        A new dataset containing the patches from the raw images and density
-        maps.
-
-    """
-    # Compute full static shapes for each batch. (We can't specify the batch
-    # size statically because the last one might be smaller.)
-    image_shape = tuple(image_shape)
-    map_shape = tuple(map_shape)
-    full_image_shape = (None,) + image_shape + (3,)
-    full_density_shape = (None,) + map_shape + (1,)
-    images_with_shapes = image_dataset.map(
-        lambda i, d: (
-            tf.ensure_shape(i, full_image_shape),
-            tf.ensure_shape(d, full_density_shape),
-        )
-    )
-
-    if random_patches:
-        patched_dataset = images_with_shapes.map(
-            lambda i, d: extract_random_patches(
-                images=i, density_maps=d, patch_scale=patch_scale
-            ),
-            num_parallel_calls=_NUM_THREADS,
-        )
-    else:
-        patched_dataset = images_with_shapes.interleave(
-            lambda i, d: extract_standard_patches_from_dataset(
-                images=i, density_maps=d, patch_scale=patch_scale
-            ),
-            cycle_length=_NUM_THREADS,
-            num_parallel_calls=_NUM_THREADS,
-        )
-        # This effectively removed the batching, so we need to re-batch.
-        patched_dataset = patched_dataset.batch(batch_size)
-
-    return patched_dataset
+        targets["count"] = count
+    return targets
 
 
 def _repeat_patches(
@@ -349,12 +327,84 @@ def _write_to_file(
     return file_path
 
 
+def _extract_from_feature_dict(
+    feature_dataset: tf.data.Dataset,
+    *,
+    include_counts: bool = False,
+    batch_size: int,
+) -> tf.data.Dataset:
+    """
+    Extracts and wrangles relevant data from the parsed feature dictionaries. It
+    will extract patches, and combine the data into batches.
+
+    Args:
+        feature_dataset: The input dataset containing parsed feature
+            dictionaries. It expects the JPEG images to have already been
+            decoded, and patches to have already been extracted.
+        include_counts: If true, include the raw counts in the targets.
+        batch_size: The size of the batches that we generate.
+
+    Returns:
+        A dataset containing a dictionary of inputs, and a dictionary of
+        targets, divided into batches.
+
+    """
+
+    def add_counts(feature_dict: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
+        """
+        Stage 1: Adds "count" and "discrete_count" keys to the feature
+        dictionary.
+
+        Args:
+            feature_dict: The input feature dictionary.
+
+        Returns:
+            The output feature dictionary.
+
+        """
+        count_features = _counts_from_feature_dict(
+            feature_dict=feature_dict, include_counts=include_counts
+        )
+
+        feature_dict.update(count_features)
+        return feature_dict
+
+    features_with_counts = feature_dataset.map(
+        add_counts, num_parallel_calls=_NUM_THREADS
+    )
+
+    def split_inputs_and_targets(
+        feature_dict: Dict[str, tf.Tensor]
+    ) -> Tuple[Dict[str, tf.Tensor], Dict[str, tf.Tensor]]:
+        """
+        Stage 2: Splits a feature dictionary into separate inputs and targets
+        dictionaries with extraneous keys removed.
+
+        Args:
+            feature_dict: The feature dictionary to split.
+
+        Returns:
+            The two separate inputs and targets dictionaries.
+
+        """
+        inputs = dict(image=feature_dict["image"])
+        targets = dict(discrete_count=feature_dict["discrete_count"],)
+        if include_counts:
+            targets["count"] = feature_dict["count"]
+
+        return inputs, targets
+
+    with_correct_schema = features_with_counts.map(
+        split_inputs_and_targets, num_parallel_calls=_NUM_THREADS,
+    )
+
+    return with_correct_schema.batch(batch_size)
+
+
 def inputs_and_targets_from_dataset(
     raw_dataset: tf.data.Dataset,
     *,
     image_shape: Vector2I,
-    map_shape: Vector2I,
-    sigma: float,
     batch_size: int = 32,
     num_prefetch_batches: int = 5,
     patch_scale: float = 1.0,
@@ -370,11 +420,6 @@ def inputs_and_targets_from_dataset(
         raw_dataset: The raw dataset, containing serialized data.
         image_shape: The shape of the input images, in the form
             (height, width).
-        map_shape: The shape of the output density maps to generate, in the
-            form (height, width). The samples dimension will be inferred.
-        sigma:
-            The standard deviation in pixels to use for the applied gaussian
-            filter.
         batch_size: The size of the batches that we generate.
         num_prefetch_batches: The number of batches to prefetch into memory.
             Increasing this can increase performance at the expense of memory
@@ -402,29 +447,19 @@ def inputs_and_targets_from_dataset(
             batch_size * num_prefetch_batches, reshuffle_each_iteration=True
         )
 
-    # Batch and wrangle it.
-    batched = feature_dataset.batch(batch_size)
-    density_dataset = batched.map(
-        functools.partial(
-            _load_from_points_feature_dict, map_shape=map_shape, sigma=sigma
-        ),
-        num_parallel_calls=_NUM_THREADS,
-    )
+    # Pre-batch the data now for efficient patch extraction.
+    feature_dataset_batched = feature_dataset.batch(batch_size)
+
     # Extract patches.
-    patched_dataset = _extract_patches(
-        density_dataset,
+    patch_dataset = _transform_to_patches(
+        feature_dataset_batched,
+        image_shape=image_shape,
         patch_scale=patch_scale,
         random_patches=random_patches,
-        batch_size=batch_size,
-        image_shape=image_shape,
-        map_shape=map_shape,
     )
-    # Compute total counts.
-    patches_with_counts = patched_dataset.map(
-        lambda i, d: _add_counts(
-            images=i, density_maps=d, include_counts=include_counts,
-        ),
-        num_parallel_calls=_NUM_THREADS,
+    # Re-batch and wrangle it.
+    patches_with_counts = _extract_from_feature_dict(
+        patch_dataset, include_counts=include_counts, batch_size=batch_size,
     )
 
     if random_patches:

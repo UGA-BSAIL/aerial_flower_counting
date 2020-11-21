@@ -25,8 +25,6 @@ def create_pipeline(**kwargs):
     # Parameters for point datasets with no patching.
     pre_process_params_no_patch = dict(
         image_shape="params:input_image_shape",
-        map_shape="params:density_map_shape",
-        sigma="params:density_map_sigma",
         **pre_process_params_tagged_patches,
     )
     # Parameters for point datasets with patching.
@@ -37,7 +35,10 @@ def create_pipeline(**kwargs):
     # Training datasets should use random patches, but testing and validation
     # datasets shouldn't.
     pre_process_node_training = partial(
-        inputs_and_targets_from_dataset, random_patches=True, shuffle=True
+        inputs_and_targets_from_dataset,
+        random_patches=True,
+        shuffle=True,
+        include_counts=True,
     )
     pre_process_node_not_training = partial(
         inputs_and_targets_from_dataset, random_patches=False, shuffle=False
