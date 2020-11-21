@@ -171,7 +171,6 @@ def _make_patch_bboxes(
     # Resulting vector should be (height, width, height, width).
     image_shape_expanded = tf.tile(image_shape[0:2], (2,))
     # Convert to frame fractions, like the annotations.
-    tf.print("bounding_box_px:", bounding_box_px)
     return tf.cast(bounding_box_px, tf.float32) / tf.cast(
         image_shape_expanded, tf.float32
     )

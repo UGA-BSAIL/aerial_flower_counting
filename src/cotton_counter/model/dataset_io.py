@@ -22,9 +22,9 @@ from .records import Annotations
 
 _POINTS_FEATURE_DESCRIPTION = {
     "image": tf.io.FixedLenFeature([1], tf.dtypes.string),
-    "frame_numbers": tf.io.VarLenFeature(tf.dtypes.int64),
-    "annotation_x": tf.io.VarLenFeature(tf.dtypes.float32),
-    "annotation_y": tf.io.VarLenFeature(tf.dtypes.float32),
+    "frame_numbers": tf.io.RaggedFeature(tf.dtypes.int64),
+    "annotation_x": tf.io.RaggedFeature(tf.dtypes.float32),
+    "annotation_y": tf.io.RaggedFeature(tf.dtypes.float32),
 }
 """
 Descriptions of the features found in datasets containing point annotations.
@@ -65,7 +65,7 @@ def _decode_jpegs(jpeg_batch: tf.Tensor) -> tf.Tensor:
     )
 
 
-def _parse_example(
+def _parse_examples(
     serialized: tf.Tensor,
     feature_schema: Dict[str, Any] = _POINTS_FEATURE_DESCRIPTION,
 ) -> Dict[str, tf.Tensor]:
@@ -73,14 +73,14 @@ def _parse_example(
     Deserializes a set of serialized examples.
 
     Args:
-        serialized: The tensor containing a serialized example.
+        serialized: The tensor containing a batch of serialized examples.
         feature_schema: The schema to use when extracting features.
 
     Returns:
         The parsed feature dictionary.
 
     """
-    return tf.io.parse_single_example(serialized, feature_schema)
+    return tf.io.parse_example(serialized, feature_schema)
 
 
 def _transform_to_patches(
@@ -127,10 +127,8 @@ def _transform_to_patches(
             The extracted patches, in a new dataset.
 
         """
-        # Convert from sparse to ragged tensors.
-        x_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_x"])
-        y_values = tf.RaggedTensor.from_sparse(feature_dict["annotation_y"])
-
+        x_values = feature_dict["annotation_x"]
+        y_values = feature_dict["annotation_y"]
         annotations = Annotations(x_values=x_values, y_values=y_values,)
 
         # Decode the images.
@@ -436,23 +434,21 @@ def inputs_and_targets_from_dataset(
         A dataset that produces input images and density maps.
 
     """
-    # Deserialize it.
-    feature_dataset = raw_dataset.map(
-        _parse_example, num_parallel_calls=_NUM_THREADS
-    )
-
     # Shuffle the data so we get different batches every time.
     if shuffle:
-        feature_dataset = feature_dataset.shuffle(
+        raw_dataset = raw_dataset.shuffle(
             batch_size * num_prefetch_batches, reshuffle_each_iteration=True
         )
 
-    # Pre-batch the data now for efficient patch extraction.
-    feature_dataset_batched = feature_dataset.batch(batch_size)
+    # Deserialize it.
+    batched_raw_dataset = raw_dataset.batch(batch_size)
+    feature_dataset = batched_raw_dataset.map(
+        _parse_examples, num_parallel_calls=_NUM_THREADS
+    )
 
     # Extract patches.
     patch_dataset = _transform_to_patches(
-        feature_dataset_batched,
+        feature_dataset,
         image_shape=image_shape,
         patch_scale=patch_scale,
         random_patches=random_patches,
@@ -497,21 +493,21 @@ def inputs_and_targets_from_patch_dataset(
         the image contains at least one flower.
 
     """
-    # Deserialize it.
-    feature_dataset = raw_dataset.map(
-        lambda x: _parse_example(x, feature_schema=_TAG_FEATURE_DESCRIPTION),
-        num_parallel_calls=_NUM_THREADS,
-    )
-
     # Shuffle the data so we get different batches every time.
     if shuffle:
-        feature_dataset = feature_dataset.shuffle(
+        raw_dataset = raw_dataset.shuffle(
             batch_size * num_prefetch_batches, reshuffle_each_iteration=True
         )
 
-    # Batch and wrangle it.
-    batched = feature_dataset.batch(batch_size)
-    discrete_count_dataset = batched.map(
+    # Deserialize it.
+    batched_raw_dataset = raw_dataset.batch(batch_size)
+    feature_dataset = batched_raw_dataset.map(
+        lambda x: _parse_examples(x, feature_schema=_TAG_FEATURE_DESCRIPTION),
+        num_parallel_calls=_NUM_THREADS,
+    )
+
+    # Wrangle the format.
+    discrete_count_dataset = feature_dataset.map(
         functools.partial(_load_from_tag_feature_dict),
         num_parallel_calls=_NUM_THREADS,
     )
