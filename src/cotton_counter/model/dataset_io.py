@@ -155,7 +155,9 @@ def _transform_to_patches(
         )
 
     return feature_dataset.interleave(
-        patch_extractor, num_parallel_calls=_NUM_THREADS
+        patch_extractor,
+        cycle_length=_NUM_THREADS,
+        num_parallel_calls=_NUM_THREADS,
     )
 
 
