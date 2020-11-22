@@ -26,20 +26,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module contains an example test.
 
-Tests should be placed in ``src/tests``, in modules that mirror your
-project's structure, and in files named test_*.py. They are simply functions
-named ``test_*`` which test a unit of logic.
-
-To run the tests, run ``kedro test``.
 """
+Tests for the `run` module.
+"""
+
+
 from pathlib import Path
 
 import pytest
 
-from cotton_counter.run import ProjectContext
+from ..cotton_counter.run import ProjectContext
 
 
 @pytest.fixture
