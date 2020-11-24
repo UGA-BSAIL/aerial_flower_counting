@@ -12,7 +12,7 @@ cotton_images:
 # image-level annotations.
 cotton_patches_1:
   type: pycvat.CvatDataSet
-  task_id: 125
+  task_id: 127
   << : *cvat_credentials
 
 # Cotton counting dataset annotations, stored locally.
