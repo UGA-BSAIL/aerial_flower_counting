@@ -196,8 +196,9 @@ def predict_patches(
     model_output = model_with_path.predict(patch_dataset)
 
     # Organize the resulting data.
-    patch_softmax, patch_paths = model_output
-    patch_classes = np.argmax(patch_softmax, axis=1)
+    patch_sigmoid, _, patch_paths = model_output
+    patch_classes = patch_sigmoid > 0.5
+    patch_classes = patch_classes.squeeze().astype(np.int32)
     patch_paths = patch_paths.squeeze()
     patch_paths = [p.decode("utf8") for p in patch_paths]
     return pd.DataFrame(data={"paths": patch_paths, "classes": patch_classes})
