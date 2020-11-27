@@ -1,4 +1,3 @@
-# Fraction of the dataset to be used as training data.
-train_fraction: 0.9
-# Fraction of the dataset to be used as test data. (The rest will be validation data.)
-test_fraction: 0.05
+# Fractions of the cotton_part_a_test dataset to use as the testing and validation set,
+# respectively.
+test_split_fractions: [0.5, 0.5]

@@ -22,15 +22,27 @@ def create_pipeline(**kwargs: Any):
     """
     return Pipeline(
         [
+            # Perform EDA for training data.
             node(
                 annotation_histogram,
-                "local_annotations",
-                "eda_annotation_histogram",
+                "local_annotations_train",
+                "eda_annotation_histogram_train",
             ),
             node(
                 annotation_spatial_dist,
-                "local_annotations",
-                "eda_annotation_spatial_dist",
+                "local_annotations_train",
+                "eda_annotation_spatial_dist_train",
+            ),
+            # Perform EDA for testing and validation data.
+            node(
+                annotation_histogram,
+                "local_annotations_test",
+                "eda_annotation_histogram_test",
+            ),
+            node(
+                annotation_spatial_dist,
+                "local_annotations_test",
+                "eda_annotation_spatial_dist_test",
             ),
         ]
     )

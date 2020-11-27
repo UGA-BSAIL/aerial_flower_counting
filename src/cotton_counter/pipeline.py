@@ -41,10 +41,7 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
         "model_training": data_loading_pipeline + training_pipeline,
         "model_evaluation": data_loading_pipeline + evaluation_pipeline,
         "auto_annotation": auto_annotation_pipeline,
-        "prepare_data": cleaning_pipeline
-        + eda_pipeline
-        + points_pipeline
-        + patches_pipeline,
+        "prepare_points": cleaning_pipeline + eda_pipeline + points_pipeline,
         "prepare_patches": patches_pipeline,
         "__default__": data_loading_pipeline
         + training_pipeline

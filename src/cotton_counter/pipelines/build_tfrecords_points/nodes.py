@@ -15,20 +15,19 @@ from ..tfrecords_utils import bytes_feature, float_feature, int_feature
 
 
 def make_splits(
-    local_annotations: pd.DataFrame,
-    train_fraction: float = 0.9,
-    test_fraction: float = 0.05,
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    local_annotations: pd.DataFrame, split_fractions: Tuple[float, ...],
+) -> Tuple[pd.DataFrame, ...]:
     """
     Generates the train, test and validation splits for the data.
 
     Args:
         local_annotations: The `DataFrame` containing cleaned annotation data.
-        train_fraction: The fraction of the data to use for training.
-        test_fraction: The fraction of the data to use for testing.
+        split_fractions: The fraction of the data that will go in each generated
+            split. Should add up to 1.0.
 
     Returns:
-        The train, test, and validation data as separate `DataFrame`s.
+        Annotations for each split corresponding to `split_fractions`,
+        as a separate `DataFrame`.
 
     """
     # We split on frames instead of points so we don't have data from the
@@ -37,34 +36,30 @@ def make_splits(
     num_frames = len(frame_nums)
     logger.debug("Splitting data from {} frames.", num_frames)
 
-    valid_fraction = 1.0 - train_fraction - test_fraction
-    assert valid_fraction >= 0.0, "Train and test fraction should not be >1.0."
-    train_split_size = int(num_frames * train_fraction)
-    test_split_size = int(num_frames * test_fraction)
-    valid_split_size = num_frames - train_split_size - test_split_size
-    logger.debug(
-        "Train split has {} items, test split has {} items, and validation "
-        "split has {} items.",
-        train_split_size,
-        test_split_size,
-        valid_split_size,
-    )
+    split_fractions = np.array(split_fractions)
+    split_sizes = split_fractions * num_frames
+    split_sizes = split_sizes.astype(np.int32)
+    logger.debug("Number of items in each split: {}", split_sizes)
 
     # Choose the frames to go in each split.
     np.random.shuffle(frame_nums)
-    train_frames = frame_nums[0:train_split_size]
-    test_frames = frame_nums[
-        train_split_size : train_split_size + test_split_size
-    ]
-    valid_frames = frame_nums[train_split_size + test_split_size :]
+    split_frame_indices = []
+    split_start = 0
+    for split_size in split_sizes:
+        split_end = split_start + split_size
+        frame_indices = frame_nums[split_start:split_end]
+        split_frame_indices.append(frame_indices)
+
+        split_start += split_size
 
     # Split the DataFrames.
     frame_num_column = local_annotations["frame_num"]
-    train_data = local_annotations[frame_num_column.isin(train_frames)]
-    test_data = local_annotations[frame_num_column.isin(test_frames)]
-    valid_data = local_annotations[frame_num_column.isin(valid_frames)]
+    all_split_data = []
+    for frame_indices in split_frame_indices:
+        split_data = local_annotations[frame_num_column.isin(frame_indices)]
+        all_split_data.append(split_data)
 
-    return train_data, test_data, valid_data
+    return tuple(all_split_data)
 
 
 def shuffle(annotations: pd.DataFrame) -> pd.DataFrame:
@@ -128,7 +123,7 @@ def generate_tf_records(
         Each example that it produced.
 
     """
-    frame_nums = annotations["frame_num"].unique()
+    frame_nums = annotations["frame_num"].unique().tolist()
     for frame_num in frame_nums:
         logger.debug("Generating example for frame {}.", frame_num)
 

@@ -3,9 +3,16 @@ _cvat_credentials: &cvat_credentials
   credentials: dev_cvat
 
 # Cotton counting dataset from CVAT containing full images.
-cotton_images:
+cotton_part_a:
   type: pycvat.CvatDataSet
-  task_id: 120
+  task_id: 2
+  << : *cvat_credentials
+
+# The images to use for the test and validation sets, which come
+# from a different session.
+cotton_part_a_test:
+  type: pycvat.CvatDataSet
+  task_id: 129
   << : *cvat_credentials
 
 # Cotton counting datasets from CVAT containing image patches with
@@ -15,10 +22,17 @@ cotton_patches_1:
   task_id: 127
   << : *cvat_credentials
 
-# Cotton counting dataset annotations, stored locally.
-local_annotations:
+# Cotton counting dataset annotations, stored locally. These come
+# in training and testing flavors which correspond to annotations
+# from cotton_part_a and cotton_part_a_test, respectively.
+local_annotations_train:
   type: pandas.ParquetDataSet
-  filepath: data/03_primary/annotations/annotations.parquet
+  filepath: data/03_primary/annotations/annotations_train.parquet
+  versioned: True
+
+local_annotations_test:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/annotations/annotations_test.parquet
   versioned: True
 
 # TFRecord dataset of training split.
