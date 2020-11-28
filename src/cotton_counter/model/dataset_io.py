@@ -43,6 +43,13 @@ _NUM_THREADS = cpu_count()
 """
 Number of threads to use for multi-threaded operations.
 """
+_INTERNAL_BATCH_SIZE_DIVISOR = 2
+"""
+The initial parts of the pipeline work with batches for computational
+efficiency. However, using large batches here increases memory usage. The
+internal batch size to use here is derived from the (output) batch size divided
+by this constant.
+"""
 
 
 def _decode_jpegs(jpeg_batch: tf.Tensor) -> tf.Tensor:
@@ -434,7 +441,9 @@ def inputs_and_targets_from_dataset(
 
     """
     # Deserialize it.
-    batched_raw_dataset = raw_dataset.batch(batch_size)
+    batched_raw_dataset = raw_dataset.batch(
+        batch_size // _INTERNAL_BATCH_SIZE_DIVISOR
+    )
     feature_dataset = batched_raw_dataset.map(
         _parse_examples, num_parallel_calls=_NUM_THREADS
     )
@@ -484,7 +493,9 @@ def inputs_and_targets_from_patch_dataset(
 
     """
     # Deserialize it.
-    batched_raw_dataset = raw_dataset.batch(batch_size)
+    batched_raw_dataset = raw_dataset.batch(
+        batch_size // _INTERNAL_BATCH_SIZE_DIVISOR
+    )
     feature_dataset = batched_raw_dataset.map(
         lambda x: _parse_examples(x, feature_schema=_TAG_FEATURE_DESCRIPTION),
         num_parallel_calls=_NUM_THREADS,
