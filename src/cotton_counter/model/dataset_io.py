@@ -409,7 +409,6 @@ def inputs_and_targets_from_dataset(
     num_prefetch_batches: int = 5,
     patch_scale: float = 1.0,
     random_patches: bool = True,
-    shuffle: bool = True,
     include_counts: bool = False,
 ) -> tf.data.Dataset:
     """
@@ -427,8 +426,6 @@ def inputs_and_targets_from_dataset(
         patch_scale: Scale of the patches to extract from each image.
         random_patches: Whether to extract random patches from the input. If
             false, it will instead extract a set of standardized patches.
-        shuffle: If true, it will shuffle the data in the dataset randomly.
-            Disable if you want the output to always be deterministic.
         include_counts: If true, include the raw flower count for the patch
             in the targets under the "count" key.
 
@@ -436,12 +433,6 @@ def inputs_and_targets_from_dataset(
         A dataset that produces input images and density maps.
 
     """
-    # Shuffle the data so we get different batches every time.
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(
-            batch_size * num_prefetch_batches, reshuffle_each_iteration=True
-        )
-
     # Deserialize it.
     batched_raw_dataset = raw_dataset.batch(batch_size)
     feature_dataset = batched_raw_dataset.map(
@@ -475,7 +466,6 @@ def inputs_and_targets_from_patch_dataset(
     *,
     batch_size: int = 32,
     num_prefetch_batches: int = 5,
-    shuffle: bool = True,
 ) -> tf.data.Dataset:
     """
     Deserializes raw data from a `Dataset` containing patches and tag
@@ -487,20 +477,12 @@ def inputs_and_targets_from_patch_dataset(
         num_prefetch_batches: The number of batches to prefetch into memory.
             Increasing this can increase performance at the expense of memory
             usage.
-        shuffle: If true, it will shuffle the data in the dataset randomly.
-            Disable if you want the output to always be deterministic.
 
     Returns:
         A dataset that produces input images and a flag indicating whether
         the image contains at least one flower.
 
     """
-    # Shuffle the data so we get different batches every time.
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(
-            batch_size * num_prefetch_batches, reshuffle_each_iteration=True
-        )
-
     # Deserialize it.
     batched_raw_dataset = raw_dataset.batch(batch_size)
     feature_dataset = batched_raw_dataset.map(

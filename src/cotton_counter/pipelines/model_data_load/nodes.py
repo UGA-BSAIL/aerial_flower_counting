@@ -103,6 +103,10 @@ def combine_point_and_tag_datasets(
     combined = tf.data.experimental.sample_from_datasets(
         [tag_dataset, point_dataset_stripped], weights=sample_weights
     )
+
+    # Shuffle the data.
+    combined = combined.shuffle(batch_size * 2, reshuffle_each_iteration=True)
+
     # Re-batch once we've combined.
     return combined.batch(batch_size)
 
