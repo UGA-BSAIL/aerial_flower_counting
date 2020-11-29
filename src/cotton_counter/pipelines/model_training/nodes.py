@@ -108,6 +108,7 @@ def make_callbacks(
     max_density_threshold: float,
     classify_counts: bool,
     num_per_batch_to_visualize: int,
+    max_num_batches_to_visualize: int,
 ) -> List[keras.callbacks.Callback]:
     """
     Creates callbacks to use when training the model.
@@ -128,6 +129,8 @@ def make_callbacks(
             regressing them.
         num_per_batch_to_visualize: Number of images to visualize from each
             batch.
+        max_num_batches_to_visualize: Maximum number of batches to visualize
+            data from.
 
     Returns:
         The list of callbacks.
@@ -161,6 +164,7 @@ def make_callbacks(
             log_period=visualization_period,
             num_classes=1,
             num_images_per_batch=num_per_batch_to_visualize,
+            max_num_batches=max_num_batches_to_visualize,
         )
         callbacks.append(activation_callback)
 

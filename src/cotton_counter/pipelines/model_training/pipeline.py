@@ -68,6 +68,8 @@ def create_pipeline(**kwargs: Any):
                     classify_counts="params:classify_counts",
                     num_per_batch_to_visualize="params"
                     ":num_per_batch_to_visualize",
+                    max_num_batches_to_visualize="params"
+                    ":max_num_batches_to_visualize",
                 ),
                 "callbacks",
                 tags={PRE_PROCESS_TAG},

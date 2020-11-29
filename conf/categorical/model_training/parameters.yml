@@ -12,6 +12,8 @@ histogram_frequency: 1
 visualization_period: 10
 # How many images from each batch to visualize.
 num_per_batch_to_visualize: 1
+# Maximum number of testing batches to visualize data from.
+max_num_batches_to_visualize: 20
 
 # Learning phases to use for training the model.
 learning_phases:

@@ -31,6 +31,7 @@ class _ImageLoggingCallback(callbacks.Callback, abc.ABC):
         dataset: tf.data.Dataset,
         log_period: int = 1,
         num_images_per_batch: int = 3,
+        max_num_batches: Optional[int] = None,
     ):
         """
         Args:
@@ -40,6 +41,8 @@ class _ImageLoggingCallback(callbacks.Callback, abc.ABC):
                 This can be increased if logging is getting too expensive.
             num_images_per_batch: Maximum number of images to log for each
                 batch in the dataset.
+            max_num_batches: The maximum number of batches to log data from. If
+                not specified, it will log from all of them.
         """
         super().__init__()
 
@@ -50,6 +53,10 @@ class _ImageLoggingCallback(callbacks.Callback, abc.ABC):
         self.__dataset = dataset
         self.__log_period = log_period
         self.__num_images_per_batch = num_images_per_batch
+
+        if max_num_batches is not None:
+            # Limit the dataset to a set number of batches.
+            self.__dataset = self.__dataset.take(max_num_batches)
 
     @property
     def _model(self) -> keras.Model:
@@ -199,7 +206,9 @@ class LogClassActivations(_ImageLoggingCallback):
     epoch when performing discrete counting.
     """
 
-    def __init__(self, *args: Any, num_classes: int, **kwargs: Any):
+    def __init__(
+        self, *args: Any, num_classes: int, **kwargs: Any,
+    ):
         """
         Args:
             *args: Will be forwarded to the superclass.
