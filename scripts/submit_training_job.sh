@@ -13,7 +13,7 @@
 #SBATCH --cpus-per-task=24
 #SBATCH --gres=gpu:1
 #SBATCH --time=8:00:00
-#SBATCH --mem=16gb
+#SBATCH --mem=18gb
 #SBATCH --mail-user=daniel.petti@uga.edu
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=cotton_count_model_train.%j.out    # Standard output log
