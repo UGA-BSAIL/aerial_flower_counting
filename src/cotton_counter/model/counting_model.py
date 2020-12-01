@@ -59,16 +59,16 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
     pool1 = layers.MaxPool2D()(conv1_2)
 
     # Dense blocks.
-    dense1 = DenseBlock(6, growth_rate=6)(pool1)
+    dense1 = DenseBlock(6, growth_rate=4)(pool1)
     transition1 = TransitionLayer()(dense1)
 
-    dense2 = DenseBlock(12, growth_rate=6)(transition1)
+    dense2 = DenseBlock(12, growth_rate=4)(transition1)
     transition2 = TransitionLayer()(dense2)
 
-    dense3 = DenseBlock(24, growth_rate=6)(transition2)
+    dense3 = DenseBlock(24, growth_rate=4)(transition2)
     transition3 = TransitionLayer()(dense3)
 
-    dense4 = DenseBlock(16, growth_rate=6)(transition3)
+    dense4 = DenseBlock(16, growth_rate=4)(transition3)
     transition4 = TransitionLayer()(dense4)
 
     return transition4
