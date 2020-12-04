@@ -41,6 +41,6 @@ learning_phases:
     # The loss weight for count categorization.
     discrete_count_loss_weight: 1.0
     # The loss weight for cross-scale consistency.
-    cross_scale_loss_weight: 0.5
+    cross_scale_loss_weight: 0.75
     # Number of epochs to train for in this phase.
     num_epochs: 30
