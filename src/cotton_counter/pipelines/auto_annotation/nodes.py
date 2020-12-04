@@ -20,7 +20,12 @@ from ...type_helpers import Vector2I
 
 
 def unannotated_patch_dataset(
-    *, cvat_task: Task, start_frame_num: int, num_frames: int, **kwargs: Any,
+    *,
+    cvat_task: Task,
+    start_frame_num: int,
+    num_frames: int,
+    annotation_interval: int = 1,
+    **kwargs: Any,
 ) -> tf.data.Dataset:
     """
     Creates a dataset containing all the unannotated images from CVAT in raw
@@ -30,6 +35,8 @@ def unannotated_patch_dataset(
         cvat_task: The CVAT task to pull data from.
         start_frame_num: The frame number to start at.
         num_frames: Maximum number of frames to iterate over.
+        annotation_interval: Number of frames to skip between each annotated
+            one. This can be useful for videos with many similar frames.
         **kwargs: Will be forwarded to `inputs_from_generator`.
 
     Returns:
@@ -51,6 +58,10 @@ def unannotated_patch_dataset(
         for i, annotations in enumerate(
             job.iter_annotations(start_at=start_frame_num),
         ):
+            if i % annotation_interval != 0:
+                # This frame should be skipped.
+                continue
+
             frame_num = i + start_frame_num
 
             if num_frames_produced >= num_frames:
@@ -73,12 +84,12 @@ def coerce_patch_shapes(
     *, patches: tf.data.Dataset, desired_shape: Vector2I
 ) -> tf.data.Dataset:
     """
-    Modifies a dataset of _patches such that the images have a desired shape.
+    Modifies a dataset of patches such that the images have a desired shape.
     It will not change the aspect ratio, so this may involve cropping out the
     edges.
 
     Args:
-        patches: The dataset of raw _patches.
+        patches: The dataset of raw patches.
         desired_shape: The desired shape for the _patches, in the form
             (height, width)
 

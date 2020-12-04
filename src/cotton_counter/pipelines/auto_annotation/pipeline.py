@@ -35,14 +35,15 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
             node(
                 unannotated_patch_dataset,
                 dict(
-                    cvat_task="cotton_images",
-                    image_shape="params:cvat_image_shape",
+                    cvat_task="cotton_part_a_2020_09_19",
+                    image_shape="params:cvat_image_shape_phantom_video",
                     batch_size="params:batch_size",
                     num_prefetch_batches="params:num_prefetch_batches",
                     patch_scale="params:annotation_patch_scale",
                     patch_stride="params:annotation_patch_stride",
                     start_frame_num="params:num_initial_frames_to_skip",
                     num_frames="params:num_frames_to_annotate",
+                    annotation_interval="params:annotation_interval",
                 ),
                 "unannotated_patch_data",
             ),
@@ -79,7 +80,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 upload_patches,
                 dict(
                     annotations="auto_patch_annotations",
-                    cvat_task="cotton_images",
+                    cvat_task="cotton_part_a_2020_09_19",
                 ),
                 None,
             ),
