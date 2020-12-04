@@ -269,18 +269,21 @@ def upload_patches(*, annotations: pd.DataFrame, cvat_task: Task) -> None:
     )
     logger.info("Creating new task: {}", task_name)
 
-    # For these data, we only have one label.
-    flower_label = Label(name="has_flower", attributes=[])
+    # For these data, we labels for the presence of pollinated and
+    # unpollinated flowers.
+    unpollinated_label = Label(name="has_flower", attributes=[])
+    pollinated_label = Label(name="has_pollinated_flower", attributes=[])
 
     task = Task.create_new(
         api_client=cvat_task.api,
         name=task_name,
-        labels=[flower_label],
+        labels=[unpollinated_label, pollinated_label],
         images=annotations["paths"],
     )
-    # Refresh the label definition so that it's populated with the actual ID.
-    flower_label = task.find_label(flower_label.name)
+    # Refresh the label definitions so that they're populated with the actual
+    # IDs.
+    unpollinated_label = task.find_label(unpollinated_label.name)
 
     _update_cvat_annotations(
-        annotations=annotations, cvat_task=task, label=flower_label,
+        annotations=annotations, cvat_task=task, label=unpollinated_label,
     )

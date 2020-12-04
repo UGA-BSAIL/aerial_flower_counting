@@ -2,14 +2,13 @@
 Contains node definitions for the `build_tfrecords_patches` pipeline.
 """
 
-
 import enum
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable
 
 import numpy as np
 import tensorflow as tf
 from loguru import logger
-from pycvat import Task
+from pycvat import Job, Label, Task
 
 from ..tfrecords_utils import bytes_feature, int_feature
 
@@ -35,7 +34,7 @@ class AnnotationFilter(enum.IntEnum):
 
 
 def _make_example(
-    *, image: np.ndarray, frame_num: int, has_flower: bool
+    *, image: np.ndarray, frame_num: int, **kwargs: Any,
 ) -> tf.train.Example:
     """
     Creates a single Tensorflow example.
@@ -43,28 +42,76 @@ def _make_example(
     Args:
         image: The image data to include in the example.
         frame_num: The frame number associated with the image.
-        has_flower: Whether this image contains at least one flower.
+        **kwargs: Will be parsed as additional boolean features for each
+            example. The could be used to indicate the presence of an organ.
 
     Returns:
         The example that it created.
 
     """
+    # Boolean values are represented as integers for Tensorflow.
+    boolean_features = {k: int_feature([int(v)]) for k, v in kwargs.items()}
+
     features = dict(
         image=bytes_feature(image),
         frame_number=int_feature([frame_num]),
-        # Boolean value is represented as an integer for Tensorflow.
-        has_flower=int_feature([int(has_flower)]),
+        **boolean_features,
     )
     return tf.train.Example(features=tf.train.Features(feature=features))
+
+
+def _get_tags_for_frame(
+    *, frame_num: int, job: Job, ids_to_labels: Dict[int, Label]
+) -> Dict[str, bool]:
+    """
+    Extracts the boolean tag annotations for a particular frame.
+
+    Args:
+        frame_num: The frame number within the job.
+        job: The job.
+        ids_to_labels: Maps label IDs to allowed labels.
+
+    Returns:
+        A mapping of tag names to whether that tag is present or not.
+
+    """
+    # Get the annotations and filter to the relevant ones.
+    annotations = job.annotations_for_frame(frame_num)
+
+    annotation_label_ids = set()
+    for annotation in annotations:
+        label = ids_to_labels.get(annotation.label_id)
+        if label is None:
+            # Unknown label.
+            logger.warning(
+                "Ignoring unknown label ID {}. If this is "
+                "intentional, it can be safely ignored.",
+                annotation.label_id,
+            )
+            continue
+        annotation_label_ids.add(label.id)
+
+    # Convert labels to booleans.
+    boolean_annotations = {}
+    for label_id, label in ids_to_labels.items():
+        if label_id in annotation_label_ids:
+            boolean_annotations[label.name] = True
+        else:
+            boolean_annotations[label.name] = False
+    logger.debug(
+        "Boolean annotations for frame {}: {}", frame_num, boolean_annotations,
+    )
+
+    return boolean_annotations
 
 
 def _generate_examples_from_task(
     task: Task,
     *,
     frame_offset: int,
-    label_name: str,
+    label_names: Iterable[str],
     job_num: int = 0,
-    keep_examples: AnnotationFilter = AnnotationFilter.KEEP_ALL
+    keep_examples: AnnotationFilter = AnnotationFilter.KEEP_ALL,
 ) -> Iterable[tf.train.Example]:
     """
     Generates TFRecord examples from a CVAT task.
@@ -72,8 +119,8 @@ def _generate_examples_from_task(
     Args:
         task: The task to generate examples from.
         frame_offset: The initial frame number to use for these annotations.
-        label_name: The name of the label that indicates whether we have a
-            flower or not.
+        label_names: The names of the labels that we want to include in our
+            examples.
         job_num: The job number within that task to source annotations from.
         keep_examples: Specifies what filtering to perform on the
             annotations, if any.
@@ -86,27 +133,22 @@ def _generate_examples_from_task(
     job = task.get_jobs()[job_num]
 
     # Get the label to use.
-    flower_label = task.find_label(label_name)
+    possible_labels = [task.find_label(label) for label in label_names]
+    # Map unique label IDs to labels.
+    ids_to_labels = {label.id: label for label in possible_labels}
 
     for frame_num in range(job.start_frame, job.end_frame + 1):
-        # Get the annotations and filter to the relevant ones.
-        annotations = job.annotations_for_frame(frame_num)
-        flower_tags = list(
-            filter(lambda a: a.label_id == flower_label.id, annotations)
+        boolean_annotations = _get_tags_for_frame(
+            frame_num=frame_num, job=job, ids_to_labels=ids_to_labels
         )
-        if len(flower_tags) > 1:
-            # This shouldn't happen, but it's not really fatal.
-            logger.warning(
-                "Frame {} from task {} has multiple flower tags.",
-                frame_num,
-                task.id,
-            )
-        has_flower = len(flower_tags) > 0
 
+        # Possibly filter out positive or negative examples.
+        has_any_label = True in boolean_annotations.values()
         if (
-            has_flower and keep_examples == AnnotationFilter.KEEP_NEGATIVE
+            has_any_label and keep_examples == AnnotationFilter.KEEP_NEGATIVE
         ) or (
-            not has_flower and keep_examples == AnnotationFilter.KEEP_POSITIVE
+            not has_any_label
+            and keep_examples == AnnotationFilter.KEEP_POSITIVE
         ):
             # We should filter out this annotation.
             continue
@@ -116,7 +158,7 @@ def _generate_examples_from_task(
         yield _make_example(
             image=image,
             frame_num=frame_offset + frame_num,
-            has_flower=len(flower_tags) > 0,
+            **boolean_annotations,
         )
 
 
@@ -124,7 +166,7 @@ def generate_tf_records(
     *,
     flower_label_name: str,
     keep_examples: AnnotationFilter = AnnotationFilter.KEEP_ALL,
-    **tasks: Any
+    **tasks: Any,
 ) -> Iterable[tf.train.Example]:
     """
     Generates TFRecord examples from multiple tasks on CVAT containing
@@ -149,7 +191,7 @@ def generate_tf_records(
         task_examples = _generate_examples_from_task(
             task,
             frame_offset=frame_counter,
-            label_name=flower_label_name,
+            label_names=[flower_label_name],
             keep_examples=keep_examples,
         )
 
