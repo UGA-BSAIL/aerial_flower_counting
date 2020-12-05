@@ -12,6 +12,7 @@ from .nodes import (
     drop_out_of_bounds,
     get_frame_sizes,
     remove_unannotated,
+    remove_with_attributes,
 )
 
 
@@ -32,6 +33,15 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
             node(
                 remove_unannotated,
                 "cotton_part_a",
+                "non_empty_annotations_train",
+            ),
+            node(
+                remove_with_attributes,
+                dict(
+                    annotations="non_empty_annotations_train",
+                    cvat_task="cotton_part_a",
+                    attributes="params:remove_with_attributes",
+                ),
                 "cleaned_annotations_train",
             ),
             node(
@@ -53,6 +63,15 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
             node(
                 remove_unannotated,
                 "cotton_part_a_test",
+                "non_empty_annotations_test",
+            ),
+            node(
+                remove_with_attributes,
+                dict(
+                    annotations="non_empty_annotations_test",
+                    cvat_task="cotton_part_a_test",
+                    attributes="params:remove_with_attributes",
+                ),
                 "cleaned_annotations_test",
             ),
             node(

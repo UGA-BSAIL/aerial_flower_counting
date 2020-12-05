@@ -4,12 +4,12 @@ Contains node definitions for the `data_cleaning` pipeline.
 
 
 import itertools
-from typing import List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-from pycvat import Task
+from pycvat import LabeledShape, Task
 
 from ...cvat_utils import get_main_job
 
@@ -38,6 +38,114 @@ def remove_unannotated(cvat_task: Task) -> List[Tuple[int, List]]:
             filtered_annotations.append((count, annotations))
 
     return filtered_annotations
+
+
+def _remove_with_attribute(
+    *,
+    annotations: Iterable[Tuple[int, List]],
+    cvat_task: Task,
+    attribute_name: str,
+    attribute_value: Any,
+) -> Iterable[Tuple[int, List]]:
+    """
+    Removes any annotations that have a specific attribute.
+
+    Args:
+        annotations: The annotations to convert. It expects the output from the
+            `remove_unannotated` node.
+        cvat_task: The CVAT task that these annotations came from.
+        attribute_name: The name of the attribute to look at.
+        attribute_value: The value of this attribute to remove annotations with.
+
+    Yields:
+        Same annotations, but excluding ones with this attribute set to this
+        value.
+
+    """
+    # Find the corresponding annotation IDs.
+    labels = cvat_task.get_labels()
+    attributes = itertools.chain.from_iterable(
+        (la.attributes for la in labels)
+    )
+    for attribute in attributes:
+        if attribute.name == attribute_name:
+            attribute_id = attribute.id
+            break
+    else:
+        # In this case, we have no such attribute, so there is no filtering
+        # to do.
+        logger.debug(
+            "Attribute '{}' is not present in any task labels.", attribute_name
+        )
+        yield from annotations
+        return
+
+    def has_filtered_attribute(_annotation: LabeledShape) -> bool:
+        """
+        Args:
+            _annotation: The annotation to check.
+
+        Returns:
+            True if the annotation contains an attribute we are filtering.
+
+        """
+        for _attribute in _annotation.attributes:
+            if (
+                _attribute.spec_id == attribute_id
+                and _attribute.value == attribute_value
+            ):
+                return True
+        return False
+
+    # Remove annotations with the correct attribute value.
+    for frame_num, frame_annotations in annotations:
+        filtered_annotations = []
+        for annotation in frame_annotations:
+            if not has_filtered_attribute(annotation):
+                filtered_annotations.append(annotation)
+        logger.debug(
+            "Filtered out {} annotations from frame {}.",
+            len(frame_annotations) - len(filtered_annotations),
+            frame_num,
+        )
+        yield frame_num, filtered_annotations
+
+
+def remove_with_attributes(
+    *,
+    annotations: Iterable[Tuple[int, List]],
+    cvat_task: Task,
+    attributes: Dict[str, Any],
+) -> List[Tuple[int, List]]:
+    """
+    Removes any annotations that have specific attributes.
+
+    Args:
+        annotations: The annotations to convert. It expects the output from the
+            `remove_unannotated` node.
+        cvat_task: The CVAT task that these annotations came from.
+        attributes: A dictionary mapping attribute names to attribute values. If
+            an annotation has any of the named attributes, and they have the
+            corresponding value, they will be removed.
+
+    Returns:
+        Same annotations, but excluding ones with any of these attributes set to
+        these values.
+
+    """
+    filtered_annotations = annotations
+    for name, value in attributes.items():
+        logger.debug(
+            "Removing annotations with attribute {} set to {}.", name, value
+        )
+        filtered_annotations = _remove_with_attribute(
+            annotations=filtered_annotations,
+            cvat_task=cvat_task,
+            attribute_name=name,
+            attribute_value=value,
+        )
+
+    return list(filtered_annotations)
 
 
 def annotations_as_dataframe(

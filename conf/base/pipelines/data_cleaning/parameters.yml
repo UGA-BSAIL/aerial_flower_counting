@@ -1,5 +1,6 @@
-# This is a boilerplate parameters config generated for pipeline 'data_cleaning'
-# using Kedro 0.16.4.
-#
-# Documentation for this file format can be found in
-# https://kedro.readthedocs.io/en/stable/04_user_guide/03_configuration.html#parameters
+# Annotations with these attributes set to these values will be removed.
+remove_with_attributes:
+  # Annoyingly, I've been inconsistent with how I signify pollination.
+  pollination: pollinated
+  # Stringification is necessary here because that's how CVAT reports bools.
+  pollinated: "true"
