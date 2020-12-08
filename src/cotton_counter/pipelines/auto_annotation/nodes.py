@@ -188,7 +188,8 @@ def predict_patches(
 
     Args:
         model: The model to use for making predictions.
-        patch_dataset: The dataset of patch images to predict.
+        patch_dataset: The dataset of patch images to predict. It should have
+            already been augmented with saved image paths.
 
     Returns:
         A `DataFrame` containing the path to the file where each patch is
@@ -279,6 +280,7 @@ def upload_patches(*, annotations: pd.DataFrame, cvat_task: Task) -> None:
         name=task_name,
         labels=[unpollinated_label, pollinated_label],
         images=annotations["paths"],
+        image_quality=100,
     )
     # Refresh the label definitions so that they're populated with the actual
     # IDs.

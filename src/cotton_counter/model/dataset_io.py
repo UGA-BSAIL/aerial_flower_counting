@@ -542,7 +542,7 @@ def save_images_to_disk(
 
         # Save the image.
         image_path = _write_to_file(encoded, **kwargs)
-        return dict(image=image, path=image_path)
+        return dict(path=image_path, **element)
 
     return numbered_images.map(
         lambda i, e: encode_and_write(

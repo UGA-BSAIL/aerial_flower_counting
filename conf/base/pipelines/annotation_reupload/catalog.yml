@@ -1,0 +1,13 @@
+# Intermediate TF datasets.
+combined_example_patch_data:
+  type: MemoryDataSet
+  copy_mode: assign
+
+patch_data_with_saving:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Temporary directory where images are saved.
+temporary_image_dir:
+  type: MemoryDataSet
+  copy_mode: assign

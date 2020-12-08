@@ -7,6 +7,7 @@ from typing import Any, Dict
 from kedro.pipeline import Pipeline
 
 from .pipelines import (
+    annotation_reupload,
     auto_annotation,
     build_tfrecords_patches,
     build_tfrecords_points,
@@ -36,6 +37,7 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
     evaluation_pipeline = model_evaluation.create_pipeline()
     data_loading_pipeline = model_data_load.create_pipeline()
     auto_annotation_pipeline = auto_annotation.create_pipeline()
+    reupload_pipeline = annotation_reupload.create_pipeline()
 
     return {
         "model_training": data_loading_pipeline + training_pipeline,
@@ -43,6 +45,7 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
         "auto_annotation": auto_annotation_pipeline,
         "prepare_points": cleaning_pipeline + eda_pipeline + points_pipeline,
         "prepare_patches": patches_pipeline,
+        "re_upload_annotations": data_loading_pipeline + reupload_pipeline,
         "__default__": data_loading_pipeline
         + training_pipeline
         + evaluation_pipeline,
