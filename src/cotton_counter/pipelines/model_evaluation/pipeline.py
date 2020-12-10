@@ -37,7 +37,7 @@ def create_pipeline(**kwargs):
             # Evaluate model on all datasets.
             node(
                 evaluate_model,
-                dict(eval_data="training_data", **eval_params),
+                dict(eval_data="combined_training_data", **eval_params),
                 "model_report_train",
             ),
             node(
