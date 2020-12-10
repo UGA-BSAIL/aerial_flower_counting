@@ -493,9 +493,7 @@ def inputs_and_targets_from_patch_dataset(
 
     """
     # Deserialize it.
-    batched_raw_dataset = raw_dataset.batch(
-        batch_size // _INTERNAL_BATCH_SIZE_DIVISOR
-    )
+    batched_raw_dataset = raw_dataset.batch(batch_size)
     feature_dataset = batched_raw_dataset.map(
         lambda x: _parse_examples(x, feature_schema=_TAG_FEATURE_DESCRIPTION),
         num_parallel_calls=_NUM_THREADS,
