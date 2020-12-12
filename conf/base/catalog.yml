@@ -8,9 +8,9 @@ cotton_part_a:
   task_id: 2
   << : *cvat_credentials
 
-cotton_part_a_2020_09_19:
+cotton_part_b_2020_09_19:
   type: pycvat.CvatDataSet
-  task_id: 132
+  task_id: 136
   << : *cvat_credentials
 
 # The images to use for the test and validation sets, which come
@@ -24,7 +24,7 @@ cotton_part_a_test:
 # image-level annotations.
 cotton_patches_1:
   type: pycvat.CvatDataSet
-  task_id: 139
+  task_id: 140
   << : *cvat_credentials
 
 # Cotton counting dataset annotations, stored locally. These come
