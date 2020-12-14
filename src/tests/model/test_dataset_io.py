@@ -38,7 +38,6 @@ def test_point_dataset_integration(snapshot: Snapshot) -> None:
         image_shape=IMAGE_SHAPE,
         patch_scale=0.125,
         random_patches=False,
-        shuffle=False,
         include_counts=True,
     )
 
