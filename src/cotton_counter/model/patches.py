@@ -427,7 +427,7 @@ def extract_standard_patches(
         sizes=kernel_size,
         strides=kernel_strides,
         rates=[1, 1, 1, 1],
-        padding="VALID",
+        padding="SAME",
     )
 
     # Collapse the first three dimensions into a single index.
