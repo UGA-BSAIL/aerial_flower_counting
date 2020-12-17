@@ -177,17 +177,38 @@ def _predict_with_activation_maps(
     Predicts with the model on a set of input images and returns the
     corresponding activation maps.
 
+    Notes:
+        The activation map will be resized to be the same size as the input,
+        meaning that there will always be a pixel-to-pixel correspondence
+        between the input and activation map regardless of how much the model
+        down-samples.
+
     Args:
-        model:
-        images:
-        batch_size:
+        model: The model to use for generating predictions.
+        images: The images to generate predictions for.
+        batch_size: The batch size to use when predicting.
 
     Returns:
+        A corresponding tensor of predicted activation maps.
 
     """
+    # Modify the model to produce activation maps.
+    activation_layer = model.get_layer("activation_maps")
+    activation_output = activation_layer.get_output_at(0)
+    activation_model = tf.keras.Model(
+        inputs=model.inputs, outputs=[activation_output]
+    )
+
+    # Apply the model to produce activation maps for the patches.
+    logger.info("Producing activation maps...")
+    activation_maps = activation_model.predict(images, batch_size=batch_size)
+
+    # Resize patches to be the same as the input.
+    input_size = tf.shape(images)[1:3]
+    return tf.image.resize(activation_maps, input_size)
 
 
-def _extract_complete_activation_maps(
+def _predict_with_activation_maps_patched(
     model: tf.keras.Model,
     images: tf.Tensor,
     *,
@@ -195,8 +216,8 @@ def _extract_complete_activation_maps(
     batch_size: int,
 ) -> tf.Tensor:
     """
-    Extracts the complete activation map for a large input image. It will
-    actually perform the inference in patches, so as not to use too much memory.
+    Same as `_predict_with_activation_maps`, but will perform the prediction
+    patch-wise on the input, making it suitable for very large input images.
 
     Notes:
         The activation map will be resized to be the same size as the input,
@@ -239,20 +260,9 @@ def _extract_complete_activation_maps(
         (-1, model_input_size[0], model_input_size[1], model_input_channels),
     )
 
-    # Modify the model to produce activation maps.
-    activation_layer = model.get_layer("activation_maps")
-    activation_output = activation_layer.get_output_at(0)
-    activation_model = tf.keras.Model(
-        inputs=model.inputs, outputs=[activation_output]
+    activation_patches = _predict_with_activation_maps(
+        model, got_patches, batch_size=batch_size
     )
-
-    # Apply the model to produce activation maps for the patches.
-    logger.info("Producing activation maps...")
-    activation_patches = activation_model.predict(
-        got_patches, batch_size=batch_size
-    )
-    # Resize patches to be the same as the input.
-    activation_patches = tf.image.resize(activation_patches, model_input_size)
 
     patch_indices = _make_patch_indices_absolute(
         image_size=image_size, sizes=kernel_size, strides=kernel_size
@@ -313,7 +323,7 @@ def count_with_patches(
     num_images = image_batch_shape[0]
 
     # Get the activation maps for these images.
-    activation_maps = _extract_complete_activation_maps(
+    activation_maps = _predict_with_activation_maps_patched(
         model, images, image_size=image_size, batch_size=batch_size
     )
 
