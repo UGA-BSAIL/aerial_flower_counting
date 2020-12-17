@@ -4,7 +4,7 @@ Utilities for handling input patching.
 
 
 from multiprocessing import cpu_count
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -392,6 +392,29 @@ def _make_dataset(
     )
 
 
+def frame_fraction_to_size_or_stride(
+    frame_fraction: float, *, image_size: Tuple[int, int]
+) -> List[int]:
+    """
+    Utility function that converts a patch scale or patch stride, expressed in
+    frame fractions, to a kernel size/stride that that is compatible with
+    `tf.image.extract_patches`.
+
+    Args:
+        frame_fraction: The patch scale or stride to convert, as a fraction
+            of the input size.
+        image_size: The size of the input image, in the form (height, width).
+
+    Returns:
+        The scale or stride expressed in a form that is compatible with
+        `extract_patches`.
+
+    """
+    size_px = np.array(image_size) * frame_fraction
+    size_px = size_px.astype(np.int32)
+    return [1] + size_px.tolist() + [1]
+
+
 def extract_standard_patches(
     images: tf.Tensor, *, patch_scale: float, patch_stride: float,
 ) -> tf.Tensor:
@@ -413,14 +436,13 @@ def extract_standard_patches(
     image_channels = image_shape[2]
 
     # Convert to pixels.
-    patch_scale_px = image_size * patch_scale
-    patch_scale_px = patch_scale_px.astype(np.int32)
-    patch_stride_px = image_size * patch_stride
-    patch_stride_px = patch_stride_px.astype(np.int32)
+    kernel_size = frame_fraction_to_size_or_stride(
+        patch_scale, image_size=image_size
+    )
+    kernel_strides = frame_fraction_to_size_or_stride(
+        patch_stride, image_size=image_size
+    )
 
-    # Put into a form that we can use for patch extraction.
-    kernel_size = [1] + patch_scale_px.tolist() + [1]
-    kernel_strides = [1] + patch_stride_px.tolist() + [1]
     # Perform the extraction.
     flat_patches = tf.image.extract_patches(
         images=images,
@@ -436,8 +458,7 @@ def extract_standard_patches(
     # The patches are flattened in the last dimension, so as a last step we
     # expand them into their own batch.
     return tf.reshape(
-        flat_patches,
-        (-1, patch_scale_px[0], patch_scale_px[1], image_channels),
+        flat_patches, (-1, kernel_size[1], kernel_size[2], image_channels),
     )
 
 
