@@ -29,7 +29,7 @@ def create_pipeline(**kwargs):
         eval_data="validation_data_no_patches",
         patch_scale="params:eval_patch_scale",
         patch_stride="params:eval_patch_stride",
-        batch_size="params:batch_size",
+        batch_size="params:eval_batch_size",
     )
 
     return Pipeline(

@@ -167,6 +167,8 @@ def estimate_counting_accuracy(
     predicted_counts = []
     actual_counts = []
 
+    eval_data = eval_data.unbatch().batch(batch_size)
+
     for input_batch, target_batch in eval_data:
         # Calculate the density maps.
         density_maps = count_with_patches(
