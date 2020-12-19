@@ -43,4 +43,4 @@ learning_phases:
     # The loss weight for cross-scale consistency.
     cross_scale_loss_weight: 0.5
     # Number of epochs to train for in this phase.
-    num_epochs: 30
+    num_epochs: 14
