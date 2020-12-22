@@ -1,8 +1,8 @@
 # Fraction of training examples to draw from the tagged
 # patch dataset instead of the point-annotated data.
 # Derived from the relative sizes of both datasets.
-tag_fraction: 0.70
+tag_fraction: 0.71
 # Number of positive examples in the tagged patch dataset.
-num_positive_patches: 5555
+num_positive_patches: 5750
 # Number of negative examples in the tagged patch dataset.
-num_negative_patches: 10925
+num_negative_patches: 11370
