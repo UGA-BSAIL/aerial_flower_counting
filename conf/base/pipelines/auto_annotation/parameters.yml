@@ -11,9 +11,9 @@ annotation_patch_scale: 0.25
 annotation_patch_stride: 0.25
 
 # How many images from the start that we want to skip annotating.
-num_initial_frames_to_skip: 0
+num_initial_frames_to_skip: 1200
 # Total number of images that we want to annotate.
-num_frames_to_annotate: 40
+num_frames_to_annotate: 80
 # How many frames to skip between each annotated one. This can be useful
 # for videos with many consecutive similar frames.
 annotation_interval: 30
