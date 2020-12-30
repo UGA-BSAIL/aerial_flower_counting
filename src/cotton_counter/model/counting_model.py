@@ -148,7 +148,11 @@ def _apply_sub_patch_classification(
 
 
 def _build_count_classification_head(
-    model_top: layers.Layer, *, sub_patch_scale: float, sub_patch_stride: float
+    model_top: layers.Layer,
+    *,
+    sub_patch_scale: float,
+    sub_patch_stride: float,
+    output_bias: Optional[float] = None
 ) -> Tuple[layers.Layer, layers.Layer]:
     """
     Adds the head for classifying categorical count values.
@@ -158,13 +162,22 @@ def _build_count_classification_head(
         sub_patch_scale: The scale of the sub-patches to extract.
         sub_patch_stride: The stride of the sub-patches to extract. If not
             specified, it will extract non-overlapping sub-patches.
+        output_bias: Specify an initial bias to use for the output. This can
+            be useful for unbalanced datasets.
 
     Returns:
         The layer representing the categorical count logits, and the layer
         representing the average activations for each sub-patch.
 
     """
-    count_conv_1 = layers.Conv2D(1, 1, name="activation_maps")(model_top)
+    if output_bias is not None:
+        # Use the specified bias.
+        logger.debug("Using initial output bias {}.", output_bias)
+        output_bias = keras.initializers.Constant(output_bias)
+
+    count_conv_1 = layers.Conv2D(
+        1, 1, name="activation_maps", bias_initializer=output_bias
+    )(model_top)
 
     # Generate the sub-patch output.
     sub_patch_pool_1 = layers.Lambda(
@@ -191,7 +204,8 @@ def build_model(
     input_size: Vector2I,
     use_mil: bool = False,
     sub_patch_scale: float = 0.5,
-    sub_patch_stride: float = 0.5
+    sub_patch_stride: float = 0.5,
+    output_bias: Optional[float] = None
 ) -> keras.Model:
     """
     Creates the full SaNet model.
@@ -204,6 +218,8 @@ def build_model(
         sub_patch_scale: The scale of the sub-patches to extract.
         sub_patch_stride: The stride of the sub-patches to extract. If not
             specified, it will extract non-overlapping sub-patches.
+        output_bias: Specify an initial bias to use for the output. This can
+            be useful for unbalanced datasets.
 
     Returns:
         The model that it created.
@@ -222,6 +238,7 @@ def build_model(
             backbone,
             sub_patch_scale=sub_patch_scale,
             sub_patch_stride=sub_patch_stride,
+            output_bias=output_bias,
         )
         model_outputs["discrete_count"] = discrete_count
         model_outputs["discrete_sub_patch_count"] = discrete_sub_patch_count

@@ -3,7 +3,9 @@ Nodes for the `model_data_load` pipeline.
 """
 
 
+import numpy as np
 import tensorflow as tf
+from loguru import logger
 
 
 def _make_balanced_tag_dataset(
@@ -129,3 +131,50 @@ def add_sub_patch_target(dataset: tf.data.Dataset) -> tf.data.Dataset:
             dict(discrete_sub_patch_count=t["discrete_count"], **t),
         )
     )
+
+
+def calculate_output_bias(
+    *,
+    point_positive_fraction: float,
+    tag_fraction: float,
+    num_positive_patches: int,
+    num_negative_patches: int,
+) -> float:
+    """
+    Calculates an initial bias value for the model output so that it starts
+    by predicting roughly the correct distribution.
+
+    Args:
+        point_positive_fraction: The fraction of positive examples in the
+            point dataset.
+        tag_fraction: The fraction of elements of the combined dataset that
+            are drawn from the tag dataset.
+        num_positive_patches: The number of positive examples in the tagged
+            patch dataset.
+        num_negative_patches: The number of negative examples in the tagged
+            patch dataset.
+
+    Returns:
+        The calculated initial bias.
+
+    """
+    # The oversampling algorithm is going to repeat examples from the
+    # minority class so that there are the same number as the majority class.
+    num_majority_examples = max(num_positive_patches, num_negative_patches)
+    num_balanced_tag_examples = num_majority_examples * 2
+
+    # Compute the number of examples in the point dataset.
+    total_num_patches = num_positive_patches + num_negative_patches
+    total_num_points = total_num_patches / tag_fraction - total_num_patches
+
+    # Compute the positive fraction in the combined dataset.
+    num_positive_points = total_num_points * point_positive_fraction
+    total_num_positive = int(num_positive_points) + num_majority_examples
+    total_num_examples = total_num_points + num_balanced_tag_examples
+    logger.info(
+        "Dataset positive example fraction: {}.",
+        total_num_positive / total_num_examples,
+    )
+    total_num_negative = int(total_num_examples) - total_num_positive
+
+    return np.log(total_num_positive / total_num_negative)

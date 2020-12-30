@@ -13,7 +13,11 @@ from ...model.dataset_io import (
     inputs_and_targets_from_dataset,
     inputs_and_targets_from_patch_dataset,
 )
-from .nodes import add_sub_patch_target, combine_point_and_tag_datasets
+from .nodes import (
+    add_sub_patch_target,
+    calculate_output_bias,
+    combine_point_and_tag_datasets,
+)
 
 
 def create_pipeline(**kwargs):
@@ -123,6 +127,17 @@ def create_pipeline(**kwargs):
                 add_sub_patch_target,
                 "combined_training_data_no_sub_patch_target",
                 "combined_training_data",
+            ),
+            # Calculate the initial output bias.
+            node(
+                calculate_output_bias,
+                dict(
+                    point_positive_fraction="params:point_positive_fraction",
+                    tag_fraction="params:tag_fraction",
+                    num_positive_patches="params:num_positive_patches",
+                    num_negative_patches="params:num_negative_patches",
+                ),
+                "initial_output_bias",
             ),
         ]
     )

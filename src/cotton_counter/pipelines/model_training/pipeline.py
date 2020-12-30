@@ -51,6 +51,7 @@ def create_pipeline(**kwargs: Any):
                     sub_patch_scale="params:sub_patch_scale",
                     sub_patch_stride="params:sub_patch_stride",
                     classify_counts="params:classify_counts",
+                    initial_output_bias="initial_output_bias",
                 ),
                 "initial_model",
                 tags={PRE_PROCESS_TAG},

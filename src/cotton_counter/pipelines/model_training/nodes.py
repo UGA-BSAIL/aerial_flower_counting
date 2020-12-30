@@ -62,6 +62,7 @@ def create_model(
     sub_patch_scale: float,
     sub_patch_stride: float,
     classify_counts: bool,
+    initial_output_bias: float,
 ) -> keras.Model:
     """
     Builds the model to use.
@@ -76,6 +77,7 @@ def create_model(
             computing the cross-scale consistency loss.
         classify_counts: If true, will attempt to classify counts instead of
             regressing them.
+        initial_output_bias: The initial bias value to use for the model output.
 
     Returns:
         The model that it created.
@@ -91,6 +93,7 @@ def create_model(
         use_mil=classify_counts,
         sub_patch_scale=sub_patch_scale,
         sub_patch_stride=sub_patch_stride,
+        output_bias=initial_output_bias,
     )
 
     logger.info("Model has {} parameters.", model.count_params())
