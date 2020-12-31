@@ -5,6 +5,6 @@ tag_fraction: 0.73
 # Approximate fraction of the point dataset that is positive.
 point_positive_fraction: 0.22
 # Number of positive examples in the tagged patch dataset.
-num_positive_patches: 5959
+num_positive_patches: 6019
 # Number of negative examples in the tagged patch dataset.
-num_negative_patches: 12441
+num_negative_patches: 13021
