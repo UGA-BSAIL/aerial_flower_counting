@@ -10,7 +10,7 @@
 #SBATCH -J cotton_count_model_train
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
 #SBATCH --time=8:00:00
 #SBATCH --mem=16gb
