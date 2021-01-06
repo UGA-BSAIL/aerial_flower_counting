@@ -9,6 +9,7 @@ from .nodes import (
     estimate_counting_accuracy,
     evaluate_model,
     make_example_density_map,
+    plot_roc_curve,
 )
 
 
@@ -61,6 +62,12 @@ def create_pipeline(**kwargs):
                 estimate_counting_accuracy,
                 inference_params,
                 "count_error_report",
+            ),
+            # Create an ROC curve.
+            node(
+                plot_roc_curve,
+                dict(eval_data="validation_data", **eval_params),
+                "validation_roc_plot",
             ),
         ]
     )

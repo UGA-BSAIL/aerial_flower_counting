@@ -25,3 +25,9 @@ count_error_report:
   type: yaml.YAMLDataSet
   filepath: ${output_data_dir}/08_reporting/count_error_report.yaml
   versioned: True
+
+# A plot of the ROC curve for the validation data.
+validation_roc_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: ${output_data_dir}/08_reporting/model_reports/validation_roc.png
+  versioned: True
