@@ -2,7 +2,7 @@
 Implements the model architecture.
 """
 
-from typing import Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -34,7 +34,32 @@ def _build_image_input(*, input_size: Vector2I) -> keras.Input:
     return keras.Input(shape=input_shape, name="image", dtype="uint8")
 
 
-def _build_dense_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
+def _conv_bn_relu(
+    *args: Any, **kwargs: Any
+) -> Callable[[tf.Tensor], tf.Tensor]:
+    """
+    Small helper function that builds a conv-bn-relu block.
+
+    Args:
+        *args: Forwarded to `Conv2D()`.
+        **kwargs: Forwarded to `Conv2D()`.
+
+    Returns:
+        The block, which can be called to apply it to some input, similar to
+        a Keras layer.
+
+    """
+    conv = layers.Conv2D(*args, **kwargs)
+    norm = layers.BatchNormalization()
+    relu = layers.Activation("relu")
+
+    def _apply_block(block_input: tf.Tensor) -> tf.Tensor:
+        return relu(norm(conv(block_input)))
+
+    return _apply_block
+
+
+def _build_dense_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
     """
     Creates a DenseNet model.
 
@@ -69,7 +94,7 @@ def _build_dense_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
     return dense4
 
 
-def _build_le_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
+def _build_le_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
     """
     Creates a model similar to the LeNet-based architecture used in the
     TasselNet paper. Note, however, that the input size is much larger.
@@ -81,27 +106,19 @@ def _build_le_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
         The top model layer.
 
     """
-    conv1_1 = layers.Conv2D(16, 3, padding="same")(normalized_input)
-    norm1_1 = layers.BatchNormalization()(conv1_1)
-    relu1_1 = layers.Activation("relu")(norm1_1)
-    pool1 = layers.MaxPool2D()(relu1_1)
+    conv1_1 = _conv_bn_relu(16, 3, padding="same")(normalized_input)
+    pool1 = layers.MaxPool2D()(conv1_1)
 
-    conv2_1 = layers.Conv2D(32, 3, padding="same")(pool1)
-    norm2_1 = layers.BatchNormalization()(conv2_1)
-    relu2_1 = layers.Activation("relu")(norm2_1)
-    pool2 = layers.MaxPool2D()(relu2_1)
+    conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
+    pool2 = layers.MaxPool2D()(conv2_1)
 
-    conv3_1 = layers.Conv2D(64, 3, padding="same")(pool2)
-    norm3_1 = layers.BatchNormalization()(conv3_1)
-    relu3_1 = layers.Activation("relu")(norm3_1)
-    conv3_2 = layers.Conv2D(64, 3, padding="same")(relu3_1)
-    norm3_2 = layers.BatchNormalization()(conv3_2)
-    relu3_2 = layers.Activation("relu")(norm3_2)
+    conv3_1 = _conv_bn_relu(64, 3, padding="same")(pool2)
+    conv3_2 = _conv_bn_relu(64, 3, padding="same")(conv3_1)
 
-    return relu3_2
+    return conv3_2
 
 
-def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
+def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     """
     Creates the backbone of the model.
 
@@ -119,7 +136,7 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
     return _build_le_net_backbone(normalized)
 
 
-def _build_density_map_head(model_top: layers.Layer) -> layers.Layer:
+def _build_density_map_head(model_top: tf.Tensor) -> tf.Tensor:
     """
     Adds the head for predicting density maps.
 
@@ -133,9 +150,7 @@ def _build_density_map_head(model_top: layers.Layer) -> layers.Layer:
     return layers.Conv2D(1, 1, name="density_map")(model_top)
 
 
-def _build_count_regression_head(
-    *, density_head: layers.Layer
-) -> layers.Layer:
+def _build_count_regression_head(*, density_head: tf.Tensor) -> tf.Tensor:
     """
     Adds the head for regressing count values.
 
@@ -193,12 +208,12 @@ def _apply_sub_patch_classification(
 
 
 def _build_count_classification_head(
-    model_top: layers.Layer,
+    model_top: tf.Tensor,
     *,
     sub_patch_scale: float,
     sub_patch_stride: float,
     output_bias: Optional[float] = None
-) -> Tuple[layers.Layer, layers.Layer]:
+) -> Tuple[tf.Tensor, tf.Tensor]:
     """
     Adds the head for classifying categorical count values.
 
@@ -211,7 +226,7 @@ def _build_count_classification_head(
             be useful for unbalanced datasets.
 
     Returns:
-        The layer representing the categorical count logits, and the layer
+        A tensor representing the categorical count logits, and a tensor
         representing the average activations for each sub-patch.
 
     """
