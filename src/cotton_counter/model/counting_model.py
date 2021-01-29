@@ -34,24 +34,20 @@ def _build_image_input(*, input_size: Vector2I) -> keras.Input:
     return keras.Input(shape=input_shape, name="image", dtype="uint8")
 
 
-def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
+def _build_dense_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
     """
-    Creates the backbone SaNet model.
+    Creates a DenseNet model.
 
     Args:
-        image_input: The image input to build the model off of.
+        normalized_input: The normalized input images.
 
     Returns:
         The top model layer.
 
     """
-    # Normalize the images before putting them through the model.
-    float_images = tf.cast(image_input, K.floatx())
-    normalized = tf.image.per_image_standardization(float_images)
-
     # Input convolution layers.
     conv1_1 = layers.Conv2D(48, 3, padding="same", activation="relu")(
-        normalized
+        normalized_input
     )
     norm1_1 = layers.BatchNormalization()(conv1_1)
     conv1_2 = layers.Conv2D(48, 3, padding="same", activation="relu")(norm1_1)
@@ -71,6 +67,56 @@ def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
     dense4 = DenseBlock(8, growth_rate=4)(transition3)
 
     return dense4
+
+
+def _build_le_net_backbone(normalized_input: layers.Layer) -> layers.Layer:
+    """
+    Creates a model similar to the LeNet-based architecture used in the
+    TasselNet paper. Note, however, that the input size is much larger.
+
+    Args:
+        normalized_input: The normalized input images.
+
+    Returns:
+        The top model layer.
+
+    """
+    conv1_1 = layers.Conv2D(16, 3, padding="same")(normalized_input)
+    norm1_1 = layers.BatchNormalization()(conv1_1)
+    relu1_1 = layers.Activation("relu")(norm1_1)
+    pool1 = layers.MaxPool2D()(relu1_1)
+
+    conv2_1 = layers.Conv2D(32, 3, padding="same")(pool1)
+    norm2_1 = layers.BatchNormalization()(conv2_1)
+    relu2_1 = layers.Activation("relu")(norm2_1)
+    pool2 = layers.MaxPool2D()(relu2_1)
+
+    conv3_1 = layers.Conv2D(64, 3, padding="same")(pool2)
+    norm3_1 = layers.BatchNormalization()(conv3_1)
+    relu3_1 = layers.Activation("relu")(norm3_1)
+    conv3_2 = layers.Conv2D(64, 3, padding="same")(relu3_1)
+    norm3_2 = layers.BatchNormalization()(conv3_2)
+    relu3_2 = layers.Activation("relu")(norm3_2)
+
+    return relu3_2
+
+
+def _build_model_backbone(*, image_input: keras.Input) -> layers.Layer:
+    """
+    Creates the backbone of the model.
+
+    Args:
+        image_input: The image input to build the model off of.
+
+    Returns:
+        The top model layer.
+
+    """
+    # Normalize the images before putting them through the model.
+    float_images = tf.cast(image_input, K.floatx())
+    normalized = tf.image.per_image_standardization(float_images)
+
+    return _build_le_net_backbone(normalized)
 
 
 def _build_density_map_head(model_top: layers.Layer) -> layers.Layer:
