@@ -147,6 +147,47 @@ def _build_alexnet_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
     return conv4_2
 
 
+def _build_vgg_backboune(normalized_input: tf.Tensor) -> tf.Tensor:
+    """
+    Creates a model similar to the VGG16-based architecture that is used in the
+    TasselNet paper. Note, however, that the input size is much larger.
+
+    Args:
+        normalized_input: The normalized input images.
+
+    Returns:
+        The top model layer.
+
+    """
+    conv1_1 = _conv_bn_relu(16, 3, padding="same")(normalized_input)
+    conv1_2 = _conv_bn_relu(16, 3, padding="same")(conv1_1)
+    pool1 = layers.MaxPool2D()(conv1_2)
+
+    conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
+    conv2_2 = _conv_bn_relu(32, 3, padding="same")(conv2_1)
+    pool2 = layers.MaxPool2D()(conv2_2)
+
+    conv3_1 = _conv_bn_relu(64, 3, padding="same")(pool2)
+    conv3_2 = _conv_bn_relu(64, 3, padding="same")(conv3_1)
+    conv3_3 = _conv_bn_relu(64, 3, padding="same")(conv3_2)
+    pool3 = layers.MaxPool2D()(conv3_3)
+
+    conv4_1 = _conv_bn_relu(128, 3, padding="same")(pool3)
+    conv4_2 = _conv_bn_relu(128, 3, padding="same")(conv4_1)
+    conv4_3 = _conv_bn_relu(128, 3, padding="same")(conv4_2)
+    pool4 = layers.MaxPool2D()(conv4_3)
+
+    conv4_1 = _conv_bn_relu(256, 3, padding="same")(pool4)
+    conv4_2 = _conv_bn_relu(256, 3, padding="same")(conv4_1)
+    conv4_3 = _conv_bn_relu(256, 3, padding="same")(conv4_2)
+    pool5 = layers.MaxPool2D()(conv4_3)
+
+    conv5_1 = _conv_bn_relu(512, 1, padding="same")(pool5)
+    conv5_2 = _conv_bn_relu(512, 1, padding="same")(conv5_1)
+
+    return conv5_2
+
+
 def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     """
     Creates the backbone of the model.
@@ -162,7 +203,7 @@ def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     float_images = tf.cast(image_input, K.floatx())
     normalized = tf.image.per_image_standardization(float_images)
 
-    return _build_alexnet_backbone(normalized)
+    return _build_vgg_backboune(normalized)
 
 
 def _build_density_map_head(model_top: tf.Tensor) -> tf.Tensor:
