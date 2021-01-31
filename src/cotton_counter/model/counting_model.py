@@ -112,8 +112,8 @@ def _build_le_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
     conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
     pool2 = layers.MaxPool2D()(conv2_1)
 
-    conv3_1 = _conv_bn_relu(64, 3, padding="same")(pool2)
-    conv3_2 = _conv_bn_relu(64, 3, padding="same")(conv3_1)
+    conv3_1 = _conv_bn_relu(64, 8, padding="same")(pool2)
+    conv3_2 = _conv_bn_relu(64, 1, padding="same")(conv3_1)
 
     return conv3_2
 
@@ -203,7 +203,7 @@ def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     float_images = tf.cast(image_input, K.floatx())
     normalized = tf.image.per_image_standardization(float_images)
 
-    return _build_vgg_backboune(normalized)
+    return _build_le_net_backbone(normalized)
 
 
 def _build_density_map_head(model_top: tf.Tensor) -> tf.Tensor:
