@@ -71,11 +71,8 @@ def _build_dense_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
 
     """
     # Input convolution layers.
-    conv1_1 = layers.Conv2D(48, 3, padding="same", activation="relu")(
-        normalized_input
-    )
-    norm1_1 = layers.BatchNormalization()(conv1_1)
-    conv1_2 = layers.Conv2D(48, 3, padding="same", activation="relu")(norm1_1)
+    conv1_1 = _conv_bn_relu(48, 3, padding="same")(normalized_input)
+    conv1_2 = _conv_bn_relu(48, 3, padding="same")(conv1_1)
     # No normalization needed here because dense blocks normalize internally.
     pool1 = layers.MaxPool2D()(conv1_2)
 
@@ -203,7 +200,7 @@ def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     float_images = tf.cast(image_input, K.floatx())
     normalized = tf.image.per_image_standardization(float_images)
 
-    return _build_alexnet_backbone(normalized)
+    return _build_dense_net_backbone(normalized)
 
 
 def _build_density_map_head(model_top: tf.Tensor) -> tf.Tensor:
