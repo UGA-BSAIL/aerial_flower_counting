@@ -34,11 +34,11 @@ def _build_image_input(*, input_size: Vector2I) -> keras.Input:
     return keras.Input(shape=input_shape, name="image", dtype="uint8")
 
 
-def _conv_bn_relu(
+def _bn_relu_conv(
     *args: Any, **kwargs: Any
 ) -> Callable[[tf.Tensor], tf.Tensor]:
     """
-    Small helper function that builds a conv-bn-relu block.
+    Small helper function that builds a bn-relu-conv block.
 
     Args:
         *args: Forwarded to `Conv2D()`.
@@ -54,7 +54,7 @@ def _conv_bn_relu(
     relu = layers.Activation("relu")
 
     def _apply_block(block_input: tf.Tensor) -> tf.Tensor:
-        return relu(norm(conv(block_input)))
+        return conv(relu(norm(block_input)))
 
     return _apply_block
 
@@ -71,9 +71,8 @@ def _build_dense_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
 
     """
     # Input convolution layers.
-    conv1_1 = _conv_bn_relu(48, 3, padding="same")(normalized_input)
-    conv1_2 = _conv_bn_relu(48, 3, padding="same")(conv1_1)
-    # No normalization needed here because dense blocks normalize internally.
+    conv1_1 = _bn_relu_conv(48, 3, padding="same")(normalized_input)
+    conv1_2 = _bn_relu_conv(48, 3, padding="same")(conv1_1)
     pool1 = layers.MaxPool2D()(conv1_2)
 
     # Dense blocks.
@@ -103,14 +102,14 @@ def _build_le_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
         The top model layer.
 
     """
-    conv1_1 = _conv_bn_relu(16, 3, padding="same")(normalized_input)
+    conv1_1 = _bn_relu_conv(16, 3, padding="same")(normalized_input)
     pool1 = layers.MaxPool2D()(conv1_1)
 
-    conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
+    conv2_1 = _bn_relu_conv(32, 3, padding="same")(pool1)
     pool2 = layers.MaxPool2D()(conv2_1)
 
-    conv3_1 = _conv_bn_relu(64, 8, padding="same")(pool2)
-    conv3_2 = _conv_bn_relu(64, 1, padding="same")(conv3_1)
+    conv3_1 = _bn_relu_conv(64, 8, padding="same")(pool2)
+    conv3_2 = _bn_relu_conv(64, 1, padding="same")(conv3_1)
 
     return conv3_2
 
@@ -127,19 +126,19 @@ def _build_alexnet_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
         The top model layer.
 
     """
-    conv1_1 = _conv_bn_relu(16, 3, padding="same")(normalized_input)
+    conv1_1 = _bn_relu_conv(16, 3, padding="same")(normalized_input)
     pool1 = layers.MaxPool2D()(conv1_1)
 
-    conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
+    conv2_1 = _bn_relu_conv(32, 3, padding="same")(pool1)
     pool2 = layers.MaxPool2D()(conv2_1)
 
-    conv3_1 = _conv_bn_relu(64, 3, padding="same")(pool2)
-    conv3_2 = _conv_bn_relu(64, 3, padding="same")(conv3_1)
-    conv3_3 = _conv_bn_relu(64, 3, padding="same")(conv3_2)
+    conv3_1 = _bn_relu_conv(64, 3, padding="same")(pool2)
+    conv3_2 = _bn_relu_conv(64, 3, padding="same")(conv3_1)
+    conv3_3 = _bn_relu_conv(64, 3, padding="same")(conv3_2)
     pool3 = layers.MaxPool2D()(conv3_3)
 
-    conv4_1 = _conv_bn_relu(128, 4, padding="same")(pool3)
-    conv4_2 = _conv_bn_relu(128, 1, padding="same")(conv4_1)
+    conv4_1 = _bn_relu_conv(128, 4, padding="same")(pool3)
+    conv4_2 = _bn_relu_conv(128, 1, padding="same")(conv4_1)
 
     return conv4_2
 
@@ -156,31 +155,31 @@ def _build_vgg_backboune(normalized_input: tf.Tensor) -> tf.Tensor:
         The top model layer.
 
     """
-    conv1_1 = _conv_bn_relu(16, 3, padding="same")(normalized_input)
-    conv1_2 = _conv_bn_relu(16, 3, padding="same")(conv1_1)
+    conv1_1 = _bn_relu_conv(16, 3, padding="same")(normalized_input)
+    conv1_2 = _bn_relu_conv(16, 3, padding="same")(conv1_1)
     pool1 = layers.MaxPool2D()(conv1_2)
 
-    conv2_1 = _conv_bn_relu(32, 3, padding="same")(pool1)
-    conv2_2 = _conv_bn_relu(32, 3, padding="same")(conv2_1)
+    conv2_1 = _bn_relu_conv(32, 3, padding="same")(pool1)
+    conv2_2 = _bn_relu_conv(32, 3, padding="same")(conv2_1)
     pool2 = layers.MaxPool2D()(conv2_2)
 
-    conv3_1 = _conv_bn_relu(64, 3, padding="same")(pool2)
-    conv3_2 = _conv_bn_relu(64, 3, padding="same")(conv3_1)
-    conv3_3 = _conv_bn_relu(64, 3, padding="same")(conv3_2)
+    conv3_1 = _bn_relu_conv(64, 3, padding="same")(pool2)
+    conv3_2 = _bn_relu_conv(64, 3, padding="same")(conv3_1)
+    conv3_3 = _bn_relu_conv(64, 3, padding="same")(conv3_2)
     pool3 = layers.MaxPool2D()(conv3_3)
 
-    conv4_1 = _conv_bn_relu(128, 3, padding="same")(pool3)
-    conv4_2 = _conv_bn_relu(128, 3, padding="same")(conv4_1)
-    conv4_3 = _conv_bn_relu(128, 3, padding="same")(conv4_2)
+    conv4_1 = _bn_relu_conv(128, 3, padding="same")(pool3)
+    conv4_2 = _bn_relu_conv(128, 3, padding="same")(conv4_1)
+    conv4_3 = _bn_relu_conv(128, 3, padding="same")(conv4_2)
     pool4 = layers.MaxPool2D()(conv4_3)
 
-    conv4_1 = _conv_bn_relu(256, 3, padding="same")(pool4)
-    conv4_2 = _conv_bn_relu(256, 3, padding="same")(conv4_1)
-    conv4_3 = _conv_bn_relu(256, 3, padding="same")(conv4_2)
+    conv4_1 = _bn_relu_conv(256, 3, padding="same")(pool4)
+    conv4_2 = _bn_relu_conv(256, 3, padding="same")(conv4_1)
+    conv4_3 = _bn_relu_conv(256, 3, padding="same")(conv4_2)
     pool5 = layers.MaxPool2D()(conv4_3)
 
-    conv5_1 = _conv_bn_relu(512, 1, padding="same")(pool5)
-    conv5_2 = _conv_bn_relu(512, 1, padding="same")(conv5_1)
+    conv5_1 = _bn_relu_conv(512, 1, padding="same")(pool5)
+    conv5_2 = _bn_relu_conv(512, 1, padding="same")(conv5_1)
 
     return conv5_2
 
