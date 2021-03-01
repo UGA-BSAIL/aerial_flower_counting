@@ -8,7 +8,7 @@ from kedro.pipeline import Pipeline, node
 from .nodes import (
     estimate_counting_accuracy,
     evaluate_model,
-    make_example_density_map,
+    make_example_density_maps,
     plot_roc_curve,
 )
 
@@ -51,11 +51,11 @@ def create_pipeline(**kwargs):
                 dict(eval_data="validation_data", **eval_params),
                 "model_report_validate",
             ),
-            # Create an example density map.
+            # Create example density maps.
             node(
-                make_example_density_map,
+                make_example_density_maps,
                 inference_params,
-                "example_density_map",
+                "example_density_maps",
             ),
             # Calculate overall count accuracy on the validation set.
             node(

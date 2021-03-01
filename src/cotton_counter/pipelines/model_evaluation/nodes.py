@@ -3,7 +3,7 @@ Defines nodes for the `model_evaluation` pipeline.
 """
 
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import numpy as np
 import sklearn.metrics
@@ -52,55 +52,52 @@ def evaluate_model(
     return f"Evaluation Results:\n{tabulate(table_rows)}\n"
 
 
-def make_example_density_map(
+def make_example_density_maps(
     *,
     model: keras.Model,
     eval_data: tf.data.Dataset,
     patch_scale: float,
     patch_stride: float,
     batch_size: int,
-) -> Image.Image:
+) -> Iterable[Image.Image]:
     """
     Creates an example pseudo-density-map from a trained model.
 
     Args:
         model: The model to use.
-        eval_data: The dataset to get the image from. It will use the first
-            item in the dataset.
+        eval_data: The dataset to get the images from.
         patch_scale: The scale factor to apply for the patches we extract.
         patch_stride: The stride to use for extracting patches, provided in
             frame fractions like the scale.
         batch_size: The size of the batches to use for inference.
 
-    Returns:
-        The density map, as an image.
+    Yields:
+        The density map for each image in the dataset.
 
     """
-    # Obtain the first image.
-    first_input_batch, _ = next(iter(eval_data))
-    first_image = first_input_batch["image"][0]
-    first_image = tf.expand_dims(first_image, axis=0)
+    for batch, _ in eval_data:
+        # Calculate the density map.
+        images = batch["image"]
+        density_maps = count_with_patches(
+            model,
+            images,
+            patch_scale=patch_scale,
+            patch_stride=patch_stride,
+            batch_size=batch_size,
+        )
 
-    # Calculate the density map.
-    density_map = count_with_patches(
-        model,
-        first_image,
-        patch_scale=patch_scale,
-        patch_stride=patch_stride,
-        batch_size=batch_size,
-    )
+        # Create a heatmap.
+        max_density = calculate_max_density(images, patch_scale=patch_scale)
+        heatmaps = visualize_heat_maps(
+            images=images,
+            features=tf.constant(density_maps, dtype=tf.float32),
+            max_color_threshold=max_density,
+        )
 
-    # Create a heatmap.
-    max_density = calculate_max_density(first_image, patch_scale=patch_scale)
-    heatmap = visualize_heat_maps(
-        images=first_image,
-        features=tf.constant(density_map, dtype=tf.float32),
-        max_color_threshold=max_density,
-    )
-
-    # Convert to a PIL image.
-    heatmap = heatmap[0].numpy()
-    return Image.fromarray(heatmap)
+        # Convert to a PIL image.
+        heatmaps = heatmaps.numpy()
+        for heatmap in heatmaps:
+            yield Image.fromarray(heatmap)
 
 
 def _make_report(*, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
