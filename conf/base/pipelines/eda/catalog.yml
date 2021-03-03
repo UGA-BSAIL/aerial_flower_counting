@@ -22,3 +22,11 @@ eda_annotation_spatial_dist_test:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/eda/plots/annotation_spatial_dist_test.png
   versioned: True
+
+# Visualizations of the ground-truth annotations on top of validation images.
+eda_validation_ground_truth:
+  type: cotton_counter.data_sets.MultiFileDataSet
+  filepath: data/08_reporting/eda/validation_ground_truth
+  versioned: True
+  dataset: pillow.ImageDataSet
+  extension: .jpg

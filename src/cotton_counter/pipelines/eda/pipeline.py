@@ -7,7 +7,11 @@ from typing import Any
 
 from kedro.pipeline import Pipeline, node
 
-from .nodes import annotation_histogram, annotation_spatial_dist
+from .nodes import (
+    annotation_histogram,
+    annotation_spatial_dist,
+    visualize_ground_truth,
+)
 
 
 def create_pipeline(**kwargs: Any):
@@ -43,6 +47,11 @@ def create_pipeline(**kwargs: Any):
                 annotation_spatial_dist,
                 "local_annotations_test",
                 "eda_annotation_spatial_dist_test",
+            ),
+            node(
+                visualize_ground_truth,
+                "validation_data_raw_annotations",
+                "eda_validation_ground_truth",
             ),
         ]
     )

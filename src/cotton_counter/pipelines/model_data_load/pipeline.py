@@ -12,6 +12,7 @@ from kedro.pipeline import Pipeline, node
 from ...model.dataset_io import (
     inputs_and_targets_from_dataset,
     inputs_and_targets_from_patch_dataset,
+    load_point_dataset,
 )
 from .nodes import (
     add_sub_patch_target,
@@ -75,6 +76,16 @@ def create_pipeline(**kwargs):
                     **pre_process_params_no_patch,
                 ),
                 "validation_data_no_patches",
+            ),
+            # Create a version of the validation data with the raw annotations
+            # intact.
+            node(
+                load_point_dataset,
+                dict(
+                    raw_dataset="tfrecord_validate",
+                    batch_size="params:batch_size",
+                ),
+                "validation_data_raw_annotations",
             ),
             # Pre-process the tagged patch dataset.
             node(

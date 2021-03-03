@@ -408,6 +408,28 @@ def _extract_from_points_feature_dict(
     return with_correct_schema.batch(batch_size)
 
 
+def load_point_dataset(
+    raw_dataset: tf.data.Dataset, batch_size: int = 32
+) -> tf.data.Dataset:
+    """
+    Loads a raw dataset containing point annotations. Will perform no further
+    transformations.
+
+    Args:
+        raw_dataset: The raw dataset, containing serialized data.
+        batch_size: The size of the batches that we generate.
+
+    Returns:
+        A dataset that produces the parsed data.
+
+    """
+    # Deserialize it.
+    batched_raw_dataset = raw_dataset.batch(batch_size)
+    return batched_raw_dataset.map(
+        _parse_examples, num_parallel_calls=_NUM_THREADS
+    )
+
+
 def inputs_and_targets_from_dataset(
     raw_dataset: tf.data.Dataset,
     *,
@@ -440,12 +462,8 @@ def inputs_and_targets_from_dataset(
         A dataset that produces input images and density maps.
 
     """
-    # Deserialize it.
-    batched_raw_dataset = raw_dataset.batch(
-        batch_size // _INTERNAL_BATCH_SIZE_DIVISOR
-    )
-    feature_dataset = batched_raw_dataset.map(
-        _parse_examples, num_parallel_calls=_NUM_THREADS
+    feature_dataset = load_point_dataset(
+        raw_dataset, batch_size=batch_size // _INTERNAL_BATCH_SIZE_DIVISOR
     )
 
     # Extract patches.
