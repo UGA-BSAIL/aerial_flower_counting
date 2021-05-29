@@ -8,7 +8,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "~3.8"
 kedro = "^0.16.6"
-pycvat = {path = "pycvat", develop = true}
+pycvat = {path = "pycvat", develop = false}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"
