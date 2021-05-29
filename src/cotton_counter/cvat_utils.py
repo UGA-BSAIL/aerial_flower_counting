@@ -32,12 +32,11 @@ def get_main_job(task: Task) -> Job:
         The job associated with that task.
 
     """
-    jobs = task.get_jobs()
-    if len(jobs) != 1:
+    if len(task.jobs) != 1:
         # Force it to reload job data if we retry.
         task.reload()
         # We have the wrong number of jobs. This might mean the CVAT server
         # simply hasn't registered a new job yet.
-        raise IOError(f"Expected one job but have {len(jobs)}.")
+        raise IOError(f"Expected one job but have {len(task.jobs)}.")
 
-    return jobs[0]
+    return task.jobs[0]

@@ -7,9 +7,8 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "~3.8"
-# TODO (daniel) Switch to official Kedro release after my PR gets merged.
-kedro = {git = "https://github.com/djpetti/kedro.git", rev = "2e10246"}
-pycvat = {git = "git@github.com:UGA-BSAIL/pycvat.git", rev = "ed6d8134"}
+kedro = "^0.16.6"
+pycvat = {path = "pycvat", develop = true}
 loguru = "^0.5.2"
 seaborn = "^0.10.1"
 numpy = ">=1.16"
