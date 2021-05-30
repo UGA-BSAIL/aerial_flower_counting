@@ -62,32 +62,32 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
             # Clean the testing data.
             node(
                 remove_unannotated,
-                "cotton_part_a_test",
-                "non_empty_annotations_test",
+                "cotton_part_a_test_alternate",
+                "non_empty_annotations_test_alt",
             ),
             node(
                 remove_with_attributes,
                 dict(
-                    annotations="non_empty_annotations_test",
-                    cvat_task="cotton_part_a_test",
+                    annotations="non_empty_annotations_test_alt",
+                    cvat_task="cotton_part_a_test_alternate",
                     attributes="params:remove_with_attributes",
                 ),
-                "cleaned_annotations_test",
+                "cleaned_annotations_test_alt",
             ),
             node(
                 annotations_as_dataframe,
-                "cleaned_annotations_test",
-                "annotations_df_test",
+                "cleaned_annotations_test_alt",
+                "annotations_df_test_alt",
             ),
             node(
                 get_frame_sizes,
-                ["annotations_df_test", "cotton_part_a_test"],
-                "frame_sizes_test",
+                ["annotations_df_test_alt", "cotton_part_a_test_alternate"],
+                "frame_sizes_test_alt",
             ),
             node(
                 drop_out_of_bounds,
-                ["annotations_df_test", "frame_sizes_test"],
-                "local_annotations_test",
+                ["annotations_df_test_alt", "frame_sizes_test_alt"],
+                "local_annotations_test_alternate",
             ),
         ]
     )

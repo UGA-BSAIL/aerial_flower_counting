@@ -75,6 +75,9 @@ def make_example_density_maps(
         The density map for each image in the dataset.
 
     """
+    # Use the specified evaluation batch size.
+    eval_data = eval_data.unbatch().batch(batch_size)
+
     for batch, _ in eval_data:
         # Calculate the density map.
         images = batch["image"]

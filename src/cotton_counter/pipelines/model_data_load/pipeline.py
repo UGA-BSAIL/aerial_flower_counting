@@ -65,6 +65,13 @@ def create_pipeline(**kwargs):
             ),
             node(
                 pre_process_node_not_training,
+                dict(
+                    raw_dataset="tfrecord_test_alternate", **pre_process_params
+                ),
+                "testing_data_alt_no_sub_patch_target",
+            ),
+            node(
+                pre_process_node_not_training,
                 dict(raw_dataset="tfrecord_validate", **pre_process_params),
                 "validation_data_no_sub_patch_target",
             ),
@@ -76,6 +83,15 @@ def create_pipeline(**kwargs):
                     **pre_process_params_no_patch,
                 ),
                 "validation_data_no_patches",
+            ),
+            # Do the same for the alternate test data.
+            node(
+                pre_process_node_with_counts,
+                dict(
+                    raw_dataset="tfrecord_test_alternate",
+                    **pre_process_params_no_patch,
+                ),
+                "testing_data_alt_no_patches",
             ),
             # Create a version of the validation data with the raw annotations
             # intact.
@@ -128,6 +144,11 @@ def create_pipeline(**kwargs):
                 add_sub_patch_target,
                 "testing_data_no_sub_patch_target",
                 "testing_data",
+            ),
+            node(
+                add_sub_patch_target,
+                "testing_data_alt_no_sub_patch_target",
+                "testing_data_alternate",
             ),
             node(
                 add_sub_patch_target,

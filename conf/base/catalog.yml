@@ -30,6 +30,12 @@ cotton_part_a_test:
   task_id: 129
   << : *cvat_credentials
 
+# Additional images to use for testing and validation.
+cotton_part_a_test_alternate:
+  type: pycvat.CvatDataSet
+  task_id: 176
+  << : *cvat_credentials
+
 # Cotton counting datasets from CVAT containing image patches with
 # image-level annotations.
 cotton_patches_1:
@@ -50,6 +56,11 @@ local_annotations_test:
   filepath: data/03_primary/annotations/annotations_test.parquet
   versioned: True
 
+local_annotations_test_alternate:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/annotations/annotations_test_alternate.parquet
+  versioned: True
+
 # TFRecord dataset of training split.
 tfrecord_train:
   type: cotton_counter.data_sets.TfRecordsDataSet
@@ -66,6 +77,12 @@ tfrecord_test:
 tfrecord_validate:
   type: cotton_counter.data_sets.TfRecordsDataSet
   filepath: data/05_model_input/validate.tfrecord
+  versioned: True
+
+# TFRecord dataset containing alternate testing data.
+tfrecord_test_alternate:
+  type: cotton_counter.data_sets.TfRecordsDataSet
+  filepath: data/05_model_input/test_alternate.tfrecord
   versioned: True
 
 # TFRecord dataset of tag-annotated patches. It's split
@@ -90,6 +107,10 @@ testing_data:
   type: MemoryDataSet
   copy_mode: assign
 
+testing_data_alternate:
+  type: MemoryDataSet
+  copy_mode: assign
+
 validation_data:
   type: MemoryDataSet
   copy_mode: assign
@@ -103,6 +124,10 @@ combined_training_data:
 
 # A dataset containing validation data but with no patches extracted.
 validation_data_no_patches:
+  type: MemoryDataSet
+  copy_mode: assign
+
+testing_data_alt_no_patches:
   type: MemoryDataSet
   copy_mode: assign
 

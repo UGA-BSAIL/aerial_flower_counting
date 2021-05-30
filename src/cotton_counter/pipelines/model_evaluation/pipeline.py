@@ -25,13 +25,15 @@ def create_pipeline(**kwargs):
         model="trained_model", classify_counts="params:classify_counts"
     )
     # Common parameters used by nodes that do inference on full images.
-    inference_params = dict(
+    inference_params_valid = dict(
         model="trained_model",
         eval_data="validation_data_no_patches",
         patch_scale="params:eval_patch_scale",
         patch_stride="params:eval_patch_stride",
         batch_size="params:eval_batch_size",
     )
+    inference_params_test_alt = inference_params_valid.copy()
+    inference_params_test_alt["eval_data"] = "testing_data_alt_no_patches"
 
     return Pipeline(
         [
@@ -48,26 +50,46 @@ def create_pipeline(**kwargs):
             ),
             node(
                 evaluate_model,
+                dict(eval_data="testing_data_alternate", **eval_params),
+                "model_report_test_alt",
+            ),
+            node(
+                evaluate_model,
                 dict(eval_data="validation_data", **eval_params),
                 "model_report_validate",
             ),
             # Create example density maps.
             node(
                 make_example_density_maps,
-                inference_params,
-                "example_density_maps",
+                inference_params_valid,
+                "example_density_maps_valid",
+            ),
+            node(
+                make_example_density_maps,
+                inference_params_test_alt,
+                "example_density_maps_test_alt",
             ),
             # Calculate overall count accuracy on the validation set.
             node(
                 estimate_counting_accuracy,
-                inference_params,
-                "count_error_report",
+                inference_params_valid,
+                "count_error_report_valid",
+            ),
+            node(
+                estimate_counting_accuracy,
+                inference_params_test_alt,
+                "count_error_report_test_alt",
             ),
             # Create an ROC curve.
             node(
                 plot_roc_curve,
                 dict(eval_data="validation_data", **eval_params),
-                "validation_roc_plot",
+                "validation_roc_plot_valid",
+            ),
+            node(
+                plot_roc_curve,
+                dict(eval_data="testing_data_alternate", **eval_params),
+                "validation_roc_plot_test_alt",
             ),
         ]
     )

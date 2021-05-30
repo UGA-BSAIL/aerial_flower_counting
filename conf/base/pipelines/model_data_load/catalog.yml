@@ -7,6 +7,10 @@ testing_data_no_sub_patch_target:
   type: MemoryDataSet
   copy_mode: assign
 
+testing_data_alt_no_sub_patch_target:
+  type: MemoryDataSet
+  copy_mode: assign
+
 validation_data_no_sub_patch_target:
   type: MemoryDataSet
   copy_mode: assign

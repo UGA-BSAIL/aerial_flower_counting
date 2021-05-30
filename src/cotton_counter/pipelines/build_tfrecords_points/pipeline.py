@@ -25,12 +25,9 @@ def create_pipeline(**kwargs: Any):
         [
             # Split into testing and validation.
             node(
-                make_splits,
-                dict(
-                    local_annotations="local_annotations_test",
-                    split_fractions="params:test_split_fractions",
-                ),
-                ["test_annotations", "validate_annotations"],
+                shuffle,
+                "local_annotations_test_alternate",
+                "shuffled_test_alt",
             ),
             # Shuffle the data.
             node(shuffle, "local_annotations_train", "shuffled_train"),
@@ -49,8 +46,8 @@ def create_pipeline(**kwargs: Any):
             ),
             node(
                 generate_tf_records,
-                ["shuffled_validate", "cotton_part_a_test"],
-                "tfrecord_validate",
+                ["shuffled_test_alt", "cotton_part_a_test_alternate"],
+                "tfrecord_test_alternate",
             ),
         ]
     )
