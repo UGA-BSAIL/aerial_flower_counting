@@ -45,13 +45,24 @@ count_error_report_test_alt:
   filepath: ${output_data_dir}/08_reporting/count_error_report_test_alt.yaml
   versioned: True
 
-# A plot of the ROC curve for the validation data.
-validation_roc_plot_valid:
+# A histogram plot of the counting error.
+count_histogram_valid:
   type: matplotlib.MatplotlibWriter
-  filepath: ${output_data_dir}/08_reporting/model_reports/validation_roc_valid.png
+  filepath: ${output_data_dir}/08_reporting/count_histogram_valid.png
   versioned: True
 
-validation_roc_plot_test_alt:
+count_histogram_test_alt:
   type: matplotlib.MatplotlibWriter
-  filepath: ${output_data_dir}/08_reporting/model_reports/validation_roc_test_alt.png
+  filepath: ${output_data_dir}/08_reporting/count_histogram_test_alt.png
+  versioned: True
+
+# A plot of the ROC curve for the validation data.
+validation_roc_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: ${output_data_dir}/08_reporting/validation_roc.png
+  versioned: True
+
+testing_alt_roc_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: ${output_data_dir}/08_reporting/testing_alt_roc.png
   versioned: True

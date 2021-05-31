@@ -3,9 +3,10 @@ Defines nodes for the `model_evaluation` pipeline.
 """
 
 
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Tuple
 
 import numpy as np
+import seaborn as sns
 import sklearn.metrics
 import tensorflow as tf
 from loguru import logger
@@ -18,6 +19,8 @@ from ...model.inference import calculate_max_density, count_with_patches
 from ...model.losses import make_losses
 from ...model.metrics import make_metrics
 from ...model.visualization import visualize_heat_maps
+
+sns.set()
 
 
 def evaluate_model(
@@ -103,7 +106,64 @@ def make_example_density_maps(
             yield Image.fromarray(heatmap)
 
 
-def _make_report(*, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
+def estimate_counting_accuracy(
+    *,
+    model: keras.Model,
+    eval_data: tf.data.Dataset,
+    patch_scale: float,
+    patch_stride: float,
+    batch_size: int,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Estimates the pure counting accuracy of the model on a dataset.
+
+    Args:
+        model: The model to use.
+        eval_data: The dataset to get the images from. It should produce full
+            images, and not patches. It should also contain a raw count target.
+        patch_scale: The scale factor to apply for the patches we extract.
+        patch_stride: The stride to use for extracting patches, provided in
+            frame fractions like the scale.
+        batch_size: The size of the batches to use for inference.
+
+    Returns:
+        The true counts and the corresponding predicted counts.
+
+    """
+    # Store the predicted and actual counts for each image.
+    predicted_counts = []
+    actual_counts = []
+
+    eval_data = eval_data.unbatch().batch(batch_size)
+
+    for input_batch, target_batch in eval_data:
+        # Calculate the density maps.
+        density_maps = count_with_patches(
+            model,
+            input_batch["image"],
+            patch_scale=patch_scale,
+            patch_stride=patch_stride,
+            batch_size=batch_size,
+        )
+
+        # Estimate the predicted counts for each image.
+        batch_predicted_counts = np.sum(density_maps, axis=(1, 2, 3))
+        predicted_counts.append(batch_predicted_counts)
+
+        # Save the actual counts too.
+        actual_counts.append(target_batch["count"])
+
+    # Calculate an overall count error.
+    predicted_counts = np.concatenate(predicted_counts, axis=0)
+    actual_counts = np.concatenate(actual_counts, axis=0)
+    logger.debug("Generated counts for {} images.", len(predicted_counts))
+
+    return actual_counts, predicted_counts
+
+
+def make_accuracy_report(
+    *, y_true: np.ndarray, y_pred: np.ndarray
+) -> Dict[str, Any]:
     """
     Generates a machine-readable report for a regression problem. It contains
     the per-sample error, as well as the mean overall error.
@@ -141,59 +201,29 @@ def _make_report(*, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
     )
 
 
-def estimate_counting_accuracy(
-    *,
-    model: keras.Model,
-    eval_data: tf.data.Dataset,
-    patch_scale: float,
-    patch_stride: float,
-    batch_size: int,
-) -> Dict[str, Any]:
+def make_counting_histogram(
+    *, y_true: np.ndarray, y_pred: np.ndarray
+) -> plot.Figure:
     """
-    Estimates the pure counting accuracy of the model on a dataset.
+    Plots a histogram of the counting accuracy over the entire dataset.
 
     Args:
-        model: The model to use.
-        eval_data: The dataset to get the images from. It should produce full
-            images, and not patches. It should also contain a raw count target.
-        patch_scale: The scale factor to apply for the patches we extract.
-        patch_stride: The stride to use for extracting patches, provided in
-            frame fractions like the scale.
-        batch_size: The size of the batches to use for inference.
+        y_true: The true counts for each image.
+        y_pred: The predicted counts for each image.
 
     Returns:
-        A dictionary containing a machine-readable accuracy report.
+        The figure in which it plotted this histogram.
 
     """
-    # Store the predicted and actual counts for each image.
-    predicted_counts = []
-    actual_counts = []
+    # Calculate the counting errors.
+    errors = y_true - y_pred
 
-    eval_data = eval_data.unbatch().batch(batch_size)
+    # Plot the histogram.
+    axes = sns.histplot(errors, stat="count")
+    axes.set_title("Counting Error")
+    axes.set(xlabel="Count Error", ylabel="Number of Images")
 
-    for input_batch, target_batch in eval_data:
-        # Calculate the density maps.
-        density_maps = count_with_patches(
-            model,
-            input_batch["image"],
-            patch_scale=patch_scale,
-            patch_stride=patch_stride,
-            batch_size=batch_size,
-        )
-
-        # Estimate the predicted counts for each image.
-        batch_predicted_counts = np.sum(density_maps, axis=(1, 2, 3))
-        predicted_counts.append(batch_predicted_counts)
-
-        # Save the actual counts too.
-        actual_counts.append(target_batch["count"])
-
-    # Calculate an overall count error.
-    predicted_counts = np.concatenate(predicted_counts, axis=0)
-    actual_counts = np.concatenate(actual_counts, axis=0)
-    logger.debug("Generated counts for {} images.", len(predicted_counts))
-
-    return _make_report(y_true=actual_counts, y_pred=predicted_counts)
+    return plot.gcf()
 
 
 def plot_roc_curve(

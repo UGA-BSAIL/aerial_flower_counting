@@ -142,7 +142,7 @@ python-versions = "~=3.5"
 
 [[package]]
 name = "certifi"
-version = "2020.12.5"
+version = "2021.5.30"
 description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
@@ -1199,7 +1199,7 @@ python-versions = "*"
 
 [[package]]
 name = "pywin32"
-version = "300"
+version = "301"
 description = "Python for Window Extensions"
 category = "main"
 optional = false
@@ -1310,17 +1310,17 @@ numpy = ">=1.16.5,<1.23.0"
 
 [[package]]
 name = "seaborn"
-version = "0.10.1"
+version = "0.11.1"
 description = "seaborn: statistical data visualization"
 category = "main"
 optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-matplotlib = ">=2.1.2"
-numpy = ">=1.13.3"
-pandas = ">=0.22.0"
-scipy = ">=1.0.1"
+matplotlib = ">=2.2"
+numpy = ">=1.15"
+pandas = ">=0.23"
+scipy = ">=1.0"
 
 [[package]]
 name = "semver"
@@ -1674,7 +1674,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.8"
-content-hash = "5faccb6a0c2a80d6479a41757cc446e05cc424a49067faf8e87390203f7f7abc"
+content-hash = "d8b56b78533c05656ed3d08cfb67203068a04b1a1d0542fbfed6c04abf935dd8"
 
 [metadata.files]
 absl-py = [
@@ -1730,8 +1730,8 @@ cachetools = [
     {file = "cachetools-4.2.2.tar.gz", hash = "sha256:61b5ed1e22a0924aed1d23b478f37e8d52549ff8a961de2909c69bf950020cff"},
 ]
 certifi = [
-    {file = "certifi-2020.12.5-py2.py3-none-any.whl", hash = "sha256:719a74fb9e33b9bd44cc7f3a8d94bc35e4049deebe19ba7d8e108280cfd59830"},
-    {file = "certifi-2020.12.5.tar.gz", hash = "sha256:1a4995114262bffbc2413b159f2a1a480c969de6e6eb13ee966d470af86af59c"},
+    {file = "certifi-2021.5.30-py2.py3-none-any.whl", hash = "sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8"},
+    {file = "certifi-2021.5.30.tar.gz", hash = "sha256:2bbf76fd432960138b3ef6dda3dde0544f27cbf8546c458e60baf371917ba9ee"},
 ]
 cffi = [
     {file = "cffi-1.14.5-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:bb89f306e5da99f4d922728ddcd6f7fcebb3241fc40edebcb7284d7514741991"},
@@ -2495,16 +2495,12 @@ pytz = [
     {file = "pytz-2021.1.tar.gz", hash = "sha256:83a4a90894bf38e243cf052c8b58f381bfe9a7a483f6a9cab140bc7f702ac4da"},
 ]
 pywin32 = [
-    {file = "pywin32-300-cp35-cp35m-win32.whl", hash = "sha256:1c204a81daed2089e55d11eefa4826c05e604d27fe2be40b6bf8db7b6a39da63"},
-    {file = "pywin32-300-cp35-cp35m-win_amd64.whl", hash = "sha256:350c5644775736351b77ba68da09a39c760d75d2467ecec37bd3c36a94fbed64"},
-    {file = "pywin32-300-cp36-cp36m-win32.whl", hash = "sha256:a3b4c48c852d4107e8a8ec980b76c94ce596ea66d60f7a697582ea9dce7e0db7"},
-    {file = "pywin32-300-cp36-cp36m-win_amd64.whl", hash = "sha256:27a30b887afbf05a9cbb05e3ffd43104a9b71ce292f64a635389dbad0ed1cd85"},
-    {file = "pywin32-300-cp37-cp37m-win32.whl", hash = "sha256:d7e8c7efc221f10d6400c19c32a031add1c4a58733298c09216f57b4fde110dc"},
-    {file = "pywin32-300-cp37-cp37m-win_amd64.whl", hash = "sha256:8151e4d7a19262d6694162d6da85d99a16f8b908949797fd99c83a0bfaf5807d"},
-    {file = "pywin32-300-cp38-cp38-win32.whl", hash = "sha256:fbb3b1b0fbd0b4fc2a3d1d81fe0783e30062c1abed1d17c32b7879d55858cfae"},
-    {file = "pywin32-300-cp38-cp38-win_amd64.whl", hash = "sha256:60a8fa361091b2eea27f15718f8eb7f9297e8d51b54dbc4f55f3d238093d5190"},
-    {file = "pywin32-300-cp39-cp39-win32.whl", hash = "sha256:638b68eea5cfc8def537e43e9554747f8dee786b090e47ead94bfdafdb0f2f50"},
-    {file = "pywin32-300-cp39-cp39-win_amd64.whl", hash = "sha256:b1609ce9bd5c411b81f941b246d683d6508992093203d4eb7f278f4ed1085c3f"},
+    {file = "pywin32-301-cp35-cp35m-win32.whl", hash = "sha256:93367c96e3a76dfe5003d8291ae16454ca7d84bb24d721e0b74a07610b7be4a7"},
+    {file = "pywin32-301-cp35-cp35m-win_amd64.whl", hash = "sha256:9635df6998a70282bd36e7ac2a5cef9ead1627b0a63b17c731312c7a0daebb72"},
+    {file = "pywin32-301-cp36-cp36m-win32.whl", hash = "sha256:c866f04a182a8cb9b7855de065113bbd2e40524f570db73ef1ee99ff0a5cc2f0"},
+    {file = "pywin32-301-cp36-cp36m-win_amd64.whl", hash = "sha256:dafa18e95bf2a92f298fe9c582b0e205aca45c55f989937c52c454ce65b93c78"},
+    {file = "pywin32-301-cp37-cp37m-win32.whl", hash = "sha256:98f62a3f60aa64894a290fb7494bfa0bfa0a199e9e052e1ac293b2ad3cd2818b"},
+    {file = "pywin32-301-cp37-cp37m-win_amd64.whl", hash = "sha256:fb3b4933e0382ba49305cc6cd3fb18525df7fd96aa434de19ce0878133bf8e4a"},
 ]
 pyyaml = [
     {file = "PyYAML-5.4.1-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:3b2b1824fe7112845700f815ff6a489360226a5609b96ec2190a45e62a9fc922"},
@@ -2684,8 +2680,8 @@ scipy = [
     {file = "scipy-1.6.3.tar.gz", hash = "sha256:a75b014d3294fce26852a9d04ea27b5671d86736beb34acdfc05859246260707"},
 ]
 seaborn = [
-    {file = "seaborn-0.10.1-py3-none-any.whl", hash = "sha256:c901ce494541fb4714cfa7db79d0232dc3f4c4dfd3f273bacf17816084df5b53"},
-    {file = "seaborn-0.10.1.tar.gz", hash = "sha256:2d1a0c9d6bd1bc3cadb0364b8f06540f51322a670cf8438d0fde1c1c7317adc0"},
+    {file = "seaborn-0.11.1-py3-none-any.whl", hash = "sha256:4e1cce9489449a1c6ff3c567f2113cdb41122f727e27a984950d004a88ef3c5c"},
+    {file = "seaborn-0.11.1.tar.gz", hash = "sha256:44e78eaed937c5a87fc7a892c329a7cc091060b67ebd1d0d306b446a74ba01ad"},
 ]
 semver = [
     {file = "semver-2.13.0-py2.py3-none-any.whl", hash = "sha256:ced8b23dceb22134307c1b8abfa523da14198793d9787ac838e70e29e77458d4"},

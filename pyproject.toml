@@ -10,7 +10,7 @@ python = "~3.8"
 kedro = "^0.16.6"
 pycvat = {path = "pycvat", develop = false}
 loguru = "^0.5.2"
-seaborn = "^0.10.1"
+seaborn = "^0.11.1"
 numpy = ">=1.16"
 pandas = "^1.1.1"
 pyarrow = "^1.0.1"
