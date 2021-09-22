@@ -6,6 +6,7 @@ Defines nodes for the `model_evaluation` pipeline.
 from typing import Any, Dict, Iterable, Tuple
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import sklearn.metrics
 import tensorflow as tf
@@ -226,11 +227,11 @@ def make_counting_histogram(
     return plot.gcf()
 
 
-def plot_roc_curve(
+def calculate_roc_points(
     model: keras.Model, *, eval_data: tf.data.Dataset, classify_counts: bool
-) -> plot.Figure:
+) -> pd.DataFrame:
     """
-    Plots an ROC curve for the model.
+    Calculates the points on an ROC.
 
     Args:
         model: The model to generate the ROC curve for.
@@ -256,10 +257,30 @@ def plot_roc_curve(
     labels = 1 - np.array(labels)
     probabilities = 1.0 - probabilities
 
-    # Plot the curve.
+    # Calculate the curve points.
     false_positives, true_positives, _ = sklearn.metrics.roc_curve(
         labels, probabilities
     )
+
+    return pd.DataFrame(
+        {"false_positives": false_positives, "true_positives": true_positives}
+    )
+
+
+def plot_roc_curve(roc_points: pd.DataFrame) -> plot.Figure:
+    """
+    Plots an ROC curve for the model.
+
+    Args:
+        roc_points: The `DataFrame` containing the points in the ROC curve to
+            plot.
+
+    Returns:
+        The figure in which it plotted the ROC curve.
+
+    """
+    false_positives = roc_points["false_positives"]
+    true_positives = roc_points["true_positives"]
 
     plot.plot(
         100 * false_positives,

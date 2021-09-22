@@ -56,6 +56,17 @@ count_histogram_test_alt:
   filepath: ${output_data_dir}/08_reporting/count_histogram_test_alt.png
   versioned: True
 
+# The raw ROC curve values.
+validation_roc_data:
+  type: pandas.ParquetDataSet
+  filepath: ${output_data_dir}/08_reporting/validation_roc_data.parquet
+  versioned: True
+
+testing_alt_roc_data:
+  type: pandas.ParquetDataSet
+  filepath: ${output_data_dir}/08_reporting/testing_alt_roc_data.parquet
+  versioned: True
+
 # A plot of the ROC curve for the validation data.
 validation_roc_plot:
   type: matplotlib.MatplotlibWriter

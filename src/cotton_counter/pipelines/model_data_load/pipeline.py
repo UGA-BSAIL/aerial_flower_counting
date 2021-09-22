@@ -171,5 +171,6 @@ def create_pipeline(**kwargs):
                 ),
                 "initial_output_bias",
             ),
-        ]
+        ],
+        tags="data_load",
     )

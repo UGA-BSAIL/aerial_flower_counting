@@ -6,6 +6,7 @@ Pipeline that handles evaluating a trained model.
 from kedro.pipeline import Pipeline, node
 
 from .nodes import (
+    calculate_roc_points,
     estimate_counting_accuracy,
     evaluate_model,
     make_accuracy_report,
@@ -40,78 +41,98 @@ def create_pipeline(**kwargs):
     return Pipeline(
         [
             # Evaluate model on all datasets.
-            # node(
-            #     evaluate_model,
-            #     dict(eval_data="combined_training_data", **eval_params),
-            #     "model_report_train",
-            # ),
-            # node(
-            #     evaluate_model,
-            #     dict(eval_data="testing_data", **eval_params),
-            #     "model_report_test",
-            # ),
-            # node(
-            #     evaluate_model,
-            #     dict(eval_data="testing_data_alternate", **eval_params),
-            #     "model_report_test_alt",
-            # ),
-            # node(
-            #     evaluate_model,
-            #     dict(eval_data="validation_data", **eval_params),
-            #     "model_report_validate",
-            # ),
-            # # Create example density maps.
-            # node(
-            #     make_example_density_maps,
-            #     inference_params_valid,
-            #     "example_density_maps_valid",
-            # ),
-            # node(
-            #     make_example_density_maps,
-            #     inference_params_test_alt,
-            #     "example_density_maps_test_alt",
-            # ),
+            node(
+                evaluate_model,
+                dict(eval_data="combined_training_data", **eval_params),
+                "model_report_train",
+            ),
+            node(
+                evaluate_model,
+                dict(eval_data="testing_data", **eval_params),
+                "model_report_test",
+            ),
+            node(
+                evaluate_model,
+                dict(eval_data="testing_data_alternate", **eval_params),
+                "model_report_test_alt",
+            ),
+            node(
+                evaluate_model,
+                dict(eval_data="validation_data", **eval_params),
+                "model_report_validate",
+            ),
+            # Create example density maps.
+            node(
+                make_example_density_maps,
+                inference_params_valid,
+                "example_density_maps_valid",
+            ),
+            node(
+                make_example_density_maps,
+                inference_params_test_alt,
+                "example_density_maps_test_alt",
+            ),
             # Calculate overall count accuracy and write reports.
             node(
                 estimate_counting_accuracy,
                 inference_params_valid,
                 ["count_gt_valid", "count_pred_valid"],
+                tags="counting_accuracy",
             ),
             node(
                 estimate_counting_accuracy,
                 inference_params_test_alt,
                 ["count_gt_test_alt", "count_pred_test_alt"],
+                tags="counting_accuracy",
             ),
             node(
                 make_accuracy_report,
                 dict(y_true="count_gt_valid", y_pred="count_pred_valid"),
                 "count_error_report_valid",
+                tags="counting_accuracy",
             ),
             node(
                 make_accuracy_report,
                 dict(y_true="count_gt_test_alt", y_pred="count_pred_test_alt"),
                 "count_error_report_test_alt",
+                tags="counting_accuracy",
             ),
             node(
                 make_counting_histogram,
                 dict(y_true="count_gt_valid", y_pred="count_pred_valid"),
                 "count_histogram_valid",
+                tags="counting_accuracy",
             ),
             node(
                 make_counting_histogram,
                 dict(y_true="count_gt_test_alt", y_pred="count_pred_test_alt"),
                 "count_histogram_test_alt",
+                tags="counting_accuracy",
             ),
             # Create an ROC curve.
             node(
-                plot_roc_curve,
+                calculate_roc_points,
                 dict(eval_data="validation_data", **eval_params),
-                "validation_roc_plot",
+                "validation_roc_data",
+                tags="counting_accuracy",
+            ),
+            node(
+                calculate_roc_points,
+                dict(eval_data="testing_data_alternate", **eval_params),
+                "testing_alt_roc_data",
+                tags="counting_accuracy",
             ),
             node(
                 plot_roc_curve,
-                dict(eval_data="testing_data_alternate", **eval_params),
+                "validation_roc_data",
+                "validation_roc_plot",
+                tags="counting_accuracy",
+            ),
+            node(
+                plot_roc_curve,
+                "testing_alt_roc_data",
                 "testing_alt_roc_plot",
+                tags="counting_accuracy",
             ),
         ]
     )
