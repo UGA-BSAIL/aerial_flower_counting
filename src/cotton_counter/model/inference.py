@@ -28,12 +28,17 @@ def _make_patch_indices_absolute(
             `tf.image.extract_patches`.
 
     Returns:
-        An array, where the rows correspond to the indices in each patch.
+        An array, where the rows correspond to the indices in each patch. If
+        the patches don't perfectly overlap the input, -1 will be used to
+        indicate pixels that have no corresponding input value.
 
     """
     # Create the 2D index array.
     image_size_flat = np.prod(image_size)
-    index_array = np.arange(0, image_size_flat)
+    # When extracting patches, 0 signifies something specific, namely
+    # that this pixel is outside the bounds of the input. Therefore, for now,
+    # we shift all our indices up by one.
+    index_array = np.arange(1, image_size_flat + 1)
     index_array = index_array.reshape(image_size)
 
     # Extract the same patches from the index array.
@@ -48,6 +53,8 @@ def _make_patch_indices_absolute(
         padding="SAME",
     )
 
+    # Subtract one to get the true indices.
+    index_patches -= 1
     # Flatten them into index arrays.
     index_patches = index_patches.numpy()
     # The total number of patches is specified by the second and third
@@ -107,6 +114,8 @@ def _make_patch_overlap_map(
     patch_overlaps = np.zeros((image_size,), dtype=np.int32)
 
     for indices in patch_indices:
+        # Filter the unused pixels from any partial patches.
+        indices = indices[indices >= 0]
         patch_overlaps[indices] += 1
 
     return patch_overlaps.reshape(image_shape)
@@ -138,6 +147,8 @@ def _make_density_map(
     counts_per_pixel = np.zeros(patch_overlap_map.size, dtype=np.float32)
 
     for prediction, indices in zip(patch_predictions, patch_indices):
+        # Filter the unused pixels from any partial patches.
+        indices = indices[indices >= 0]
         patch_size = len(indices)
         # Distribute the density evenly over the entire patch.
         counts_per_pixel[indices] += prediction / patch_size
@@ -270,11 +281,15 @@ def _predict_with_activation_maps_patched(
     # _make_patch_indices_absolute gives us the indices in the original image
     # that correspond to the indices in the patches. However, we need the
     # other way around, so we get this through a scatter operation.
-    counter = tf.range(patch_indices.size)
+    patch_indices_flat = tf.reshape(patch_indices, (-1,))
+    # Remove indices that don't correspond to input locations.
+    patch_indices_flat = tf.boolean_mask(
+        patch_indices_flat, patch_indices_flat >= 0,
+    )
+    num_indices = tf.reduce_prod(tf.shape(patch_indices_flat))
+    counter = tf.range(num_indices)
     gather_indices = tf.scatter_nd(
-        tf.reshape(patch_indices, (-1, 1)),
-        counter,
-        shape=(patch_indices.size,),
+        tf.expand_dims(patch_indices_flat, 1), counter, shape=(num_indices,),
     )
     # Re-combine patches into a single image.
     num_images = tf.shape(images)[0]
@@ -363,13 +378,15 @@ def count_with_patches(
     return np.stack(density_maps, axis=0)
 
 
-def calculate_max_density(images: tf.Tensor, *, patch_scale: float) -> float:
+def calculate_max_density(
+    image_shape: Iterable[int], *, patch_scale: float
+) -> float:
     """
     Calculates the maximum value that can appear in a density map for a certain
     image and patch scale.
 
     Args:
-        images: The images to calculate this for.
+        image_shape: The shape of a single input image.
         patch_scale: The scale of the patches to extract.
 
     Returns:
@@ -377,9 +394,7 @@ def calculate_max_density(images: tf.Tensor, *, patch_scale: float) -> float:
 
     """
     # Calculate the patch shape.
-    image_batch_shape = tf.shape(images).numpy()
-    single_image_shape = image_batch_shape[1:3]
-    patch_shape = single_image_shape * patch_scale
+    patch_shape = np.array(image_shape[:2]) * patch_scale
     logger.debug("Calculated patch shape of {}.", patch_shape)
 
     # The maximum density is just the reciprocal, because at most we can have
