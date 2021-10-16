@@ -66,6 +66,12 @@ def annotation_spatial_dist(local_annotations: pd.DataFrame) -> plot.Figure:
     return plot.gcf()
 
 
+_DOT_RADIUS = 40
+"""
+Radius of the annotation dots to plot, in pixels.
+"""
+
+
 def _plot_annotations(
     image: Image.Image, annotation_x: np.ndarray, annotation_y: np.ndarray
 ) -> None:
@@ -86,8 +92,8 @@ def _plot_annotations(
     annotation_y *= image_height
 
     for x, y in zip(annotation_x, annotation_y):
-        top_left = (x - 20, y - 20)
-        bottom_right = (x + 20, y + 20)
+        top_left = (x - _DOT_RADIUS, y - _DOT_RADIUS)
+        bottom_right = (x + _DOT_RADIUS, y + _DOT_RADIUS)
         draw.ellipse([top_left, bottom_right], fill="red")
 
 
