@@ -219,12 +219,8 @@ def _predict_with_activation_maps(
     return tf.image.resize(activation_maps, input_size)
 
 
-def _predict_with_activation_maps_patched(
-    model: tf.keras.Model,
-    images: tf.Tensor,
-    *,
-    image_size: Vector2I,
-    batch_size: int,
+def predict_with_activation_maps_patched(
+    model: tf.keras.Model, images: tf.Tensor, *, batch_size: int = 32,
 ) -> tf.Tensor:
     """
     Same as `_predict_with_activation_maps`, but will perform the prediction
@@ -241,7 +237,6 @@ def _predict_with_activation_maps_patched(
             it is imperative that model's input size evenly divides the image
             size.
         images: The images to generate activation maps for.
-        image_size: The size of the input images, in the form (height, width).
         batch_size: Batch size to use when extracting activation maps.
 
     Returns:
@@ -253,6 +248,10 @@ def _predict_with_activation_maps_patched(
     logger.debug(
         "Model has input size {}.", model_input_size,
     )
+
+    image_batch_shape = tf.shape(images).numpy()
+    logger.debug("Input images have shape {}.", image_batch_shape)
+    image_size = image_batch_shape[1:3]
 
     # Extract patches that are the same shape as we specified for the model
     # input.
@@ -306,23 +305,20 @@ def _predict_with_activation_maps_patched(
 
 
 def count_with_patches(
-    model: tf.keras.Model,
-    images: tf.Tensor,
+    activation_maps: tf.Tensor,
     *,
     patch_scale: float,
     patch_stride: Optional[float] = None,
-    batch_size: int = 32,
 ) -> np.ndarray:
     """
     Uses overlapping patches to estimate the total count in an image.
 
     Args:
-        model: The model to use for inference.
-        images: The images to process, as a 4D tensor.
+        activation_maps: The predicted activation maps produced by running
+            the model on a batch of images.
         patch_scale: The patch scaling factor to use for patch extraction.
         patch_stride: The stride to use for patch extraction. If not
             specified, it defaults to 1/2 the patch scale.
-        batch_size: The batch size to use for inference.
 
     Returns:
         Approximate density maps for the images, as a 4D array.
@@ -332,15 +328,9 @@ def count_with_patches(
         # Use the default stride.
         patch_stride = patch_scale / 2.0
 
-    image_batch_shape = tf.shape(images).numpy()
-    logger.debug("Input images have shape {}.", image_batch_shape)
-    image_size = image_batch_shape[1:3]
-    num_images = image_batch_shape[0]
-
-    # Get the activation maps for these images.
-    activation_maps = _predict_with_activation_maps_patched(
-        model, images, image_size=image_size, batch_size=batch_size
-    )
+    input_batch_shape = tf.shape(activation_maps).numpy()
+    image_size = input_batch_shape[1:3]
+    num_images = input_batch_shape[0]
 
     # Extract patches from the activation maps and produce actual counts.
     got_patches = patches.extract_standard_patches(

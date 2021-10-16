@@ -15,25 +15,71 @@ from loguru import logger
 from src.cotton_counter.model.inference import (
     calculate_max_density,
     count_with_patches,
+    predict_with_activation_maps_patched,
 )
 from src.cotton_counter.model.layers import CUSTOM_OBJECTS
 from src.cotton_counter.model.patches import extract_standard_patches
 from src.cotton_counter.model.visualization import visualize_heat_maps
 
 
+def _compute_activations(
+    *, model: tf.keras.Model, image: np.ndarray
+) -> tf.Tensor:
+    """
+    Computes the raw activations from running the model on an image.
+
+    Args:
+        model: The model to run.
+        image: The image to run it on.
+
+    Returns:
+        The activations.
+
+    """
+    image_4d = tf.constant(np.expand_dims(image, 0))
+    return predict_with_activation_maps_patched(model, image_4d)
+
+
+def _visualize_activations(
+    *, image: np.ndarray, activation_maps: tf.Tensor
+) -> tf.Tensor:
+    """
+    Visualizes activation maps from the model.
+
+    Args:
+        image: The image that the activation corresponds to.
+        activation_maps: The corresponding activation, as a 4D tensor.
+
+    Returns:
+        The visualized activations, as images.
+
+    """
+    image_4d = tf.constant(np.expand_dims(image, 0))
+
+    # We want everything to be positive in order to visualize correctly.
+    min_activation = tf.reduce_min(activation_maps)
+    activation_maps -= tf.where(min_activation < 0, min_activation, 0)
+    max_activation = tf.reduce_max(activation_maps)
+
+    # Since the zero class is actually positive, to make the visualization
+    # more intuitive, we reverse the activations.
+    activation_maps = max_activation - activation_maps
+
+    return visualize_heat_maps(
+        images=image_4d,
+        features=activation_maps,
+        max_color_threshold=max_activation,
+    )
+
+
 def _make_density_map(
-    *,
-    model: tf.keras.Model,
-    image: np.ndarray,
-    patch_scale: float,
-    patch_stride: float
+    *, activation_maps: tf.Tensor, patch_scale: float, patch_stride: float
 ) -> np.ndarray:
     """
     Performs inference on a given image, and creates the density map.
 
     Args:
-        model: The model to use for inference.
-        image: The image to create a density map for.
+        activation_maps: The raw activation maps for an image.
         patch_scale: The scale factor to apply to the patches we extract.
         patch_stride: The stride to use for extracting patches, provided in
             frame fractions like the scale.
@@ -42,26 +88,44 @@ def _make_density_map(
         The density map, as a 4D tensor.
 
     """
-    image_4d = tf.constant(np.expand_dims(image, 0))
     density_maps = count_with_patches(
-        model, image_4d, patch_scale=patch_scale, patch_stride=patch_stride
+        activation_maps, patch_scale=patch_scale, patch_stride=patch_stride
     )
 
     return density_maps
 
 
-def _infer_image(image: np.ndarray, patch_scale: float, **kwargs: Any) -> None:
+def _display_image(image_tensor: tf.Tensor, *, window_name: str) -> None:
+    """
+    Displays an image on the screen.
+
+    Args:
+        image_tensor: The image to display, as a 4D tensor.
+        window_name: The name of the display window to use.
+
+    """
+    image = image_tensor[0].numpy()
+    image = cv2.resize(image, (1920, 1080))
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    cv2.imshow(window_name, image)
+
+
+def _infer_image(
+    model: tf.keras.Model, image: np.ndarray, patch_scale: float, **kwargs: Any
+) -> None:
     """
     Performs inference on an image and displays the results.
 
     Args:
+        model: The model to use for inference.
         image: The image to create a density map for.
         patch_scale: The scale factor to apply to the patches we extract.
         **kwargs: Will be forwarded to `_make_density_map`.
 
     """
+    activation_maps = _compute_activations(model=model, image=image)
     density_map = _make_density_map(
-        image=image, patch_scale=patch_scale, **kwargs
+        activation_maps=activation_maps, patch_scale=patch_scale, **kwargs
     )
 
     # Create a heatmap.
@@ -76,13 +140,15 @@ def _infer_image(image: np.ndarray, patch_scale: float, **kwargs: Any) -> None:
     # Get the total count
     count_estimate = np.sum(density_map)
 
+    # Visualize the raw activations.
+    activation_viz = _visualize_activations(
+        image=image, activation_maps=activation_maps
+    )
+
     # Display the results.
     logger.info("Total count: {}", count_estimate)
-    # Reduce the size of the heatmaps for easier display.
-    heatmap = heatmaps[0].numpy()
-    heatmap = cv2.resize(heatmap, (1920, 1080))
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR)
-    cv2.imshow("Heatmap", heatmap)
+    _display_image(heatmaps, window_name="Heatmap")
+    _display_image(activation_viz, window_name="Activation")
     cv2.waitKey()
 
 

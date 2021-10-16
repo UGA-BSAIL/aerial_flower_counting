@@ -16,7 +16,11 @@ from PIL import Image
 from tabulate import tabulate
 from tensorflow import keras
 
-from ...model.inference import calculate_max_density, count_with_patches
+from ...model.inference import (
+    calculate_max_density,
+    count_with_patches,
+    predict_with_activation_maps_patched,
+)
 from ...model.losses import make_losses
 from ...model.metrics import make_metrics
 from ...model.visualization import visualize_heat_maps
@@ -85,12 +89,13 @@ def make_example_density_maps(
     for batch, _ in eval_data:
         # Calculate the density map.
         images = batch["image"]
+        activation_maps = predict_with_activation_maps_patched(
+            model, images, batch_size=batch_size
+        )
         density_maps = count_with_patches(
-            model,
-            images,
+            activation_maps,
             patch_scale=patch_scale,
             patch_stride=patch_stride,
-            batch_size=batch_size,
         )
 
         # Create a heatmap.
@@ -139,12 +144,13 @@ def estimate_counting_accuracy(
 
     for input_batch, target_batch in eval_data:
         # Calculate the density maps.
+        activation_maps = predict_with_activation_maps_patched(
+            model, input_batch["image"], batch_size=batch_size
+        )
         density_maps = count_with_patches(
-            model,
-            input_batch["image"],
+            activation_maps,
             patch_scale=patch_scale,
             patch_stride=patch_stride,
-            batch_size=batch_size,
         )
 
         # Estimate the predicted counts for each image.
@@ -221,7 +227,6 @@ def make_counting_histogram(
 
     # Plot the histogram.
     axes = sns.histplot(errors, stat="count")
-    axes.set_title("Counting Error")
     axes.set(xlabel="Count Error", ylabel="Number of Images")
 
     return plot.gcf()
