@@ -136,6 +136,11 @@ validation_data_raw_annotations:
   type: MemoryDataSet
   copy_mode: assign
 
+# A manager for the combined training dataset.
+dataset_manager:
+  type: MemoryDataSet
+  copy_mode: assign
+
 _model_args: &model_args
   type: tensorflow.TensorFlowModelDataset
   load_args:

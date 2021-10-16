@@ -14,11 +14,7 @@ from ...model.dataset_io import (
     inputs_and_targets_from_patch_dataset,
     load_point_dataset,
 )
-from .nodes import (
-    add_sub_patch_target,
-    calculate_output_bias,
-    combine_point_and_tag_datasets,
-)
+from .nodes import DatasetManager, add_sub_patch_target, calculate_output_bias
 
 
 def create_pipeline(**kwargs):
@@ -122,17 +118,15 @@ def create_pipeline(**kwargs):
             ),
             # Pre-process the tag dataset.
             node(
-                combine_point_and_tag_datasets,
+                DatasetManager,
                 dict(
                     point_dataset="training_data",
                     tag_dataset_positive="tagged_patch_data_positive",
                     tag_dataset_negative="tagged_patch_data_negative",
-                    tag_fraction="params:tag_fraction",
                     num_positive_patches="params:num_positive_patches",
                     num_negative_patches="params:num_negative_patches",
-                    batch_size="params:batch_size",
                 ),
-                "combined_training_data_no_sub_patch_target",
+                "dataset_manager",
             ),
             # Add sub-patch targets to everything that needs them.
             node(
@@ -154,11 +148,6 @@ def create_pipeline(**kwargs):
                 add_sub_patch_target,
                 "validation_data_no_sub_patch_target",
                 "validation_data",
-            ),
-            node(
-                add_sub_patch_target,
-                "combined_training_data_no_sub_patch_target",
-                "combined_training_data",
             ),
             # Calculate the initial output bias.
             node(

@@ -3,114 +3,170 @@ Nodes for the `model_data_load` pipeline.
 """
 
 
+from typing import Sequence
+
 import numpy as np
 import tensorflow as tf
 from loguru import logger
 
+from ...model.hard_negatives import ThresholdType, filter_hard_negatives
 
-def _make_balanced_tag_dataset(
-    *,
-    tag_dataset_positive: tf.data.Dataset,
-    tag_dataset_negative: tf.data.Dataset,
-    num_positive_patches: int,
-    num_negative_patches: int,
-) -> tf.data.Dataset:
+
+class DatasetManager:
     """
-    Creates a single tagged patch example dataset that is balanced between
-    the positive and negative classes. It does this by oversampling the
-    minority class.
-
-    Args:
-        tag_dataset_positive: The dataset of positive examples.
-        tag_dataset_negative: The dataset of negative examples.
-        num_positive_patches: The number of examples in the positive dataset.
-        num_negative_patches: The number of examples in the negative dataset.
-
-    Returns:
-        The combined, balanced dataset.
-
+    Manages datasets, including combining, balancing, and hard
+    negative mining.
     """
-    # Find the minority dataset.
-    minority_dataset = tag_dataset_positive
-    majority_dataset = tag_dataset_negative
-    if num_negative_patches < num_positive_patches:
-        minority_dataset = tag_dataset_negative
-        majority_dataset = tag_dataset_positive
 
-    # Repeat and cut the minority dataset so it is the same length as the
-    # majority.
-    majority_size = max(num_positive_patches, num_negative_patches)
-    minority_dataset = minority_dataset.repeat()
-    minority_dataset = minority_dataset.take(majority_size)
+    def __init__(
+        self,
+        *,
+        point_dataset: tf.data.Dataset,
+        tag_dataset_positive: tf.data.Dataset,
+        tag_dataset_negative: tf.data.Dataset,
+        num_positive_patches: int,
+        num_negative_patches: int,
+    ):
+        """
+        Combines a dataset containing point annotations and one containing tag
+        annotations. Note that it will strip out all targets from the point
+        dataset except for discrete counts.
 
-    # Combine by random sampling.
-    return tf.data.experimental.sample_from_datasets(
-        [minority_dataset, majority_dataset]
-    )
+        Args:
+            point_dataset: The dataset containing point annotations.
+            tag_dataset_positive: The dataset containing positive tag
+                annotations.
+            tag_dataset_negative: The dataset containing negative tag
+                annotations.
+            num_positive_patches: The number of positive examples in the tagged
+                patch dataset.
+            num_negative_patches: The number of negative examples in the tagged
+                patch dataset.
 
+        Returns:
+            A new combined dataset that randomly chooses elements from both
+            inputs.
 
-def combine_point_and_tag_datasets(
-    *,
-    point_dataset: tf.data.Dataset,
-    tag_dataset_positive: tf.data.Dataset,
-    tag_dataset_negative: tf.data.Dataset,
-    tag_fraction: float,
-    num_positive_patches: int,
-    num_negative_patches: int,
-    batch_size: int,
-) -> tf.data.Dataset:
-    """
-    Combines a dataset containing point annotations and one containing tag
-    annotations. Note that it will strip out all targets from the point
-    dataset except for discrete counts.
+        """
+        # Strip extraneous targets from the point dataset.
+        point_dataset_stripped = point_dataset.map(
+            lambda i, t: (i, {"discrete_count": t["discrete_count"]})
+        )
 
-    Args:
-        point_dataset: The dataset containing point annotations.
-        tag_dataset_positive: The dataset containing positive tag annotations.
-        tag_dataset_negative: The dataset containing negative tag annotations.
-        tag_fraction: The fraction of elements of the resulting dataset to
-            draw from the tag dataset.
-        num_positive_patches: The number of positive examples in the tagged
-            patch dataset.
-        num_negative_patches: The number of negative examples in the tagged
-            patch dataset.
-        batch_size: The size of the batches in the datasets.
+        self.__point_dataset = point_dataset_stripped
+        self.__tag_dataset_positive = tag_dataset_positive
+        self.__tag_dataset_negative = tag_dataset_negative
 
-    Returns:
-        A new combined dataset that randomly chooses elements from both inputs.
+        self.__num_positive_patches = num_positive_patches
+        self.__num_negative_patches = num_negative_patches
+        self.__minority_length = min(
+            self.__num_negative_patches, self.__num_positive_patches
+        )
 
-    """
-    # Un-batch everything so that it gets mixed within batches.
-    tag_dataset_positive = tag_dataset_positive.unbatch()
-    tag_dataset_negative = tag_dataset_negative.unbatch()
-    point_dataset = point_dataset.unbatch()
+        # Balanced versions of the tag datasets with associated sizes.
+        self.__balanced_negatives = self.__tag_dataset_negative.take(
+            self.__minority_length
+        )
+        self.__balanced_positives = self.__tag_dataset_positive.take(
+            self.__minority_length
+        )
 
-    # Combine the positive and negative datasets into one (balanced) dataset.
-    tag_dataset = _make_balanced_tag_dataset(
-        tag_dataset_positive=tag_dataset_positive,
-        tag_dataset_negative=tag_dataset_negative,
-        num_positive_patches=num_positive_patches,
-        num_negative_patches=num_negative_patches,
-    )
+    @staticmethod
+    def __combine_datasets(
+        datasets: Sequence[tf.data.Dataset], lengths: Sequence[int]
+    ) -> tf.data.Dataset:
+        """
+        Combines multiple datasets into one by randomly shuffling them together.
 
-    # Strip extraneous targets from the point dataset.
-    point_dataset_stripped = point_dataset.map(
-        lambda i, t: (i, {"discrete_count": t["discrete_count"]})
-    )
+        Args:
+            datasets: The datasets to combine.
+            lengths: The corresponding lengths of the datasets.
 
-    # Weights for random sampling.
-    assert 0.0 <= tag_fraction <= 1.0, "tag_fraction must be in [0.0, 1.0]"
-    sample_weights = [tag_fraction, 1.0 - tag_fraction]
+        Returns:
+            The combined dataset.
 
-    combined = tf.data.experimental.sample_from_datasets(
-        [tag_dataset, point_dataset_stripped], weights=sample_weights
-    )
+        """
+        # Compute sampling weights based on the lengths.
+        total_length = sum(lengths)
+        logger.debug("Shuffled datasets will have length of {}.", total_length)
+        weights = [length / total_length for length in lengths]
 
-    # Shuffle the data.
-    combined = combined.shuffle(batch_size * 2, reshuffle_each_iteration=True)
+        return tf.data.experimental.sample_from_datasets(
+            datasets, weights=weights
+        )
 
-    # Re-batch once we've combined.
-    return combined.batch(batch_size)
+    def rebalance(self, *, model: tf.keras.Model) -> None:
+        """
+        Re-balances the dataset through hard negative (or positive) mining.
+        After calling this, calling `get_combined()` will return the new
+        balanced dataset.
+
+        Args:
+            model: The partially-trained model to use for finding hard
+                negatives (or positives).
+
+        """
+        # Find the minority dataset.
+        majority_dataset = self.__tag_dataset_negative
+        # A zero output from the model means positive.
+        threshold_type = ThresholdType.LOW_SCORE
+        if self.__num_negative_patches < self.__num_positive_patches:
+            majority_dataset = self.__tag_dataset_positive
+            threshold_type = ThresholdType.HIGH_SCORE
+
+        # Do the hard negative mining. (The same function works for hard
+        # positives too with the proper threshold type.)
+        reduced_majority_dataset = filter_hard_negatives(
+            negative_patches=majority_dataset,
+            threshold_type=threshold_type,
+            model=model,
+            num_to_keep=self.__minority_length,
+        )
+
+        if self.__num_negative_patches < self.__num_positive_patches:
+            self.__balanced_positives = reduced_majority_dataset
+        else:
+            self.__balanced_negatives = reduced_majority_dataset
+
+    def get_combined(
+        self, *, tag_fraction: float, batch_size: int
+    ) -> tf.data.Dataset:
+        """
+        Creates a combined dataset from all the inputs.
+
+        Args:
+            tag_fraction: The fraction of elements of the resulting dataset to
+                draw from the tag dataset.
+            batch_size: The size of the batches in the datasets.
+
+        Returns:
+            The combined dataset.
+
+        """
+        # Un-batch everything so that it gets mixed within batches.
+        tag_dataset_negative = self.__balanced_negatives.unbatch()
+        tag_dataset_positive = self.__balanced_positives.unbatch()
+        point_dataset = self.__point_dataset.unbatch()
+
+        tag_dataset = self.__combine_datasets(
+            (tag_dataset_negative, tag_dataset_positive),
+            (self.__minority_length, self.__minority_length),
+        )
+
+        # Weights for random sampling.
+        assert 0.0 <= tag_fraction <= 1.0, "tag_fraction must be in [0.0, 1.0]"
+        sample_weights = [tag_fraction, 1.0 - tag_fraction]
+
+        combined = tf.data.experimental.sample_from_datasets(
+            [tag_dataset, point_dataset], weights=sample_weights
+        )
+
+        # Shuffle the data.
+        combined = combined.shuffle(
+            batch_size * 2, reshuffle_each_iteration=True
+        )
+        # Re-batch once we've combined.
+        return add_sub_patch_target(combined.batch(batch_size))
 
 
 def add_sub_patch_target(dataset: tf.data.Dataset) -> tf.data.Dataset:
@@ -158,19 +214,16 @@ def calculate_output_bias(
         The calculated initial bias.
 
     """
-    # The oversampling algorithm is going to repeat examples from the
-    # minority class so that there are the same number as the majority class.
-    num_majority_examples = max(num_positive_patches, num_negative_patches)
-    num_balanced_tag_examples = num_majority_examples * 2
-
     # Compute the number of examples in the point dataset.
     total_num_patches = num_positive_patches + num_negative_patches
     total_num_points = total_num_patches / tag_fraction - total_num_patches
 
     # Compute the positive fraction in the combined dataset.
     num_positive_points = total_num_points * point_positive_fraction
-    total_num_positive = int(num_positive_points) + num_majority_examples
-    total_num_examples = total_num_points + num_balanced_tag_examples
+    total_num_positive = int(num_positive_points) + num_positive_patches
+    total_num_examples = (
+        total_num_points + num_positive_patches + num_negative_patches
+    )
     logger.info(
         "Dataset positive example fraction: {}.",
         total_num_positive / total_num_examples,

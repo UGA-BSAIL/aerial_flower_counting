@@ -3,6 +3,7 @@ Defines nodes for the `model_training` pipeline.
 """
 
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
@@ -17,6 +18,7 @@ from ...model.losses import make_losses
 from ...model.metrics import make_metrics
 from ...model.schedules import LoggingWrapper
 from ...type_helpers import Vector2I
+from ..model_data_load.nodes import DatasetManager
 
 
 def _make_learning_rate(
@@ -177,20 +179,23 @@ def make_callbacks(
 def train_model(
     model: keras.Model,
     *,
-    training_data: tf.data.Dataset,
+    training_data_manager: DatasetManager,
     testing_data: tf.data.Dataset,
     learning_phases: List[Dict[str, Any]],
     classify_counts: bool,
     callbacks: List[keras.callbacks.Callback] = [],
     validation_frequency: int,
+    rebalance_frequency: int,
     tensorboard_output_dir: str,
+    batch_size: int,
+    tag_fraction: float,
 ) -> keras.Model:
     """
     Trains a model.
 
     Args:
         model: The model to train.
-        training_data: The `Dataset` containing pre-processed training data.
+        training_data_manager: Manager for producing training data.
         testing_data: The `Dataset` containing pre-processed testing data.
         learning_phases: List of hyperparameter configurations for each training
             stage, in order.
@@ -199,13 +204,26 @@ def train_model(
         callbacks: The callbacks to use when training.
         validation_frequency: Number of training epochs after which to run
             validation.
+        rebalance_frequency: Number of training epochs after which to
+            rebalance the dataset.
         tensorboard_output_dir: The directory to use for storing Tensorboard
             logs.
+        batch_size: The batch size to use for training.
+        tag_fraction: The fraction of the training data to draw from the
+            tagged dataset.
 
     Returns:
         The trained model.
 
     """
+    # Obtain the training data.
+    training_data_getter = partial(
+        training_data_manager.get_combined,
+        batch_size=batch_size,
+        tag_fraction=tag_fraction,
+    )
+    training_data = training_data_getter()
+
     for phase in learning_phases:
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
@@ -232,12 +250,22 @@ def train_model(
             },
             metrics=make_metrics(classify_counts=classify_counts),
         )
-        model.fit(
-            training_data,
-            validation_data=testing_data,
-            epochs=phase["num_epochs"],
-            callbacks=callbacks,
-            validation_freq=validation_frequency,
-        )
+
+        ran_epochs = 0
+        epochs_to_run = min(phase["num_epochs"], rebalance_frequency)
+        while ran_epochs < phase["num_epochs"]:
+            model.fit(
+                training_data,
+                validation_data=testing_data,
+                epochs=epochs_to_run,
+                callbacks=callbacks,
+                validation_freq=validation_frequency,
+            )
+            ran_epochs += epochs_to_run
+
+            if ran_epochs >= rebalance_frequency:
+                logger.info("Re-balancing training data...")
+                training_data_manager.rebalance(model=model)
+                training_data = training_data_getter()
 
     return model

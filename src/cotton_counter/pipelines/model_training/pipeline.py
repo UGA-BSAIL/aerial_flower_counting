@@ -32,12 +32,15 @@ def create_pipeline(**kwargs: Any):
     """
     # Common parameters shared by training nodes.
     training_params = dict(
-        training_data="combined_training_data",
+        training_data_manager="dataset_manager",
         testing_data="testing_data",
         classify_counts="params:classify_counts",
         callbacks="callbacks",
         validation_frequency="params:validation_frequency",
+        rebalance_frequency="params:rebalance_frequency",
         tensorboard_output_dir="params:tensorboard_output_dir",
+        batch_size="params:batch_size",
+        tag_fraction="params:tag_fraction",
     )
 
     return Pipeline(
