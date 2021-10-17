@@ -43,6 +43,7 @@ def _find_activation_threshold(
     model: tf.keras.Model,
     num_to_keep: int,
     threshold_type: ThresholdType = ThresholdType.HIGH_SCORE,
+    batch_size: int = 16,
 ) -> Tuple[float, np.ndarray]:
     """
     Finds the activation cutoff to use for hard negative mining. Every
@@ -56,6 +57,7 @@ def _find_activation_threshold(
             training.
         threshold_type: Type of thresholding to use for determining which
             examples are hard.
+        batch_size: The batch size to use for prediction.
 
     Returns:
         The activation threshold, as well as an array of the raw activations, in
@@ -64,15 +66,17 @@ def _find_activation_threshold(
     """
     # Get all the predictions from the model.
     logger.info("Getting predictions for negative examples...")
+    negative_patches = negative_patches.batch(batch_size)
     predictions = model.predict(negative_patches)["discrete_count"].squeeze()
 
     # Find the ones we did worst on.
     sorted_predictions = np.sort(predictions)
     if threshold_type == ThresholdType.HIGH_SCORE:
         worst_predictions = sorted_predictions[-num_to_keep:]
+        activation_threshold = float(worst_predictions[0])
     else:
         worst_predictions = sorted_predictions[:num_to_keep]
-    activation_threshold = float(worst_predictions[0])
+        activation_threshold = float(worst_predictions[-1])
     logger.debug("Using activation threshold: {}", activation_threshold)
 
     return activation_threshold, predictions
@@ -95,7 +99,7 @@ def filter_hard_negatives(
     Args:
         negative_patches: The dataset of negative examples. (Technically,
             this can also be used to find hard *positive* examples if the
-            correct threshold is specified.)
+            correct threshold is specified.) It should not be batched.
         threshold_type: Type of thresholding to use for determining which
             examples are hard.
         num_to_keep: The total number of negative examples we want to use for

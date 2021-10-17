@@ -53,14 +53,18 @@ class DatasetManager:
             lambda i, t: (i, {"discrete_count": t["discrete_count"]})
         )
 
-        self.__point_dataset = point_dataset_stripped
-        self.__tag_dataset_positive = tag_dataset_positive
-        self.__tag_dataset_negative = tag_dataset_negative
+        # We un-batch everything, so that we can easily mix it across batches.
+        self.__point_dataset = point_dataset_stripped.unbatch()
+        self.__tag_dataset_positive = tag_dataset_positive.unbatch()
+        self.__tag_dataset_negative = tag_dataset_negative.unbatch()
 
         self.__num_positive_patches = num_positive_patches
         self.__num_negative_patches = num_negative_patches
         self.__minority_length = min(
             self.__num_negative_patches, self.__num_positive_patches
+        )
+        logger.debug(
+            "Smallest tag dataset has {} examples.", self.__minority_length
         )
 
         # Balanced versions of the tag datasets with associated sizes.
@@ -143,13 +147,8 @@ class DatasetManager:
             The combined dataset.
 
         """
-        # Un-batch everything so that it gets mixed within batches.
-        tag_dataset_negative = self.__balanced_negatives.unbatch()
-        tag_dataset_positive = self.__balanced_positives.unbatch()
-        point_dataset = self.__point_dataset.unbatch()
-
         tag_dataset = self.__combine_datasets(
-            (tag_dataset_negative, tag_dataset_positive),
+            (self.__balanced_negatives, self.__balanced_positives),
             (self.__minority_length, self.__minority_length),
         )
 
@@ -158,7 +157,7 @@ class DatasetManager:
         sample_weights = [tag_fraction, 1.0 - tag_fraction]
 
         combined = tf.data.experimental.sample_from_datasets(
-            [tag_dataset, point_dataset], weights=sample_weights
+            [tag_dataset, self.__point_dataset], weights=sample_weights
         )
 
         # Shuffle the data.
@@ -214,16 +213,19 @@ def calculate_output_bias(
         The calculated initial bias.
 
     """
+    # The oversampling algorithm is going to repeat examples from the
+    # minority class so that there are the same number as the majority class.
+    num_majority_examples = max(num_positive_patches, num_negative_patches)
+    num_balanced_tag_examples = num_majority_examples * 2
+
     # Compute the number of examples in the point dataset.
     total_num_patches = num_positive_patches + num_negative_patches
     total_num_points = total_num_patches / tag_fraction - total_num_patches
 
     # Compute the positive fraction in the combined dataset.
     num_positive_points = total_num_points * point_positive_fraction
-    total_num_positive = int(num_positive_points) + num_positive_patches
-    total_num_examples = (
-        total_num_points + num_positive_patches + num_negative_patches
-    )
+    total_num_positive = int(num_positive_points) + num_majority_examples
+    total_num_examples = total_num_points + num_balanced_tag_examples
     logger.info(
         "Dataset positive example fraction: {}.",
         total_num_positive / total_num_examples,

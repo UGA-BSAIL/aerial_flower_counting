@@ -15,10 +15,6 @@ validation_data_no_sub_patch_target:
   type: MemoryDataSet
   copy_mode: assign
 
-combined_training_data_no_sub_patch_target:
-  type: MemoryDataSet
-  copy_mode: assign
-
 # Intermediate datasets containing data with patch-level annotations.
 tagged_patch_data_positive:
   type: MemoryDataSet
