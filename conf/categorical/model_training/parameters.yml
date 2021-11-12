@@ -9,7 +9,7 @@ sub_patch_stride: 0.5
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 1
 # Number of training epochs after which to rebalance the dataset.
-rebalance_frequency: 20
+rebalance_frequency: 1
 # Every time this many epochs elapse, it will generate new density map visualizations.
 visualization_period: 10
 # How many images from each batch to visualize.
@@ -26,8 +26,8 @@ learning_phases:
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      # (1177 steps per epoch)
-      decay_steps: 2347
+      # (745 steps per epoch)
+      decay_steps: 1490
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
