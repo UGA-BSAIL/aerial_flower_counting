@@ -154,11 +154,12 @@ class DatasetManager:
 
         # Weights for random sampling.
         assert 0.0 <= tag_fraction <= 1.0, "tag_fraction must be in [0.0, 1.0]"
-        sample_weights = [tag_fraction, 1.0 - tag_fraction]
+        # sample_weights = [tag_fraction, 1.0 - tag_fraction]
 
-        combined = tf.data.experimental.sample_from_datasets(
-            [tag_dataset, self.__point_dataset], weights=sample_weights
-        )
+        # combined = tf.data.experimental.sample_from_datasets(
+        #     [tag_dataset, self.__point_dataset], weights=sample_weights
+        # )
+        combined = tag_dataset
 
         # Shuffle the data.
         combined = combined.shuffle(
