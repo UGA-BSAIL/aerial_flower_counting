@@ -2,6 +2,17 @@
 
 # Helper script that packages artifacts from a training run.
 
+#SBATCH --partition=batch
+#SBATCH -J cotton_mot_model_package_artifacts
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=0:05:00
+#SBATCH --mem=2gb
+#SBATCH --mail-user=daniel.petti@uga.edu
+#SBATCH --output=cotton_mot_model_package_artifacts.out    # Standard output log
+#SBATCH --error=cotton_mot_model_package_artifacts.err     # Standard error log
+
 set -e
 
 if [[ "$#" -ne 1 ]]; then
