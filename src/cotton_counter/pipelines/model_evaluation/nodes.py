@@ -45,7 +45,10 @@ def evaluate_model(
 
     """
     model.compile(
-        loss=make_losses(classify_counts=classify_counts),
+        # Disable focal loss for the evaluation.
+        loss=make_losses(
+            classify_counts=classify_counts, alpha=1.0, gamma=0.0
+        ),
         metrics=make_metrics(classify_counts=classify_counts),
     )
 
@@ -249,7 +252,10 @@ def calculate_roc_points(
 
     """
     model.compile(
-        loss=make_losses(classify_counts=classify_counts),
+        # Disable focal loss for evaluation.
+        loss=make_losses(
+            classify_counts=classify_counts, alpha=1.0, gamma=0.0
+        ),
         metrics=make_metrics(classify_counts=classify_counts),
     )
 
