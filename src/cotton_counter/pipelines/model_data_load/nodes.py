@@ -148,18 +148,17 @@ class DatasetManager:
 
         """
         tag_dataset = self.__combine_datasets(
-            (self.__balanced_negatives, self.__balanced_positives),
-            (self.__minority_length, self.__minority_length),
+            (self.__tag_dataset_negative, self.__tag_dataset_positive),
+            (self.__num_negative_patches, self.__num_positive_patches),
         )
 
         # Weights for random sampling.
         assert 0.0 <= tag_fraction <= 1.0, "tag_fraction must be in [0.0, 1.0]"
-        # sample_weights = [tag_fraction, 1.0 - tag_fraction]
+        sample_weights = [tag_fraction, 1.0 - tag_fraction]
 
-        # combined = tf.data.experimental.sample_from_datasets(
-        #     [tag_dataset, self.__point_dataset], weights=sample_weights
-        # )
-        combined = tag_dataset
+        combined = tf.data.experimental.sample_from_datasets(
+            [tag_dataset, self.__point_dataset], weights=sample_weights
+        )
 
         # Shuffle the data.
         combined = combined.shuffle(
@@ -214,19 +213,16 @@ def calculate_output_bias(
         The calculated initial bias.
 
     """
-    # The oversampling algorithm is going to repeat examples from the
-    # minority class so that there are the same number as the majority class.
-    num_majority_examples = max(num_positive_patches, num_negative_patches)
-    num_balanced_tag_examples = num_majority_examples * 2
-
     # Compute the number of examples in the point dataset.
     total_num_patches = num_positive_patches + num_negative_patches
     total_num_points = total_num_patches / tag_fraction - total_num_patches
 
     # Compute the positive fraction in the combined dataset.
     num_positive_points = total_num_points * point_positive_fraction
-    total_num_positive = int(num_positive_points) + num_majority_examples
-    total_num_examples = total_num_points + num_balanced_tag_examples
+    total_num_positive = int(num_positive_points) + num_positive_patches
+    total_num_examples = (
+        total_num_points + num_positive_patches + num_negative_patches
+    )
     logger.info(
         "Dataset positive example fraction: {}.",
         total_num_positive / total_num_examples,
