@@ -189,6 +189,8 @@ def train_model(
     tensorboard_output_dir: str,
     batch_size: int,
     tag_fraction: float,
+    focal_loss_alpha: float,
+    focal_loss_gamma: float,
 ) -> keras.Model:
     """
     Trains a model.
@@ -211,6 +213,8 @@ def train_model(
         batch_size: The batch size to use for training.
         tag_fraction: The fraction of the training data to draw from the
             tagged dataset.
+        focal_loss_alpha: Alpha parameter for focal loss.
+        focal_loss_gamma: Gamma parameter for focal loss.
 
     Returns:
         The trained model.
@@ -241,7 +245,11 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss=make_losses(classify_counts=classify_counts),
+            loss=make_losses(
+                classify_counts=classify_counts,
+                alpha=focal_loss_alpha,
+                gamma=focal_loss_gamma,
+            ),
             loss_weights={
                 "discrete_count": discrete_count_loss_weight,
                 "discrete_sub_patch_count": cross_scale_loss_weight,

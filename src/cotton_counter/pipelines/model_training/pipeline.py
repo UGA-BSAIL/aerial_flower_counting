@@ -41,6 +41,8 @@ def create_pipeline(**kwargs: Any):
         tensorboard_output_dir="params:tensorboard_output_dir",
         batch_size="params:batch_size",
         tag_fraction="params:tag_fraction",
+        focal_loss_alpha="params:focal_loss_alpha",
+        focal_loss_gamma="params:focal_loss_gamma",
     )
 
     return Pipeline(

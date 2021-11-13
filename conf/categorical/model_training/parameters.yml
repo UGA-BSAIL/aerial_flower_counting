@@ -9,13 +9,17 @@ sub_patch_stride: 0.5
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 1
 # Number of training epochs after which to rebalance the dataset.
-rebalance_frequency: 1
+rebalance_frequency: 100
 # Every time this many epochs elapse, it will generate new density map visualizations.
 visualization_period: 10
 # How many images from each batch to visualize.
 num_per_batch_to_visualize: 1
 # Maximum number of testing batches to visualize data from.
 max_num_batches_to_visualize: 20
+
+# Focal loss parameters.
+focal_loss_alpha: 0.25
+focal_loss_gamma: 2.0
 
 # Learning phases to use for training the model.
 learning_phases:
