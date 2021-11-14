@@ -238,10 +238,12 @@ def train_model(
         # If not specified explicitly, the cross-scale loss is ignored.
         cross_scale_loss_weight = phase.get("cross_scale_loss_weight", 0.0)
 
-        optimizer = keras.optimizers.Adam(
+        optimizer = keras.optimizers.SGD(
             learning_rate=_make_learning_rate(
                 phase["learning_rate"], log_dir=Path(tensorboard_output_dir)
             ),
+            momentum=phase["momentum"],
+            nesterov=True,
         )
         model.compile(
             optimizer=optimizer,
