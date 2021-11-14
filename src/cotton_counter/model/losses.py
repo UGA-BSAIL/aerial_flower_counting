@@ -101,11 +101,7 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
     """
 
     def __init__(
-        self,
-        *args: Any,
-        reverse_classes: bool = False,
-        threshold: float = 0.5,
-        **kwargs: Any,
+        self, *args: Any, reverse_classes: bool = False, **kwargs: Any,
     ):
         """
         Args:
@@ -114,10 +110,6 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
                 signifying that an example belongs to the negative class,
                 and 1 as signifying that it belongs to the positive class. If
                 this is true, however, it will flip those.
-            threshold: If the overall probability that the input example belongs
-                to the positive class is above this threshold, the value of this
-                loss will be zero. This is used to prevent the loss from
-                unfairly penalizing positive examples.
             **kwargs: Forwarded to superclass constructor.
         """
         super().__init__(*args, **kwargs)
@@ -125,7 +117,6 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
         # Single-underscore is deliberate in order to avoid autograph issues
         # with name-mangling.
         self._reverse_classes = reverse_classes
-        self._threshold = threshold
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         activation = tf.sigmoid
@@ -153,10 +144,10 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
         # Weight by the probability of the full input being negative.
         weighted_input_losses = input_losses * (1.0 - input_probability)
 
-        # Obey the threshold, zeroing anything that falls above it.
-        threshold_mask = input_probability <= self._threshold
-        threshold_mask = tf.cast(threshold_mask, tf.float32)
-        return weighted_input_losses * threshold_mask
+        # Only apply the loss to negative examples.
+        negative_example_mask = tf.equal(y_true, 0)
+        negative_example_mask = tf.cast(negative_example_mask, tf.float32)
+        return weighted_input_losses * negative_example_mask
 
 
 class FocalLoss(tf.keras.losses.Loss):
