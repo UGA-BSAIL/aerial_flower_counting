@@ -18,8 +18,8 @@ num_per_batch_to_visualize: 1
 max_num_batches_to_visualize: 20
 
 # Focal loss parameters.
-focal_loss_alpha: 0.75
-focal_loss_gamma: 0.0
+focal_loss_alpha: 0.25
+focal_loss_gamma: 2.0
 
 # Learning phases to use for training the model.
 learning_phases:

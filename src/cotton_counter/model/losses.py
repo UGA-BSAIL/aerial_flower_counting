@@ -187,12 +187,17 @@ class FocalLoss(tf.keras.losses.Loss):
         positive_mask = tf.equal(y_true, 1)
         pred_t = tf.where(positive_mask, positive_pred, negative_pred)
 
+        # Define the loss weight in the same fashion.
+        positive_alpha = self._alpha
+        negative_alpha = one - self._alpha
+        alpha_t = tf.where(positive_mask, positive_alpha, negative_alpha)
+
         # Don't allow it to take the log of 0.
         pred_t = tf.maximum(pred_t, self._EPSILON)
 
         # Compute the focal loss.
         point_loss = -tf.pow(one - pred_t, self._gamma) * tf.math.log(pred_t)
-        return self._alpha * tf.reduce_mean(point_loss)
+        return alpha_t * tf.reduce_mean(point_loss)
 
 
 def make_losses(
