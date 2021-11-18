@@ -24,7 +24,7 @@ focal_loss_gamma: 0.0
 # Whether to enable debugging checks for NaN and infinity. This
 # is very useful when trying to debug numerical issues, but it
 # slows down training a lot.
-enable_numeric_checks: true
+enable_numeric_checks: false
 
 # Learning phases to use for training the model.
 learning_phases:

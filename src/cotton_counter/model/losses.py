@@ -197,7 +197,7 @@ class FocalLoss(tf.keras.losses.Loss):
 
         # Compute the focal loss.
         point_loss = -tf.pow(one - pred_t, self._gamma) * tf.math.log(pred_t)
-        return alpha_t * tf.reduce_mean(point_loss)
+        return alpha_t * point_loss
 
 
 def make_losses(
