@@ -7,7 +7,12 @@ from typing import Any
 
 from kedro.pipeline import Pipeline, node
 
-from .nodes import create_model, make_callbacks, train_model
+from .nodes import (
+    create_model,
+    make_callbacks,
+    set_check_numerics,
+    train_model,
+)
 
 PRE_PROCESS_TAG = "pre_process"
 """
@@ -48,6 +53,7 @@ def create_pipeline(**kwargs: Any):
     return Pipeline(
         [
             # Build and train the model.
+            node(set_check_numerics, "params:enable_numeric_checks", None),
             node(
                 create_model,
                 dict(
