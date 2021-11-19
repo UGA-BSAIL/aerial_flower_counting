@@ -162,7 +162,7 @@ def make_callbacks(
     tensorboard_callback = keras.callbacks.TensorBoard(
         log_dir=log_dir, histogram_freq=histogram_frequency
     )
-    callbacks = [tensorboard_callback]
+    callbacks = [tensorboard_callback, tf.keras.callbacks.TerminateOnNaN()]
 
     if not classify_counts:
         # Create a callback for saving density map visualizations.
