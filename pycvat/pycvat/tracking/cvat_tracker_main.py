@@ -74,7 +74,7 @@ def main() -> None:
     args = parser.parse_args()
 
     api_client = make_api_client(
-        user=args.username, password=args.password, host=args.url
+        username=args.username, password=args.password, host=args.url
     )
     with Task.init_and_upload(
         task_id=args.task_id, api_client=api_client

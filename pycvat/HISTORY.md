@@ -53,3 +53,7 @@
 ### v0.7.2 (2021-03-14)
 
 - Make Pillow dependency less restrictive.
+
+### v0.8.0 (2021-07-08)
+
+- Add Task API method for getting number of frames.

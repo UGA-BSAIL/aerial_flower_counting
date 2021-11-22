@@ -99,7 +99,9 @@ class TestCvatDataSet:
         """
         # Assert.
         config.mock_make_api_client.assert_called_once_with(
-            user=config.username, password=config.password, host=config.host
+            username=config.username,
+            password=config.password,
+            host=config.host,
         )
 
     @pytest.mark.parametrize(

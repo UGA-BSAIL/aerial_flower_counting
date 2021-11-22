@@ -247,8 +247,24 @@ class Task(CvatConnector):
         """
         Returns:
             The ID for the task.
+
         """
         return self.__task_id
+
+    @property
+    def num_frames(self) -> int:
+        """
+        Returns:
+            The total number of frames associated with the task.
+
+        """
+        # Find the largest frame number in any segment.
+        segments = self.__task_data.segments
+        largest_frame = 0
+        for segment in segments:
+            largest_frame = max(largest_frame, segment.stop_frame)
+
+        return largest_frame
 
     def reload(self) -> None:
         logger.debug("Forcing data reload.")
