@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pycvat"
-version = "0.7.4"
+version = "0.8.0"
 description = "High-level Python API and utilities for CVAT."
 authors = ["Daniel Petti <djpetti@gmail.com>"]
 license = "MIT"

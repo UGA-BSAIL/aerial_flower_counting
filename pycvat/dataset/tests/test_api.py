@@ -27,10 +27,11 @@ def test_make_api_client(mocker: MockFixture, faker: Faker) -> None:
     username = faker.simple_profile()["username"]
     password = faker.pystr()
     host = faker.url()
+    other = faker.pystr()
 
     # Act.
     got_client = api.make_api_client(
-        user=username, password=password, host=host
+        username=username, password=password, host=host, other=other
     )
 
     # Assert.
@@ -40,6 +41,7 @@ def test_make_api_client(mocker: MockFixture, faker: Faker) -> None:
     assert mock_config.username == username
     assert mock_config.password == password
     assert mock_config.host == host
+    assert mock_config.other == other
 
     # It should have created the API client.
     mock_api_client_class.assert_called_once_with(mock_config)

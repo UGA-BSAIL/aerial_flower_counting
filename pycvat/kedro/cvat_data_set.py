@@ -24,16 +24,19 @@ class CvatDataSet(AbstractDataSet):
         *,
         task_id: int,
         credentials: Dict[str, str],
-        host: str = "http://localhost:8080/api/v1"
+        host: str = "http://localhost:8080/api/v1",
+        **kwargs: Any
     ):
         """
         Args:
             task_id: The numerical ID of the task to load data from.
             credentials: Credentials to use for logging into CVAT. Should
-                contain two keys: "username", which is the name of the user
-                to log in as, and "password", which is the password for that
-                user.
+                contain at least two keys: "username", which is the name of the
+                username to log in as, and "password", which is the password for
+                that username.
             host: The address of the CVAT server to connect to.
+            **kwargs: Will be passed directly to the Swagger `Configuration`
+                structure.
         """
         assert (
             "username" in credentials
@@ -44,9 +47,8 @@ class CvatDataSet(AbstractDataSet):
 
         username = credentials["username"]
         password = credentials["password"]
-        host = host
         self.__api = make_api_client(
-            user=username, password=password, host=host
+            username=username, password=password, host=host, **kwargs
         )
 
         self.__task_id = task_id

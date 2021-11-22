@@ -265,6 +265,33 @@ class TestTask:
         # Assert.
         assert got_labels == mock_labels
 
+    def test_num_frames(
+        self, config: ConfigForTests, mocker: MockFixture
+    ) -> None:
+        """
+        Tests that `num_frames` works.
+
+        Args:
+            config: The configuration to use for testing.
+            mocker: The fixture to use for mocking.
+
+        """
+        # Arrange.
+        mock_api = config.mock_tasks_api_class.return_value
+        mock_task_data = mock_api.tasks_read.return_value
+
+        # Make it look like we have some segments.
+        mock_segment_1 = mocker.create_autospec(Segment, instance=True)
+        mock_segment_2 = mocker.create_autospec(Segment, instance=True)
+        mock_segment_1.start_frame = 1
+        mock_segment_1.stop_frame = 1000
+        mock_segment_2.start_frame = 800
+        mock_segment_2.stop_frame = 1800
+        mock_task_data.segments = [mock_segment_1, mock_segment_2]
+
+        # Act and assert.
+        assert config.task.num_frames == 1800
+
     def test_find_label(self, config: ConfigForTests, faker: Faker) -> None:
         """
         Tests that `find_label` works.
