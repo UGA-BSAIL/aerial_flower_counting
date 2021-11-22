@@ -70,6 +70,7 @@ class TestExtendedTasksApi:
         mock_api_client.configuration.username = faker.pystr()
         mock_api_client.configuration.password = faker.pystr()
         mock_api_client.configuration.host = faker.url()
+        mock_api_client.configuration.verify_ssl = faker.pybool()
 
         api = swagger_extensions.ExtendedTasksApi(mock_api_client)
 
@@ -123,6 +124,7 @@ class TestExtendedTasksApi:
             auth=mock_auth,
             data=mock_data.to_dict.return_value,
             files=mock.ANY,
+            verify=mock_config.verify_ssl,
         )
         args, kwargs = config.mock_post.call_args
 

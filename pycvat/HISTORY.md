@@ -54,6 +54,10 @@
 
 - Make Pillow dependency less restrictive.
 
+### v0.8.1 (2021-11-22)
+
+- Allow for arbitrary configuration arguments in `CvatTask`.
+
 ### v0.8.0 (2021-07-08)
 
 - Add Task API method for getting number of frames.
