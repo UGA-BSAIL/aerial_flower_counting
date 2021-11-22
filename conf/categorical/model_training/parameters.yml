@@ -19,7 +19,7 @@ max_num_batches_to_visualize: 20
 
 # Focal loss parameters.
 focal_loss_alpha: 0.75
-focal_loss_gamma: 0.1
+focal_loss_gamma: 0.0
 
 # Whether to enable debugging checks for NaN and infinity. This
 # is very useful when trying to debug numerical issues, but it
@@ -31,7 +31,7 @@ learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
-      initial: 0.01
+      initial: 0.005
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.

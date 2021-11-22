@@ -182,21 +182,33 @@ class FocalLoss(tf.keras.losses.Loss):
         one = tf.constant(1.0)
 
         # Figure out which locations are positive and which are negative.
-        positive_pred = y_pred
-        negative_pred = one - y_pred
         positive_mask = tf.equal(y_true, 1)
-        pred_t = tf.where(positive_mask, positive_pred, negative_pred)
+        positive_pred = tf.boolean_mask(y_pred, positive_mask)
+        negative_pred = one - tf.boolean_mask(y_pred, ~positive_mask)
+        tf.print("positive_pred", positive_pred)
+        tf.print("negative_pred", negative_pred)
+        tf.print("num_positive_pred", tf.shape(positive_pred))
+        tf.print("num_negative_pred", tf.shape(negative_pred))
+        pred_t = tf.concat([positive_pred, negative_pred], axis=-1)
 
         # Define the loss weight in the same fashion.
-        positive_alpha = self._alpha
-        negative_alpha = one - self._alpha
-        alpha_t = tf.where(positive_mask, positive_alpha, negative_alpha)
+        positive_alpha = tf.broadcast_to(self._alpha, tf.shape(positive_pred))
+        negative_alpha = tf.broadcast_to(
+            1.0 - self._alpha, tf.shape(negative_pred)
+        )
+        alpha_t = tf.concat([positive_alpha, negative_alpha], axis=-1)
 
         # Don't allow it to take the log of 0.
         pred_t = tf.maximum(pred_t, self._EPSILON)
 
         # Compute the focal loss.
         point_loss = -tf.pow(one - pred_t, self._gamma) * tf.math.log(pred_t)
+        tf.print(
+            "point_loss",
+            point_loss,
+            "max_point_loss",
+            tf.reduce_max(point_loss),
+        )
         return alpha_t * point_loss
 
 

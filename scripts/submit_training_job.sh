@@ -13,7 +13,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
 #SBATCH --time=8:00:00
-#SBATCH --mem=16gb
+#SBATCH --mem=20gb
 #SBATCH --mail-user=daniel.petti@uga.edu
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=cotton_count_model_train.%j.out    # Standard output log
@@ -54,8 +54,8 @@ prepare_environment
 
 # Load needed modules.
 ml Python/3.8.2-GCCcore-8.3.0
-ml CUDA/10.1.243-GCC-8.3.0
-ml cuDNN/7.6.4.38-gcccuda-2019b
+ml CUDA/11.2.1-GCC-8.3.0
+ml cuDNN/8.1.0.77-CUDA-11.2.1
 
 # Set this for deterministic runs. For more info, see
 # https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development
