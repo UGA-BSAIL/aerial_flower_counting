@@ -46,7 +46,11 @@ class ExtendedTasksApi(TasksApi):
         auth = HTTPBasicAuth(config.username, config.password)
         endpoint = f"{config.host}/tasks/{id}/data"
         response = requests.post(
-            endpoint, auth=auth, data=form_data, files=files
+            endpoint,
+            auth=auth,
+            data=form_data,
+            files=files,
+            verify=config.verify_ssl,
         )
         response.raise_for_status()
 
