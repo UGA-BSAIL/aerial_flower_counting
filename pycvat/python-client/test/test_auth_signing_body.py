@@ -15,12 +15,14 @@ from __future__ import absolute_import
 import unittest
 
 import swagger_client
-from swagger_client.models.body import Body  # noqa: E501
+from swagger_client.models.auth_signing_body import (  # noqa: E501
+    AuthSigningBody,
+)
 from swagger_client.rest import ApiException
 
 
-class TestBody(unittest.TestCase):
-    """Body unit test stubs"""
+class TestAuthSigningBody(unittest.TestCase):
+    """AuthSigningBody unit test stubs"""
 
     def setUp(self):
         pass
@@ -28,10 +30,10 @@ class TestBody(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def testBody(self):
-        """Test Body"""
+    def testAuthSigningBody(self):
+        """Test AuthSigningBody"""
         # FIXME: construct object with mandatory attributes with example values
-        # model = swagger_client.models.body.Body()  # noqa: E501
+        # model = swagger_client.models.auth_signing_body.AuthSigningBody()  # noqa: E501
         pass
 
 

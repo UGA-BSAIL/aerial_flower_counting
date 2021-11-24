@@ -13,8 +13,11 @@ Name | Type | Description | Notes
 **owner_id** | **int** |  | [optional]
 **assignee_id** | **int** |  | [optional]
 **bug_tracker** | **str** |  | [optional]
+**task_subsets** | **list[str]** |  | [optional]
 **created_date** | **datetime** |  | [optional]
 **updated_date** | **datetime** |  | [optional]
 **status** | **str** |  | [optional]
+**training_project** | [**TrainingProject**](TrainingProject.md) |  | [optional]
+**dimension** | **str** |  | [optional]
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

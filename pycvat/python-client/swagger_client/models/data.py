@@ -42,8 +42,11 @@ class Data(object):
         "server_files": "list[ServerFile]",
         "remote_files": "list[RemoteFile]",
         "use_zip_chunks": "bool",
+        "cloud_storage_id": "int",
         "use_cache": "bool",
         "copy_data": "bool",
+        "storage_method": "str",
+        "storage": "str",
     }
 
     attribute_map = {
@@ -59,8 +62,11 @@ class Data(object):
         "server_files": "server_files",
         "remote_files": "remote_files",
         "use_zip_chunks": "use_zip_chunks",
+        "cloud_storage_id": "cloud_storage_id",
         "use_cache": "use_cache",
         "copy_data": "copy_data",
+        "storage_method": "storage_method",
+        "storage": "storage",
     }
 
     def __init__(
@@ -77,8 +83,11 @@ class Data(object):
         server_files=None,
         remote_files=None,
         use_zip_chunks=False,
+        cloud_storage_id=None,
         use_cache=False,
         copy_data=False,
+        storage_method=None,
+        storage=None,
     ):  # noqa: E501
         """Data - a model defined in Swagger"""  # noqa: E501
         self._chunk_size = None
@@ -93,8 +102,11 @@ class Data(object):
         self._server_files = None
         self._remote_files = None
         self._use_zip_chunks = None
+        self._cloud_storage_id = None
         self._use_cache = None
         self._copy_data = None
+        self._storage_method = None
+        self._storage = None
         self.discriminator = None
         if chunk_size is not None:
             self.chunk_size = chunk_size
@@ -119,10 +131,16 @@ class Data(object):
             self.remote_files = remote_files
         if use_zip_chunks is not None:
             self.use_zip_chunks = use_zip_chunks
+        if cloud_storage_id is not None:
+            self.cloud_storage_id = cloud_storage_id
         if use_cache is not None:
             self.use_cache = use_cache
         if copy_data is not None:
             self.copy_data = copy_data
+        if storage_method is not None:
+            self.storage_method = storage_method
+        if storage is not None:
+            self.storage = storage
 
     @property
     def chunk_size(self):
@@ -395,6 +413,27 @@ class Data(object):
         self._use_zip_chunks = use_zip_chunks
 
     @property
+    def cloud_storage_id(self):
+        """Gets the cloud_storage_id of this Data.  # noqa: E501
+
+
+        :return: The cloud_storage_id of this Data.  # noqa: E501
+        :rtype: int
+        """
+        return self._cloud_storage_id
+
+    @cloud_storage_id.setter
+    def cloud_storage_id(self, cloud_storage_id):
+        """Sets the cloud_storage_id of this Data.
+
+
+        :param cloud_storage_id: The cloud_storage_id of this Data.  # noqa: E501
+        :type: int
+        """
+
+        self._cloud_storage_id = cloud_storage_id
+
+    @property
     def use_cache(self):
         """Gets the use_cache of this Data.  # noqa: E501
 
@@ -435,6 +474,62 @@ class Data(object):
         """
 
         self._copy_data = copy_data
+
+    @property
+    def storage_method(self):
+        """Gets the storage_method of this Data.  # noqa: E501
+
+
+        :return: The storage_method of this Data.  # noqa: E501
+        :rtype: str
+        """
+        return self._storage_method
+
+    @storage_method.setter
+    def storage_method(self, storage_method):
+        """Sets the storage_method of this Data.
+
+
+        :param storage_method: The storage_method of this Data.  # noqa: E501
+        :type: str
+        """
+        allowed_values = ["cache", "file_system"]  # noqa: E501
+        if storage_method not in allowed_values:
+            raise ValueError(
+                "Invalid value for `storage_method` ({0}), must be one of {1}".format(  # noqa: E501
+                    storage_method, allowed_values
+                )
+            )
+
+        self._storage_method = storage_method
+
+    @property
+    def storage(self):
+        """Gets the storage of this Data.  # noqa: E501
+
+
+        :return: The storage of this Data.  # noqa: E501
+        :rtype: str
+        """
+        return self._storage
+
+    @storage.setter
+    def storage(self, storage):
+        """Sets the storage of this Data.
+
+
+        :param storage: The storage of this Data.  # noqa: E501
+        :type: str
+        """
+        allowed_values = ["cloud_storage", "local", "share"]  # noqa: E501
+        if storage not in allowed_values:
+            raise ValueError(
+                "Invalid value for `storage` ({0}), must be one of {1}".format(  # noqa: E501
+                    storage, allowed_values
+                )
+            )
+
+        self._storage = storage
 
     def to_dict(self):
         """Returns the model properties as a dict"""

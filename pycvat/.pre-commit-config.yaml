@@ -13,6 +13,7 @@ repos:
     rev: 3.8.4
     hooks:
       - id: flake8
+        exclude: python-client
   - repo: https://github.com/timothycrosley/isort
     rev: 5.4.2
     hooks:

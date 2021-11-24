@@ -1,15 +1,72 @@
 # swagger_client.ProjectsApi
 
-All URIs are relative to *http://localhost:8080/api/v1*
+All URIs are relative to *http://bsailn1.engr.uga.edu/api/v1*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**projects_annotations**](ProjectsApi.md#projects_annotations) | **GET** /projects/{id}/annotations | Method allows to download project annotations
 [**projects_create**](ProjectsApi.md#projects_create) | **POST** /projects | Method creates a new project
+[**projects_dataset_export**](ProjectsApi.md#projects_dataset_export) | **GET** /projects/{id}/dataset | Export project as a dataset in a specific format
 [**projects_delete**](ProjectsApi.md#projects_delete) | **DELETE** /projects/{id} | Method deletes a specific project
 [**projects_list**](ProjectsApi.md#projects_list) | **GET** /projects | Returns a paginated list of projects according to query parameters (12 projects per page)
 [**projects_partial_update**](ProjectsApi.md#projects_partial_update) | **PATCH** /projects/{id} | Methods does a partial update of chosen fields in a project
 [**projects_read**](ProjectsApi.md#projects_read) | **GET** /projects/{id} | Method returns details of a specific project
 [**projects_tasks**](ProjectsApi.md#projects_tasks) | **GET** /projects/{id}/tasks | Returns information of the tasks of the project with the selected id
+
+# **projects_annotations**
+> projects_annotations(id, format, filename=filename, action=action)
+
+Method allows to download project annotations
+
+### Example
+```python
+from __future__ import print_function
+import time
+import swagger_client
+from swagger_client.rest import ApiException
+from pprint import pprint
+# Configure HTTP basic authorization: Basic
+configuration = swagger_client.Configuration()
+configuration.username = 'YOUR_USERNAME'
+configuration.password = 'YOUR_PASSWORD'
+
+# create an instance of the API class
+api_instance = swagger_client.ProjectsApi(swagger_client.ApiClient(configuration))
+id = 56 # int | A unique integer value identifying this project.
+format = 'format_example' # str | Desired output format name You can get the list of supported formats at: /server/annotation/formats
+filename = 'filename_example' # str | Desired output file name (optional)
+action = 'action_example' # str | Used to start downloading process after annotation file had been created (optional)
+
+try:
+    # Method allows to download project annotations
+    api_instance.projects_annotations(id, format, filename=filename, action=action)
+except ApiException as e:
+    print("Exception when calling ProjectsApi->projects_annotations: %s\n" % e)
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **int**| A unique integer value identifying this project. |
+ **format** | **str**| Desired output format name You can get the list of supported formats at: /server/annotation/formats |
+ **filename** | **str**| Desired output file name | [optional]
+ **action** | **str**| Used to start downloading process after annotation file had been created | [optional]
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[Basic](../README.md#Basic)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: Not defined
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **projects_create**
 > Project projects_create(body)
@@ -58,6 +115,61 @@ Name | Type | Description  | Notes
 
  - **Content-Type**: application/json
  - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **projects_dataset_export**
+> projects_dataset_export(id, format, filename=filename, action=action)
+
+Export project as a dataset in a specific format
+
+### Example
+```python
+from __future__ import print_function
+import time
+import swagger_client
+from swagger_client.rest import ApiException
+from pprint import pprint
+# Configure HTTP basic authorization: Basic
+configuration = swagger_client.Configuration()
+configuration.username = 'YOUR_USERNAME'
+configuration.password = 'YOUR_PASSWORD'
+
+# create an instance of the API class
+api_instance = swagger_client.ProjectsApi(swagger_client.ApiClient(configuration))
+id = 56 # int | A unique integer value identifying this project.
+format = 'format_example' # str | Desired output format name You can get the list of supported formats at: /server/annotation/formats
+filename = 'filename_example' # str | Desired output file name (optional)
+action = 'action_example' # str | Used to start downloading process after annotation file had been created (optional)
+
+try:
+    # Export project as a dataset in a specific format
+    api_instance.projects_dataset_export(id, format, filename=filename, action=action)
+except ApiException as e:
+    print("Exception when calling ProjectsApi->projects_dataset_export: %s\n" % e)
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **int**| A unique integer value identifying this project. |
+ **format** | **str**| Desired output format name You can get the list of supported formats at: /server/annotation/formats |
+ **filename** | **str**| Desired output file name | [optional]
+ **action** | **str**| Used to start downloading process after annotation file had been created | [optional]
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[Basic](../README.md#Basic)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: Not defined
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
@@ -111,7 +223,7 @@ void (empty response body)
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **projects_list**
-> InlineResponse200 projects_list(search=search, id=id, name=name, owner=owner, status=status, ordering=ordering, page=page, page_size=page_size)
+> InlineResponse200 projects_list(search=search, id=id, name=name, owner=owner, status=status, assignee=assignee, ordering=ordering, page=page, page_size=page_size, names_only=names_only, without_tasks=without_tasks)
 
 Returns a paginated list of projects according to query parameters (12 projects per page)
 
@@ -134,13 +246,16 @@ id = 1.2 # float | A unique number value identifying this project (optional)
 name = 'name_example' # str | Find all projects where name contains a parameter value (optional)
 owner = 'owner_example' # str | Find all project where owner name contains a parameter value (optional)
 status = 'status_example' # str | Find all projects with a specific status (optional)
+assignee = 'assignee_example' # str |  (optional)
 ordering = 'ordering_example' # str | Which field to use when ordering the results. (optional)
 page = 56 # int | A page number within the paginated result set. (optional)
 page_size = 56 # int | Number of results to return per page. (optional)
+names_only = true # bool | Returns only names and id's of projects. (optional)
+without_tasks = true # bool | Returns only projects entities without related tasks (optional)
 
 try:
     # Returns a paginated list of projects according to query parameters (12 projects per page)
-    api_response = api_instance.projects_list(search=search, id=id, name=name, owner=owner, status=status, ordering=ordering, page=page, page_size=page_size)
+    api_response = api_instance.projects_list(search=search, id=id, name=name, owner=owner, status=status, assignee=assignee, ordering=ordering, page=page, page_size=page_size, names_only=names_only, without_tasks=without_tasks)
     pprint(api_response)
 except ApiException as e:
     print("Exception when calling ProjectsApi->projects_list: %s\n" % e)
@@ -155,9 +270,12 @@ Name | Type | Description  | Notes
  **name** | **str**| Find all projects where name contains a parameter value | [optional]
  **owner** | **str**| Find all project where owner name contains a parameter value | [optional]
  **status** | **str**| Find all projects with a specific status | [optional]
+ **assignee** | **str**|  | [optional]
  **ordering** | **str**| Which field to use when ordering the results. | [optional]
  **page** | **int**| A page number within the paginated result set. | [optional]
  **page_size** | **int**| Number of results to return per page. | [optional]
+ **names_only** | **bool**| Returns only names and id&#x27;s of projects. | [optional]
+ **without_tasks** | **bool**| Returns only projects entities without related tasks | [optional]
 
 ### Return type
 

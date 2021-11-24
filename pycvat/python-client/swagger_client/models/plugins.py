@@ -33,25 +33,29 @@ class Plugins(object):
         "git_integration": "bool",
         "analytics": "bool",
         "models": "bool",
+        "predict": "bool",
     }
 
     attribute_map = {
         "git_integration": "GIT_INTEGRATION",
         "analytics": "ANALYTICS",
         "models": "MODELS",
+        "predict": "PREDICT",
     }
 
     def __init__(
-        self, git_integration=None, analytics=None, models=None
+        self, git_integration=None, analytics=None, models=None, predict=None
     ):  # noqa: E501
         """Plugins - a model defined in Swagger"""  # noqa: E501
         self._git_integration = None
         self._analytics = None
         self._models = None
+        self._predict = None
         self.discriminator = None
         self.git_integration = git_integration
         self.analytics = analytics
         self.models = models
+        self.predict = predict
 
     @property
     def git_integration(self):
@@ -127,6 +131,31 @@ class Plugins(object):
             )  # noqa: E501
 
         self._models = models
+
+    @property
+    def predict(self):
+        """Gets the predict of this Plugins.  # noqa: E501
+
+
+        :return: The predict of this Plugins.  # noqa: E501
+        :rtype: bool
+        """
+        return self._predict
+
+    @predict.setter
+    def predict(self, predict):
+        """Sets the predict of this Plugins.
+
+
+        :param predict: The predict of this Plugins.  # noqa: E501
+        :type: bool
+        """
+        if predict is None:
+            raise ValueError(
+                "Invalid value for `predict`, must not be `None`"
+            )  # noqa: E501
+
+        self._predict = predict
 
     def to_dict(self):
         """Returns the model properties as a dict"""

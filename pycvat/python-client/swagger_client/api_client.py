@@ -76,7 +76,7 @@ class ApiClient(object):
             self.default_headers[header_name] = header_value
         self.cookie = cookie
         # Set default User-Agent.
-        self.user_agent = "Swagger-Codegen/1.0.0/python"
+        self.user_agent = "Swagger-Codegen/1.1.0/python"
 
     def __del__(self):
         self.pool.close()
@@ -621,10 +621,14 @@ class ApiClient(object):
                 r'filename=[\'"]?([^\'"\s]+)[\'"]?', content_disposition
             ).group(1)
             path = os.path.join(os.path.dirname(path), filename)
-
-        with open(path, "wb") as f:
-            f.write(response.data)
-
+            response_data = response.data
+            with open(path, "wb") as f:
+                if isinstance(response_data, str):
+                    # change str to bytes so we can write it
+                    response_data = response_data.encode("utf-8")
+                    f.write(response_data)
+                else:
+                    f.write(response_data)
         return path
 
     def __deserialize_primitive(self, data, klass):

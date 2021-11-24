@@ -34,6 +34,7 @@ class DatasetFormat(object):
         "ext": "str",
         "version": "str",
         "enabled": "bool",
+        "dimension": "str",
     }
 
     attribute_map = {
@@ -41,21 +42,24 @@ class DatasetFormat(object):
         "ext": "ext",
         "version": "version",
         "enabled": "enabled",
+        "dimension": "dimension",
     }
 
     def __init__(
-        self, name=None, ext=None, version=None, enabled=None
+        self, name=None, ext=None, version=None, enabled=None, dimension=None
     ):  # noqa: E501
         """DatasetFormat - a model defined in Swagger"""  # noqa: E501
         self._name = None
         self._ext = None
         self._version = None
         self._enabled = None
+        self._dimension = None
         self.discriminator = None
         self.name = name
         self.ext = ext
         self.version = version
         self.enabled = enabled
+        self.dimension = dimension
 
     @property
     def name(self):
@@ -156,6 +160,31 @@ class DatasetFormat(object):
             )  # noqa: E501
 
         self._enabled = enabled
+
+    @property
+    def dimension(self):
+        """Gets the dimension of this DatasetFormat.  # noqa: E501
+
+
+        :return: The dimension of this DatasetFormat.  # noqa: E501
+        :rtype: str
+        """
+        return self._dimension
+
+    @dimension.setter
+    def dimension(self, dimension):
+        """Sets the dimension of this DatasetFormat.
+
+
+        :param dimension: The dimension of this DatasetFormat.  # noqa: E501
+        :type: str
+        """
+        if dimension is None:
+            raise ValueError(
+                "Invalid value for `dimension`, must not be `None`"
+            )  # noqa: E501
+
+        self._dimension = dimension
 
     def to_dict(self):
         """Returns the model properties as a dict"""

@@ -1,6 +1,6 @@
 # swagger_client.UsersApi
 
-All URIs are relative to *http://localhost:8080/api/v1*
+All URIs are relative to *http://bsailn1.engr.uga.edu/api/v1*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
@@ -60,7 +60,7 @@ void (empty response body)
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **users_list**
-> InlineResponse2002 users_list(search=search, id=id, ordering=ordering, page=page, page_size=page_size)
+> InlineResponse2002 users_list(search=search, id=id, is_active=is_active, ordering=ordering, page=page, page_size=page_size)
 
 Method provides a paginated list of users registered on the server
 
@@ -80,13 +80,14 @@ configuration.password = 'YOUR_PASSWORD'
 api_instance = swagger_client.UsersApi(swagger_client.ApiClient(configuration))
 search = 'search_example' # str | A search term. (optional)
 id = 1.2 # float | A unique number value identifying this user (optional)
+is_active = true # bool | Returns only active users (optional)
 ordering = 'ordering_example' # str | Which field to use when ordering the results. (optional)
 page = 56 # int | A page number within the paginated result set. (optional)
 page_size = 56 # int | Number of results to return per page. (optional)
 
 try:
     # Method provides a paginated list of users registered on the server
-    api_response = api_instance.users_list(search=search, id=id, ordering=ordering, page=page, page_size=page_size)
+    api_response = api_instance.users_list(search=search, id=id, is_active=is_active, ordering=ordering, page=page, page_size=page_size)
     pprint(api_response)
 except ApiException as e:
     print("Exception when calling UsersApi->users_list: %s\n" % e)
@@ -98,6 +99,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **search** | **str**| A search term. | [optional]
  **id** | **float**| A unique number value identifying this user | [optional]
+ **is_active** | **bool**| Returns only active users | [optional]
  **ordering** | **str**| Which field to use when ordering the results. | [optional]
  **page** | **int**| A page number within the paginated result set. | [optional]
  **page_size** | **int**| Number of results to return per page. | [optional]
@@ -220,7 +222,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **users_self**
-> InlineResponse2002 users_self(search=search, id=id, ordering=ordering, page=page, page_size=page_size)
+> InlineResponse2002 users_self(search=search, id=id, is_active=is_active, ordering=ordering, page=page, page_size=page_size)
 
 Method returns an instance of a user who is currently authorized
 
@@ -242,13 +244,14 @@ configuration.password = 'YOUR_PASSWORD'
 api_instance = swagger_client.UsersApi(swagger_client.ApiClient(configuration))
 search = 'search_example' # str | A search term. (optional)
 id = 1.2 # float |  (optional)
+is_active = 'is_active_example' # str |  (optional)
 ordering = 'ordering_example' # str | Which field to use when ordering the results. (optional)
 page = 56 # int | A page number within the paginated result set. (optional)
 page_size = 56 # int | Number of results to return per page. (optional)
 
 try:
     # Method returns an instance of a user who is currently authorized
-    api_response = api_instance.users_self(search=search, id=id, ordering=ordering, page=page, page_size=page_size)
+    api_response = api_instance.users_self(search=search, id=id, is_active=is_active, ordering=ordering, page=page, page_size=page_size)
     pprint(api_response)
 except ApiException as e:
     print("Exception when calling UsersApi->users_self: %s\n" % e)
@@ -260,6 +263,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **search** | **str**| A search term. | [optional]
  **id** | **float**|  | [optional]
+ **is_active** | **str**|  | [optional]
  **ordering** | **str**| Which field to use when ordering the results. | [optional]
  **page** | **int**| A page number within the paginated result set. | [optional]
  **page_size** | **int**| Number of results to return per page. | [optional]

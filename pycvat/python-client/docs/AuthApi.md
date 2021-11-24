@@ -1,6 +1,6 @@
 # swagger_client.AuthApi
 
-All URIs are relative to *http://localhost:8080/api/v1*
+All URIs are relative to *http://bsailn1.engr.uga.edu/api/v1*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
@@ -384,7 +384,7 @@ configuration.password = 'YOUR_PASSWORD'
 
 # create an instance of the API class
 api_instance = swagger_client.AuthApi(swagger_client.ApiClient(configuration))
-body = swagger_client.Body() # Body |
+body = swagger_client.AuthSigningBody() # AuthSigningBody |
 
 try:
     # This method signs URL for access to the server.
@@ -397,7 +397,7 @@ except ApiException as e:
 
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
- **body** | [**Body**](Body.md)|  |
+ **body** | [**AuthSigningBody**](AuthSigningBody.md)|  |
 
 ### Return type
 

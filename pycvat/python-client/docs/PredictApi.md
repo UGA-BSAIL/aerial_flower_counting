@@ -1,16 +1,16 @@
-# swagger_client.RestrictionsApi
+# swagger_client.PredictApi
 
 All URIs are relative to *http://bsailn1.engr.uga.edu/api/v1*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**restrictions_terms_of_use**](RestrictionsApi.md#restrictions_terms_of_use) | **GET** /restrictions/terms-of-use |
-[**restrictions_user_agreements**](RestrictionsApi.md#restrictions_user_agreements) | **GET** /restrictions/user-agreements | Method provides user agreements that the user must accept to register
+[**predict_predict_image**](PredictApi.md#predict_predict_image) | **GET** /predict/frame | Returns prediction for image
+[**predict_predict_status**](PredictApi.md#predict_predict_status) | **GET** /predict/status | Returns information of the tasks of the project with the selected id
 
-# **restrictions_terms_of_use**
-> restrictions_terms_of_use()
+# **predict_predict_image**
+> predict_predict_image()
 
-
+Returns prediction for image
 
 ### Example
 ```python
@@ -25,12 +25,13 @@ configuration.username = 'YOUR_USERNAME'
 configuration.password = 'YOUR_PASSWORD'
 
 # create an instance of the API class
-api_instance = swagger_client.RestrictionsApi(swagger_client.ApiClient(configuration))
+api_instance = swagger_client.PredictApi(swagger_client.ApiClient(configuration))
 
 try:
-    api_instance.restrictions_terms_of_use()
+    # Returns prediction for image
+    api_instance.predict_predict_image()
 except ApiException as e:
-    print("Exception when calling RestrictionsApi->restrictions_terms_of_use: %s\n" % e)
+    print("Exception when calling PredictApi->predict_predict_image: %s\n" % e)
 ```
 
 ### Parameters
@@ -51,10 +52,10 @@ void (empty response body)
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
-# **restrictions_user_agreements**
-> UserAgreement restrictions_user_agreements()
+# **predict_predict_status**
+> predict_predict_status()
 
-Method provides user agreements that the user must accept to register
+Returns information of the tasks of the project with the selected id
 
 ### Example
 ```python
@@ -69,14 +70,13 @@ configuration.username = 'YOUR_USERNAME'
 configuration.password = 'YOUR_PASSWORD'
 
 # create an instance of the API class
-api_instance = swagger_client.RestrictionsApi(swagger_client.ApiClient(configuration))
+api_instance = swagger_client.PredictApi(swagger_client.ApiClient(configuration))
 
 try:
-    # Method provides user agreements that the user must accept to register
-    api_response = api_instance.restrictions_user_agreements()
-    pprint(api_response)
+    # Returns information of the tasks of the project with the selected id
+    api_instance.predict_predict_status()
 except ApiException as e:
-    print("Exception when calling RestrictionsApi->restrictions_user_agreements: %s\n" % e)
+    print("Exception when calling PredictApi->predict_predict_status: %s\n" % e)
 ```
 
 ### Parameters
@@ -84,7 +84,7 @@ This endpoint does not need any parameter.
 
 ### Return type
 
-[**UserAgreement**](UserAgreement.md)
+void (empty response body)
 
 ### Authorization
 
@@ -93,6 +93,6 @@ This endpoint does not need any parameter.
 ### HTTP request headers
 
  - **Content-Type**: Not defined
- - **Accept**: application/json
+ - **Accept**: Not defined
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

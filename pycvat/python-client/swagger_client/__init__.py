@@ -16,10 +16,12 @@ from __future__ import absolute_import
 
 # import apis into sdk package
 from swagger_client.api.auth_api import AuthApi
+from swagger_client.api.cloud_storages_api import CloudStoragesApi
 from swagger_client.api.comments_api import CommentsApi
 from swagger_client.api.issues_api import IssuesApi
 from swagger_client.api.jobs_api import JobsApi
 from swagger_client.api.lambda_api import LambdaApi
+from swagger_client.api.predict_api import PredictApi
 from swagger_client.api.projects_api import ProjectsApi
 from swagger_client.api.restrictions_api import RestrictionsApi
 from swagger_client.api.reviews_api import ReviewsApi
@@ -35,9 +37,11 @@ from swagger_client.configuration import Configuration
 from swagger_client.models.about import About
 from swagger_client.models.attribute import Attribute
 from swagger_client.models.attribute_val import AttributeVal
+from swagger_client.models.auth_signing_body import AuthSigningBody
+from swagger_client.models.base_cloud_storage import BaseCloudStorage
 from swagger_client.models.basic_user import BasicUser
-from swagger_client.models.body import Body
 from swagger_client.models.client_file import ClientFile
+from swagger_client.models.cloud_storage import CloudStorage
 from swagger_client.models.combined_issue import CombinedIssue
 from swagger_client.models.combined_review import CombinedReview
 from swagger_client.models.comment import Comment
@@ -60,6 +64,7 @@ from swagger_client.models.labeled_shape import LabeledShape
 from swagger_client.models.labeled_track import LabeledTrack
 from swagger_client.models.log_event import LogEvent
 from swagger_client.models.login import Login
+from swagger_client.models.manifest import Manifest
 from swagger_client.models.password_change import PasswordChange
 from swagger_client.models.password_reset_confirm import PasswordResetConfirm
 from swagger_client.models.password_reset_serializer_ex import (
@@ -76,5 +81,6 @@ from swagger_client.models.server_file import ServerFile
 from swagger_client.models.simple_job import SimpleJob
 from swagger_client.models.task import Task
 from swagger_client.models.tracked_shape import TrackedShape
+from swagger_client.models.training_project import TrainingProject
 from swagger_client.models.user import User
 from swagger_client.models.user_agreement import UserAgreement
