@@ -1,6 +1,6 @@
 # swagger_client.ReviewsApi
 
-All URIs are relative to *http://localhost:8080/api/v1*
+All URIs are relative to *http://bsailn1.engr.uga.edu/api/v1*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------

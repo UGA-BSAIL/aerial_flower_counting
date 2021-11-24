@@ -28,10 +28,24 @@ class TestProjectsApi(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_projects_annotations(self):
+        """Test case for projects_annotations
+
+        Method allows to download project annotations  # noqa: E501
+        """
+        pass
+
     def test_projects_create(self):
         """Test case for projects_create
 
         Method creates a new project  # noqa: E501
+        """
+        pass
+
+    def test_projects_dataset_export(self):
+        """Test case for projects_dataset_export
+
+        Export project as a dataset in a specific format  # noqa: E501
         """
         pass
 

@@ -53,6 +53,8 @@ class Task(object):
         "size": "str",
         "image_quality": "str",
         "data": "str",
+        "dimension": "str",
+        "subset": "str",
     }
 
     attribute_map = {
@@ -79,6 +81,8 @@ class Task(object):
         "size": "size",
         "image_quality": "image_quality",
         "data": "data",
+        "dimension": "dimension",
+        "subset": "subset",
     }
 
     def __init__(
@@ -106,6 +110,8 @@ class Task(object):
         size=None,
         image_quality=None,
         data=None,
+        dimension=None,
+        subset=None,
     ):  # noqa: E501
         """Task - a model defined in Swagger"""  # noqa: E501
         self._url = None
@@ -131,6 +137,8 @@ class Task(object):
         self._size = None
         self._image_quality = None
         self._data = None
+        self._dimension = None
+        self._subset = None
         self.discriminator = None
         if url is not None:
             self.url = url
@@ -177,6 +185,10 @@ class Task(object):
             self.image_quality = image_quality
         if data is not None:
             self.data = data
+        if dimension is not None:
+            self.dimension = dimension
+        if subset is not None:
+            self.subset = subset
 
     @property
     def url(self):
@@ -675,6 +687,48 @@ class Task(object):
         """
 
         self._data = data
+
+    @property
+    def dimension(self):
+        """Gets the dimension of this Task.  # noqa: E501
+
+
+        :return: The dimension of this Task.  # noqa: E501
+        :rtype: str
+        """
+        return self._dimension
+
+    @dimension.setter
+    def dimension(self, dimension):
+        """Sets the dimension of this Task.
+
+
+        :param dimension: The dimension of this Task.  # noqa: E501
+        :type: str
+        """
+
+        self._dimension = dimension
+
+    @property
+    def subset(self):
+        """Gets the subset of this Task.  # noqa: E501
+
+
+        :return: The subset of this Task.  # noqa: E501
+        :rtype: str
+        """
+        return self._subset
+
+    @subset.setter
+    def subset(self, subset):
+        """Sets the subset of this Task.
+
+
+        :param subset: The subset of this Task.  # noqa: E501
+        :type: str
+        """
+
+        self._subset = subset
 
     def to_dict(self):
         """Returns the model properties as a dict"""

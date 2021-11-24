@@ -17,9 +17,11 @@ from __future__ import absolute_import
 from swagger_client.models.about import About
 from swagger_client.models.attribute import Attribute
 from swagger_client.models.attribute_val import AttributeVal
+from swagger_client.models.auth_signing_body import AuthSigningBody
+from swagger_client.models.base_cloud_storage import BaseCloudStorage
 from swagger_client.models.basic_user import BasicUser
-from swagger_client.models.body import Body
 from swagger_client.models.client_file import ClientFile
+from swagger_client.models.cloud_storage import CloudStorage
 from swagger_client.models.combined_issue import CombinedIssue
 from swagger_client.models.combined_review import CombinedReview
 from swagger_client.models.comment import Comment
@@ -42,6 +44,7 @@ from swagger_client.models.labeled_shape import LabeledShape
 from swagger_client.models.labeled_track import LabeledTrack
 from swagger_client.models.log_event import LogEvent
 from swagger_client.models.login import Login
+from swagger_client.models.manifest import Manifest
 from swagger_client.models.password_change import PasswordChange
 from swagger_client.models.password_reset_confirm import PasswordResetConfirm
 from swagger_client.models.password_reset_serializer_ex import (
@@ -58,5 +61,6 @@ from swagger_client.models.server_file import ServerFile
 from swagger_client.models.simple_job import SimpleJob
 from swagger_client.models.task import Task
 from swagger_client.models.tracked_shape import TrackedShape
+from swagger_client.models.training_project import TrainingProject
 from swagger_client.models.user import User
 from swagger_client.models.user_agreement import UserAgreement

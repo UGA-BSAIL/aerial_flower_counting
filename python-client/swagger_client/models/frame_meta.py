@@ -29,19 +29,33 @@ class FrameMeta(object):
       attribute_map (dict): The key is attribute name
                             and the value is json key in definition.
     """
-    swagger_types = {"width": "int", "height": "int", "name": "str"}
+    swagger_types = {
+        "width": "int",
+        "height": "int",
+        "name": "str",
+        "has_related_context": "bool",
+    }
 
-    attribute_map = {"width": "width", "height": "height", "name": "name"}
+    attribute_map = {
+        "width": "width",
+        "height": "height",
+        "name": "name",
+        "has_related_context": "has_related_context",
+    }
 
-    def __init__(self, width=None, height=None, name=None):  # noqa: E501
+    def __init__(
+        self, width=None, height=None, name=None, has_related_context=None
+    ):  # noqa: E501
         """FrameMeta - a model defined in Swagger"""  # noqa: E501
         self._width = None
         self._height = None
         self._name = None
+        self._has_related_context = None
         self.discriminator = None
         self.width = width
         self.height = height
         self.name = name
+        self.has_related_context = has_related_context
 
     @property
     def width(self):
@@ -117,6 +131,31 @@ class FrameMeta(object):
             )  # noqa: E501
 
         self._name = name
+
+    @property
+    def has_related_context(self):
+        """Gets the has_related_context of this FrameMeta.  # noqa: E501
+
+
+        :return: The has_related_context of this FrameMeta.  # noqa: E501
+        :rtype: bool
+        """
+        return self._has_related_context
+
+    @has_related_context.setter
+    def has_related_context(self, has_related_context):
+        """Sets the has_related_context of this FrameMeta.
+
+
+        :param has_related_context: The has_related_context of this FrameMeta.  # noqa: E501
+        :type: bool
+        """
+        if has_related_context is None:
+            raise ValueError(
+                "Invalid value for `has_related_context`, must not be `None`"
+            )  # noqa: E501
+
+        self._has_related_context = has_related_context
 
     def to_dict(self):
         """Returns the model properties as a dict"""

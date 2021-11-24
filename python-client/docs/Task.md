@@ -26,5 +26,7 @@ Name | Type | Description | Notes
 **size** | **str** |  | [optional]
 **image_quality** | **str** |  | [optional]
 **data** | **str** |  | [optional]
+**dimension** | **str** |  | [optional]
+**subset** | **str** |  | [optional]
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

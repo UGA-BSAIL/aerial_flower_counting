@@ -15,7 +15,10 @@ Name | Type | Description | Notes
 **server_files** | [**list[ServerFile]**](ServerFile.md) |  | [optional]
 **remote_files** | [**list[RemoteFile]**](RemoteFile.md) |  | [optional]
 **use_zip_chunks** | **bool** |  | [optional] [default to False]
+**cloud_storage_id** | **int** |  | [optional]
 **use_cache** | **bool** |  | [optional] [default to False]
 **copy_data** | **bool** |  | [optional] [default to False]
+**storage_method** | **str** |  | [optional]
+**storage** | **str** |  | [optional]
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

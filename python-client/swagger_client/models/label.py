@@ -34,6 +34,7 @@ class Label(object):
         "name": "str",
         "color": "str",
         "attributes": "list[Attribute]",
+        "deleted": "bool",
     }
 
     attribute_map = {
@@ -41,16 +42,18 @@ class Label(object):
         "name": "name",
         "color": "color",
         "attributes": "attributes",
+        "deleted": "deleted",
     }
 
     def __init__(
-        self, id=None, name=None, color=None, attributes=None
+        self, id=None, name=None, color=None, attributes=None, deleted=None
     ):  # noqa: E501
         """Label - a model defined in Swagger"""  # noqa: E501
         self._id = None
         self._name = None
         self._color = None
         self._attributes = None
+        self._deleted = None
         self.discriminator = None
         if id is not None:
             self.id = id
@@ -59,6 +62,8 @@ class Label(object):
             self.color = color
         if attributes is not None:
             self.attributes = attributes
+        if deleted is not None:
+            self.deleted = deleted
 
     @property
     def id(self):
@@ -147,6 +152,29 @@ class Label(object):
         """
 
         self._attributes = attributes
+
+    @property
+    def deleted(self):
+        """Gets the deleted of this Label.  # noqa: E501
+
+        Delete label if value is true from proper Task/Project object  # noqa: E501
+
+        :return: The deleted of this Label.  # noqa: E501
+        :rtype: bool
+        """
+        return self._deleted
+
+    @deleted.setter
+    def deleted(self, deleted):
+        """Sets the deleted of this Label.
+
+        Delete label if value is true from proper Task/Project object  # noqa: E501
+
+        :param deleted: The deleted of this Label.  # noqa: E501
+        :type: bool
+        """
+
+        self._deleted = deleted
 
     def to_dict(self):
         """Returns the model properties as a dict"""

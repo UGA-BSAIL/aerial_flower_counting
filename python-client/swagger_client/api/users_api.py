@@ -136,6 +136,7 @@ class UsersApi(object):
         :param async_req bool
         :param str search: A search term.
         :param float id: A unique number value identifying this user
+        :param bool is_active: Returns only active users
         :param str ordering: Which field to use when ordering the results.
         :param int page: A page number within the paginated result set.
         :param int page_size: Number of results to return per page.
@@ -161,6 +162,7 @@ class UsersApi(object):
         :param async_req bool
         :param str search: A search term.
         :param float id: A unique number value identifying this user
+        :param bool is_active: Returns only active users
         :param str ordering: Which field to use when ordering the results.
         :param int page: A page number within the paginated result set.
         :param int page_size: Number of results to return per page.
@@ -172,6 +174,7 @@ class UsersApi(object):
         all_params = [
             "search",
             "id",
+            "is_active",
             "ordering",
             "page",
             "page_size",
@@ -200,6 +203,10 @@ class UsersApi(object):
             query_params.append(("search", params["search"]))  # noqa: E501
         if "id" in params:
             query_params.append(("id", params["id"]))  # noqa: E501
+        if "is_active" in params:
+            query_params.append(
+                ("is_active", params["is_active"])
+            )  # noqa: E501
         if "ordering" in params:
             query_params.append(("ordering", params["ordering"]))  # noqa: E501
         if "page" in params:
@@ -469,6 +476,7 @@ class UsersApi(object):
         :param async_req bool
         :param str search: A search term.
         :param float id:
+        :param str is_active:
         :param str ordering: Which field to use when ordering the results.
         :param int page: A page number within the paginated result set.
         :param int page_size: Number of results to return per page.
@@ -495,6 +503,7 @@ class UsersApi(object):
         :param async_req bool
         :param str search: A search term.
         :param float id:
+        :param str is_active:
         :param str ordering: Which field to use when ordering the results.
         :param int page: A page number within the paginated result set.
         :param int page_size: Number of results to return per page.
@@ -506,6 +515,7 @@ class UsersApi(object):
         all_params = [
             "search",
             "id",
+            "is_active",
             "ordering",
             "page",
             "page_size",
@@ -534,6 +544,10 @@ class UsersApi(object):
             query_params.append(("search", params["search"]))  # noqa: E501
         if "id" in params:
             query_params.append(("id", params["id"]))  # noqa: E501
+        if "is_active" in params:
+            query_params.append(
+                ("is_active", params["is_active"])
+            )  # noqa: E501
         if "ordering" in params:
             query_params.append(("ordering", params["ordering"]))  # noqa: E501
         if "page" in params:

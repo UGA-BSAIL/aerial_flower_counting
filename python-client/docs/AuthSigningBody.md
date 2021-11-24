@@ -1,4 +1,4 @@
-# Body
+# AuthSigningBody
 
 ## Properties
 Name | Type | Description | Notes
