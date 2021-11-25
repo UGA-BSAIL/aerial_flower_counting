@@ -19,7 +19,7 @@ max_num_batches_to_visualize: 20
 
 # Focal loss parameters.
 focal_loss_alpha: 0.25
-focal_loss_gamma: 2.0
+focal_loss_gamma: 5.0
 
 # Whether to enable debugging checks for NaN and infinity. This
 # is very useful when trying to debug numerical issues, but it
