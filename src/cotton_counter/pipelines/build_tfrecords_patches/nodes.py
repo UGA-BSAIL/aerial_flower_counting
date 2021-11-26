@@ -130,7 +130,7 @@ def _generate_examples_from_task(
 
     """
     # Get the job we are using.
-    job = task.get_jobs()[job_num]
+    job = task.jobs[job_num]
 
     # Get the label to use.
     possible_labels = [task.find_label(label) for label in label_names]

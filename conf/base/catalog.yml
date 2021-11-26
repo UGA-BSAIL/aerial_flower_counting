@@ -31,7 +31,7 @@ cotton_part_a_test_alternate:
 # image-level annotations.
 cotton_patches_1:
   type: pycvat.CvatDataSet
-  task_id: 155
+  task_id: 13
   << : *cvat_credentials
 
 # Cotton counting dataset annotations, stored locally. These come
