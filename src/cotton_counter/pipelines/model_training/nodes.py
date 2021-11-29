@@ -76,9 +76,6 @@ def create_model(
     *,
     input_image_shape: Vector2I,
     patch_scale: float,
-    sub_patch_scale: float,
-    sub_patch_stride: float,
-    classify_counts: bool,
     initial_output_bias: float,
 ) -> keras.Model:
     """
@@ -88,12 +85,6 @@ def create_model(
         input_image_shape: The shape of the input images, in the form
         (height, width)
         patch_scale: The scale factor to apply for the patches we extract.
-        sub_patch_scale: The scale factor to use for extracting sub-patches when
-            computing the cross-scale consistency loss.
-        sub_patch_stride: The stride to use for extracting sub-patches when
-            computing the cross-scale consistency loss.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
         initial_output_bias: The initial bias value to use for the model output.
 
     Returns:
@@ -107,9 +98,7 @@ def create_model(
 
     model = build_model(
         input_size=(patch_width, patch_height),
-        use_mil=classify_counts,
-        sub_patch_scale=sub_patch_scale,
-        sub_patch_stride=sub_patch_stride,
+        num_scales=3,
         output_bias=initial_output_bias,
     )
 
@@ -247,11 +236,11 @@ def train_model(
         logger.info("Starting new training phase.")
         logger.debug("Using phase parameters: {}", phase)
 
-        discrete_count_loss_weight = phase.get(
-            "discrete_count_loss_weight", 1.0
+        pac_loss_weight = phase.get("pac_loss_weight", 1.0)
+        combined_bce_loss_weight = phase.get("combined_bce_loss_weight", 1.0)
+        scale_consistency_loss_weight = phase.get(
+            "scale_consistency_loss_weight", 1.0
         )
-        # If not specified explicitly, the cross-scale loss is ignored.
-        cross_scale_loss_weight = phase.get("cross_scale_loss_weight", 0.0)
 
         optimizer = keras.optimizers.SGD(
             learning_rate=_make_learning_rate(
@@ -262,14 +251,11 @@ def train_model(
         )
         model.compile(
             optimizer=optimizer,
-            loss=make_losses(
-                classify_counts=classify_counts,
-                alpha=focal_loss_alpha,
-                gamma=focal_loss_gamma,
-            ),
+            loss=make_losses(alpha=focal_loss_alpha, gamma=focal_loss_gamma,),
             loss_weights={
-                "discrete_count": discrete_count_loss_weight,
-                "discrete_sub_patch_count": cross_scale_loss_weight,
+                "has_flower": pac_loss_weight,
+                "combined_bce_loss": combined_bce_loss_weight,
+                "scale_consistency_loss": scale_consistency_loss_weight,
             },
             metrics=make_metrics(classify_counts=classify_counts),
         )

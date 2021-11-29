@@ -198,7 +198,7 @@ def _load_from_tag_feature_dict(
     discrete_counts = discrete_counts[:, 0]
     discrete_counts = tf.cast(discrete_counts, tf.int32)
 
-    return {"image": images}, {"discrete_count": discrete_counts}
+    return {"image": images}, {"has_flower": discrete_counts}
 
 
 def _discretize_counts(
@@ -267,7 +267,7 @@ def _counts_from_feature_dict(
         bucket_min_values=[0.0, 1.0],
     )
 
-    targets = dict(discrete_count=discrete_counts)
+    targets = dict(has_flower=discrete_counts)
     if include_counts:
         targets["count"] = count
     return targets
@@ -395,7 +395,7 @@ def _extract_from_points_feature_dict(
 
         """
         inputs = dict(image=feature_dict["image"])
-        targets = dict(discrete_count=feature_dict["discrete_count"],)
+        targets = dict(has_flower=feature_dict["has_flower"],)
         if include_counts:
             targets["count"] = feature_dict["count"]
 

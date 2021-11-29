@@ -150,7 +150,21 @@ class ScaleConsistentBinaryCrossEntropy(losses.Loss):
         return weighted_input_losses * negative_example_mask
 
 
-class FocalLoss(tf.keras.losses.Loss):
+class PassThroughLoss(losses.Loss):
+    """
+    This loss simply outputs the predictions it gets fed as the loss values.
+    It is intended as part of a hack to work around the fact that Keras doesn't
+    support losses that operate on more than one output. Using this loss,
+    we can calculate the output values in the model code, and then simply
+    output them here.
+
+    """
+
+    def call(self, y_true: tf.Tensor, y_pred: tf.Tensor):
+        return y_pred
+
+
+class FocalLoss(losses.Loss):
     """
     Implements focal loss, as described by Lin et al. (2017).
     """
@@ -213,13 +227,12 @@ class FocalLoss(tf.keras.losses.Loss):
 
 
 def make_losses(
-    classify_counts: bool = False, *, alpha: float, gamma: float
+    *, alpha: float, gamma: float
 ) -> Dict[str, Union[str, losses.Loss]]:
     """
     Creates the loss dictionary to use when compiling a model.
 
     Args:
-        classify_counts: Whether we are using the classification count output.
         alpha: Alpha parameter to use for focal loss.
         gamma: Gamma parameter to use for focal loss.
 
@@ -227,12 +240,11 @@ def make_losses(
         The loss dictionary that it created.
 
     """
-    loss_dict = {}
-    if classify_counts:
-        # Use cross-entropy for classification.
-        loss_dict["discrete_count"] = FocalLoss(alpha=alpha, gamma=gamma)
-        loss_dict[
-            "discrete_sub_patch_count"
-        ] = ScaleConsistentBinaryCrossEntropy(reverse_classes=True)
+    # Use cross-entropy for classification.
+    loss_dict = dict(
+        has_flower=FocalLoss(alpha=alpha, gamma=gamma),
+        combined_bce_loss=PassThroughLoss(),
+        scale_consistency_loss=PassThroughLoss(),
+    )
 
     return loss_dict

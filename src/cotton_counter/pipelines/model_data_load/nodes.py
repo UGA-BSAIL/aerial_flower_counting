@@ -50,7 +50,7 @@ class DatasetManager:
         """
         # Strip extraneous targets from the point dataset.
         point_dataset_stripped = point_dataset.map(
-            lambda i, t: (i, {"discrete_count": t["discrete_count"]})
+            lambda i, t: (i, {"has_flower": t["has_flower"]})
         )
 
         # We un-batch everything, so that we can easily mix it across batches.
@@ -165,25 +165,28 @@ class DatasetManager:
             batch_size * 2, reshuffle_each_iteration=True
         )
         # Re-batch once we've combined.
-        return add_sub_patch_target(combined.batch(batch_size))
+        return add_dummy_targets(combined.batch(batch_size))
 
 
-def add_sub_patch_target(dataset: tf.data.Dataset) -> tf.data.Dataset:
+def add_dummy_targets(dataset: tf.data.Dataset) -> tf.data.Dataset:
     """
-    Modifies a dataset to add a target for the sub-patch classes, which is
-    needed by Keras.
+    Modifies a dataset to add a dummy target for the scale consistency and
+    combined BCE losses. We don't actually need a target to compute these
+    losses, but Keras requires that we have one.
 
     Args:
-        dataset: The dataset to add the sub-patch classes to.
+        dataset: The dataset to modify.
 
     Returns:
         The modified dataset.
 
     """
+    zero = tf.constant(0.0)
+
     return dataset.map(
         lambda i, t: (
             i,
-            dict(discrete_sub_patch_count=t["discrete_count"], **t),
+            dict(combined_bce_loss=zero, scale_consistency_loss=zero, **t),
         )
     )
 

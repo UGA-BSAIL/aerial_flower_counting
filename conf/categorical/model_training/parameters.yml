@@ -45,13 +45,12 @@ learning_phases:
       min_learning_rate: 0.00001
     # The momentum to use for the phase.
     momentum: 0.9
-    # The loss weight for density maps.
-    density_map_loss_weight: 0.0
-    # The loss weight for count regression.
-    count_loss_weight: 0.0
-    # The loss weight for count categorization.
-    discrete_count_loss_weight: 1.0
-    # The loss weight for cross-scale consistency.
-    cross_scale_loss_weight: 0.25
     # Number of epochs to train for in this phase.
     num_epochs: 35
+
+    # The loss weight to use for the PAC.
+    pac_loss_weight: 1.0
+    # The weight to use for the combined BCE loss.
+    combined_bce_loss_weight: 1.0
+    # The weight to use for the scale consistency loss.
+    scale_cosistency_loss_weight: 1.0

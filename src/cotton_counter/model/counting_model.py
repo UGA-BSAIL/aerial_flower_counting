@@ -2,7 +2,7 @@
 Implements the model architecture.
 """
 
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Iterable, Optional, Tuple
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -202,98 +202,70 @@ def _build_model_backbone(*, image_input: keras.Input) -> tf.Tensor:
     return _build_dense_net_backbone(normalized)
 
 
-def _build_density_map_head(model_top: tf.Tensor) -> tf.Tensor:
+def _get_sub_patch_features(
+    model_top: tf.Tensor, *, num_scales: int = 3
+) -> Tuple[tf.Tensor, ...]:
     """
-    Adds the head for predicting density maps.
+    Takes a set of features, and computes sub-patches of the features at
+    multiple scales. Each scale will be 1/4 the size of the previous one.
 
     Args:
-        model_top: The top model layer to build the head on.
+        model_top: The features to compute sub-patches of.
+        num_scales: The number of scales to compute sub-patches for. If this
+            is one, it will be equivalent to the identity operation.
 
     Returns:
-        The layer representing the density map output.
+        The sub-patches at each scale. The first will be the same as the
+        input, and each later one will get progressively smaller. The batch
+        dimension of scale n corresponds to the flattened sub-patches from
+        scale n-1. The output tensor for each scale will have
+        the shape (n_batch, patch_height, patch_width, patch_channels),
+        with `n_batch` increasing by 4 at every scale.
 
     """
-    return layers.Conv2D(1, 1, name="density_map")(model_top)
+    assert num_scales >= 1, "Must have at least one scale."
+
+    # Scale to use for patches 1/4 the size of the input.
+    sub_patch_scale = 0.5
+
+    # Include a "dummy" output for the initial scale of 1, i.e. exactly the
+    # input.
+    patches = [model_top]
+    # Extract the patches for each scale.
+    previous_scale_patches = model_top
+    for scale in range(num_scales - 1):
+        sub_patches = extract_standard_patches(
+            previous_scale_patches,
+            patch_scale=sub_patch_scale,
+            patch_stride=sub_patch_scale,
+        )
+
+        # Group the patches by their corresponding input image.
+        patches.append(sub_patches)
+        previous_scale_patches = sub_patches
+
+    return tuple(patches)
 
 
-def _build_count_regression_head(*, density_head: tf.Tensor) -> tf.Tensor:
-    """
-    Adds the head for regressing count values.
-
-    Args:
-        density_head: The layer that produces the density map output.
-
-    Returns:
-        The layer representing the count output.
-
-    """
-    # Sum everything to predict the total count.
-    return layers.Lambda(
-        lambda x: K.expand_dims(K.sum(x, axis=[1, 2, 3])), name="count"
-    )(density_head)
-
-
-def _apply_sub_patch_classification(
-    activation_maps: tf.Tensor,
-    *,
-    sub_patch_scale: float,
-    sub_patch_stride: Optional[float] = None
-) -> tf.Tensor:
-    """
-    Extracts sub-patches from a batch of activation maps and computes the
-    average activation for each sub-patch.
-
-    Args:
-        activation_maps: The batch of activation maps.
-        sub_patch_scale: The scale of the sub-patches to extract.
-        sub_patch_stride: The stride of the sub-patches to extract. If not
-            specified, it will extract non-overlapping sub-patches.
-
-    Returns:
-        The sub-patch activations. It will be a tensor with a shape of
-        (batch, sub-patch).
-
-    """
-    if sub_patch_stride is None:
-        # Default to non-overlapping.
-        sub_patch_stride = sub_patch_scale
-
-    # Extract the sub-patches from the activation map.
-    sub_patches = extract_standard_patches(
-        activation_maps,
-        patch_scale=sub_patch_scale,
-        patch_stride=sub_patch_stride,
-    )
-
-    # Perform global average pooling.
-    sub_patches_mean = tf.reduce_mean(sub_patches, axis=[1, 2, 3])
-
-    # Reshape to maintain the original batch size.
-    batch_size = tf.shape(activation_maps)[0]
-    return tf.reshape(sub_patches_mean, (batch_size, -1))
-
-
-def _build_count_classification_head(
+def _build_neck(
     model_top: tf.Tensor,
     *,
-    sub_patch_scale: float,
-    sub_patch_stride: float,
-    output_bias: Optional[float] = None
-) -> Tuple[tf.Tensor, tf.Tensor]:
+    output_bias: Optional[float] = None,
+    name: str = "",
+) -> tf.Tensor:
     """
-    Adds the head for classifying categorical count values.
+    Adds a neck for either task. Currently, we don't have different
+    architectures for the two, so we use the same function for both.
 
     Args:
-        model_top: The top model layer to build the head on.
-        sub_patch_scale: The scale of the sub-patches to extract.
-        sub_patch_stride: The stride of the sub-patches to extract. If not
-            specified, it will extract non-overlapping sub-patches.
+        model_top: The top model layer to build the neck on.
         output_bias: Specify an initial bias to use for the output. This can
             be useful for unbalanced datasets.
+        name: Name to use when naming the output layer. It will be called
+            "activation_maps_{name}".
 
     Returns:
-        A tensor representing the categorical count logits, and a tensor
-        representing the average activations for each sub-patch.
+        A tensor representing the activation maps.
 
     """
     if output_bias is not None:
@@ -301,37 +273,154 @@ def _build_count_classification_head(
         logger.debug("Using initial output bias {}.", output_bias)
         output_bias = keras.initializers.Constant(output_bias)
 
-    count_conv_1 = layers.Conv2D(
-        1, 1, name="activation_maps", bias_initializer=output_bias
-    )(model_top)
+        # Create the layers.
+    count_conv_1 = _bn_relu_conv(3, 128, padding="same")(model_top)
+    count_conv_2 = _bn_relu_conv(3, 128, padding="same")(count_conv_1)
+    return layers.Conv2D(
+        1, 1, name=f"activation_maps_{name}", bias_initializer=output_bias
+    )(count_conv_2)
 
-    # Generate the sub-patch output.
-    sub_patch_pool_1 = layers.Lambda(
-        _apply_sub_patch_classification,
-        arguments=dict(
-            sub_patch_scale=sub_patch_scale, sub_patch_stride=sub_patch_stride,
-        ),
-        name="discrete_sub_patch_count",
-    )(count_conv_1)
-    # We deliberately return the raw values for the sub-patches instead of the
-    # sigmoid. This is an implementation hack to get around the fact that Keras
-    # does not allow the use of multiple outputs in a single loss function.
 
-    count_pool_1 = layers.GlobalAveragePooling2D()(count_conv_1)
-    count_sigmoid = layers.Activation("sigmoid", name="discrete_count")(
-        count_pool_1
-    )
+def _build_pac_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
+    """
+    Adds the head for classifying patches based on a presence or absence of
+    objects.
 
-    return count_sigmoid, sub_patch_pool_1
+    Args:
+        model_top: The top model layer to build the head on. If provided
+            with multiple tensors, it will apply the same layers to each one.
+
+    Returns:
+        A tensor representing the presence/absence logits for each input.
+
+    """
+    count_pool_1 = layers.GlobalAveragePooling2D()
+    count_sigmoid = layers.Activation("sigmoid", name="discrete_count")
+
+    # Apply the layers.
+    for top_features in model_top:
+        yield count_sigmoid(count_pool_1(top_features))
+
+
+def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
+    """
+    Adds the head for counting the number of objects in an input.
+
+    Args:
+        model_top: The top model layer to build the head on. If provided
+            with multiple tensors, it will apply the same layers to each one.
+
+    Returns:
+        A tensor representing the counts for each input.
+
+    """
+    count_pool_1 = layers.GlobalAveragePooling2D()
+
+    # Apply the layers.
+    for top_features in model_top:
+        yield count_pool_1(top_features)
+
+
+def _compute_combined_bce_loss(
+    pac_predictions: Iterable[tf.Tensor],
+    count_predictions: Iterable[tf.Tensor],
+) -> tf.Tensor:
+    """
+    Computes BCE between the PAC predictions and the count predictions,
+    in order to enforce that the count actually tracks the objects we care
+    about.
+
+    This is a sort of hack to get around Keras' inability to compute losses
+    from two separate model outputs. To get around this, we compute the
+    scale-consistency loss within the model, and then provide that as input
+    to a dummy loss which simply returns the predictions.
+
+    Args:
+        pac_predictions: The predictions from the PAC, at every scale. Each
+            item should be a vector, with a length of batch_size * num_patches.
+        count_predictions: The predicted counts, at every scale.
+            Should have the same shape as `pac_predictions`.
+
+    Returns:
+        The total computed BCE loss for every item in the batch. Will be
+        a vector with a length of the batch size.
+
+    """
+    total_loss = None
+    # Tracks the number of patches in each input image at this scale.
+    num_patches_per_image = 1
+    for pac_prediction, count_prediction in zip(
+        pac_predictions, count_predictions
+    ):
+        # Apply sigmoid to the counts so they're directly comparable to the PAC
+        # outputs.
+        count_thresholded = tf.keras.activations.sigmoid(
+            tf.constant(10.0) * count_prediction - tf.constant(5.0)
+        )
+        # Compute cross-entropy loss.
+        scale_loss = tf.keras.losses.binary_crossentropy(
+            pac_prediction, count_thresholded
+        )
+
+        # Combine the losses for all patches from a given image.
+        loss_per_input = tf.reshape(scale_loss, (-1, num_patches_per_image))
+        loss_per_input = tf.reduce_mean(loss_per_input, axis=1)
+
+        if total_loss is None:
+            total_loss = loss_per_input
+        else:
+            total_loss += loss_per_input
+
+        num_patches_per_image *= 4
+
+    # Compute the total loss for all scales.
+    return total_loss
+
+
+def _compute_scale_consistency_loss(
+    count_predictions: Iterable[tf.Tensor],
+) -> tf.Tensor:
+    """
+    Ensures that the predicted counts at each smaller scale sum to the same
+    thing as the predicted counts at the larger scale.
+
+    Args:
+        count_predictions: The count predictions for each scale.
+
+    Returns:
+        The total computed MSE loss for every item in the batch. Will be a
+        vector with a length of the batch size.
+
+    """
+    # Compare the counts in a pair-wise fashion.
+    count_predictions = list(count_predictions)
+    total_mse = tf.zeros_like(count_predictions[0])
+    for large_scale, small_scale in zip(
+        count_predictions, count_predictions[1:]
+    ):
+        # The smaller scale should have four patches for every image in the
+        # larger-scale batch. Add a new dimension to group them by their
+        # corresponding image in the larger-scale batch.
+        batch_size = tf.shape(large_scale)[0]
+        small_scale_grouped_shape = tf.stack((batch_size, 4))
+        small_scale_grouped = tf.reshape(
+            small_scale, small_scale_grouped_shape
+        )
+
+        # Compute total counts.
+        small_scale_total_counts = tf.reduce_sum(small_scale_grouped, axis=1)
+
+        # Compute MSE.
+        total_mse += tf.keras.losses.mse(large_scale, small_scale_total_counts)
+
+    return total_mse
 
 
 def build_model(
     *,
     input_size: Vector2I,
-    use_mil: bool = False,
-    sub_patch_scale: float = 0.5,
-    sub_patch_stride: float = 0.5,
-    output_bias: Optional[float] = None
+    num_scales: int,
+    output_bias: Optional[float] = None,
 ) -> keras.Model:
     """
     Creates the full SaNet model.
@@ -339,11 +428,8 @@ def build_model(
     Args:
         input_size: The size of the input images that will be provided,
             in the form (width, height).
-        use_mil: Whether to use a binary output for the MIL task. Otherwise,
-            it will assume that we want to regress the counts directly.
-        sub_patch_scale: The scale of the sub-patches to extract.
-        sub_patch_stride: The stride of the sub-patches to extract. If not
-            specified, it will extract non-overlapping sub-patches.
+        num_scales: Number of different scales to use for weakly-supervised
+            counting.
         output_bias: Specify an initial bias to use for the output. This can
             be useful for unbalanced datasets.
 
@@ -353,21 +439,38 @@ def build_model(
     """
     image_input = _build_image_input(input_size=input_size)
     backbone = _build_model_backbone(image_input=image_input)
+    # Create the necks.
+    pac_neck = _build_neck(backbone, output_bias=output_bias)
+    count_neck = _build_neck(backbone)
+    # Compute multi-scale features.
+    pac_multi_scale_features = _get_sub_patch_features(
+        pac_neck, num_scales=num_scales
+    )
+    count_multi_scale_features = _get_sub_patch_features(
+        count_neck, num_scales=num_scales
+    )
 
-    model_outputs = {}
-    if use_mil:
-        # Use the classification head.
-        (
-            discrete_count,
-            discrete_sub_patch_count,
-        ) = _build_count_classification_head(
-            backbone,
-            sub_patch_scale=sub_patch_scale,
-            sub_patch_stride=sub_patch_stride,
-            output_bias=output_bias,
-        )
-        model_outputs["discrete_count"] = discrete_count
-        model_outputs["discrete_sub_patch_count"] = discrete_sub_patch_count
+    # Create the heads.
+    pac_head = list(_build_pac_head(pac_multi_scale_features))
+    count_head = list(_build_count_head(count_multi_scale_features))
+
+    # Compute the combined BCE loss.
+    combined_bce_loss = tf.keras.layers.Lambda(_compute_combined_bce_loss)(
+        (pac_head, count_head)
+    )
+    # Compute the scale consistency loss.
+    scale_consistency_loss = tf.keras.layers.Lambda(
+        _compute_scale_consistency_loss
+    )(count_head)
+
+    model_outputs = dict(
+        # Only include outputs for the largest scale.
+        has_flower=pac_head[0][:, 0, :, :, :],
+        count=count_head[0][:, 0, :, :],
+        # Output the combined BCE and consistency losses also.
+        combined_bce_loss=combined_bce_loss,
+        scale_consistency_loss=scale_consistency_loss,
+    )
 
     # Create the model.
     model = keras.Model(inputs=image_input, outputs=model_outputs,)

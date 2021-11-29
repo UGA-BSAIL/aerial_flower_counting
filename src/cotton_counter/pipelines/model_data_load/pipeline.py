@@ -14,7 +14,7 @@ from ...model.dataset_io import (
     inputs_and_targets_from_patch_dataset,
     load_point_dataset,
 )
-from .nodes import DatasetManager, add_sub_patch_target, calculate_output_bias
+from .nodes import DatasetManager, add_dummy_targets, calculate_output_bias
 
 
 def create_pipeline(**kwargs):
@@ -130,22 +130,22 @@ def create_pipeline(**kwargs):
             ),
             # Add sub-patch targets to everything that needs them.
             node(
-                add_sub_patch_target,
+                add_dummy_targets,
                 "training_data_no_sub_patch_target",
                 "training_data",
             ),
             node(
-                add_sub_patch_target,
+                add_dummy_targets,
                 "testing_data_no_sub_patch_target",
                 "testing_data",
             ),
             node(
-                add_sub_patch_target,
+                add_dummy_targets,
                 "testing_data_alt_no_sub_patch_target",
                 "testing_data_alternate",
             ),
             node(
-                add_sub_patch_target,
+                add_dummy_targets,
                 "validation_data_no_sub_patch_target",
                 "validation_data",
             ),
