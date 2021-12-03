@@ -165,10 +165,14 @@ class DatasetManager:
             batch_size * 2, reshuffle_each_iteration=True
         )
         # Re-batch once we've combined.
-        return add_dummy_targets(combined.batch(batch_size))
+        return add_dummy_targets(
+            combined.batch(batch_size), batch_size=batch_size
+        )
 
 
-def add_dummy_targets(dataset: tf.data.Dataset) -> tf.data.Dataset:
+def add_dummy_targets(
+    dataset: tf.data.Dataset, *, batch_size: int
+) -> tf.data.Dataset:
     """
     Modifies a dataset to add a dummy target for the scale consistency and
     combined BCE losses. We don't actually need a target to compute these
@@ -176,12 +180,13 @@ def add_dummy_targets(dataset: tf.data.Dataset) -> tf.data.Dataset:
 
     Args:
         dataset: The dataset to modify.
+        batch_size: The batch size to use.
 
     Returns:
         The modified dataset.
 
     """
-    zero = tf.constant(0.0)
+    zero = tf.zeros((batch_size,), dtype=tf.float32)
 
     return dataset.map(
         lambda i, t: (

@@ -416,7 +416,11 @@ def frame_fraction_to_size_or_stride(
 
 
 def extract_standard_patches(
-    images: tf.Tensor, *, patch_scale: float, patch_stride: float,
+    images: tf.Tensor,
+    *,
+    patch_scale: float,
+    patch_stride: float,
+    padding: str = "SAME",
 ) -> tf.Tensor:
     """
     Extracts a number of patches from each image in the input.
@@ -425,6 +429,7 @@ def extract_standard_patches(
         images: The images to extract patches from.
         patch_scale: The scale factor for each patch, in frame fractions.
         patch_stride: The stride for each patch, in frame fractions.
+        padding: The padding to use for patch extraction.
 
     Returns:
         A batch of all extracted patches. They will be in the same order as the
@@ -449,7 +454,7 @@ def extract_standard_patches(
         sizes=kernel_size,
         strides=kernel_strides,
         rates=[1, 1, 1, 1],
-        padding="SAME",
+        padding=padding,
     )
 
     # Collapse the first three dimensions into a single index.

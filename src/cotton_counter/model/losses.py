@@ -242,9 +242,9 @@ def make_losses(
     """
     # Use cross-entropy for classification.
     loss_dict = dict(
-        has_flower=FocalLoss(alpha=alpha, gamma=gamma),
-        combined_bce_loss=PassThroughLoss(),
-        scale_consistency_loss=PassThroughLoss(),
+        has_flower=FocalLoss(alpha=alpha, gamma=gamma, name="pac_loss"),
+        combined_bce_loss=PassThroughLoss(name="combined_bce_loss"),
+        scale_consistency_loss=PassThroughLoss(name="scale_consistency_loss"),
     )
 
     return loss_dict

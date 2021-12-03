@@ -238,6 +238,7 @@ def _get_sub_patch_features(
             previous_scale_patches,
             patch_scale=sub_patch_scale,
             patch_stride=sub_patch_scale,
+            padding="VALID",
         )
 
         # Group the patches by their corresponding input image.
@@ -352,7 +353,7 @@ def _compute_combined_bce_loss(
     for pac_prediction, count_prediction in zip(
         pac_predictions, count_predictions
     ):
-        # Apply sigmoid to the counts so they're directly comparable to the PAC
+        # Apply sigmoid to the counts, so they're directly comparable to the PAC
         # outputs.
         count_thresholded = tf.keras.activations.sigmoid(
             tf.constant(10.0) * count_prediction - tf.constant(5.0)
@@ -385,33 +386,54 @@ def _compute_scale_consistency_loss(
     thing as the predicted counts at the larger scale.
 
     Args:
-        count_predictions: The count predictions for each scale.
+        count_predictions: The count predictions for each scale. Each element
+            should have a shape of (batch_size, 1).
 
     Returns:
         The total computed MSE loss for every item in the batch. Will be a
         vector with a length of the batch size.
 
     """
-    # Compare the counts in a pair-wise fashion.
     count_predictions = list(count_predictions)
-    total_mse = tf.zeros_like(count_predictions[0])
+
+    batch_size = tf.shape(count_predictions[0])[0]
+    total_mse = tf.zeros(tf.expand_dims(batch_size, 0), dtype=tf.float32)
+
+    # Keeps track of the number of patches corresponding to each input image.
+    num_patches_per_image = 1
+    # Compare the counts in a pair-wise fashion.
     for large_scale, small_scale in zip(
         count_predictions, count_predictions[1:]
     ):
+        large_scale = tf.ensure_shape(large_scale, (None, 1))
+        small_scale = tf.ensure_shape(small_scale, (None, 1))
+
         # The smaller scale should have four patches for every image in the
         # larger-scale batch. Add a new dimension to group them by their
         # corresponding image in the larger-scale batch.
-        batch_size = tf.shape(large_scale)[0]
-        small_scale_grouped_shape = tf.stack((batch_size, 4))
+        large_scale_grouped_shape = tf.stack(
+            (batch_size, num_patches_per_image)
+        )
+        small_scale_grouped_shape = tf.stack(
+            (batch_size, num_patches_per_image * 4)
+        )
+        large_scale_grouped = tf.reshape(
+            large_scale, large_scale_grouped_shape
+        )
         small_scale_grouped = tf.reshape(
             small_scale, small_scale_grouped_shape
         )
 
         # Compute total counts.
+        large_scale_total_counts = tf.reduce_sum(large_scale_grouped, axis=1)
         small_scale_total_counts = tf.reduce_sum(small_scale_grouped, axis=1)
 
         # Compute MSE.
-        total_mse += tf.keras.losses.mse(large_scale, small_scale_total_counts)
+        total_mse += tf.keras.losses.mse(
+            large_scale_total_counts, small_scale_total_counts
+        )
+
+        num_patches_per_image *= 4
 
     return total_mse
 
@@ -440,8 +462,8 @@ def build_model(
     image_input = _build_image_input(input_size=input_size)
     backbone = _build_model_backbone(image_input=image_input)
     # Create the necks.
-    pac_neck = _build_neck(backbone, output_bias=output_bias)
-    count_neck = _build_neck(backbone)
+    pac_neck = _build_neck(backbone, output_bias=output_bias, name="pac")
+    count_neck = _build_neck(backbone, name="count")
     # Compute multi-scale features.
     pac_multi_scale_features = _get_sub_patch_features(
         pac_neck, num_scales=num_scales
@@ -455,18 +477,18 @@ def build_model(
     count_head = list(_build_count_head(count_multi_scale_features))
 
     # Compute the combined BCE loss.
-    combined_bce_loss = tf.keras.layers.Lambda(_compute_combined_bce_loss)(
-        (pac_head, count_head)
-    )
+    combined_bce_loss = tf.keras.layers.Lambda(
+        lambda i: _compute_combined_bce_loss(i[0], i[1]), name="combined_bce"
+    )((pac_head, count_head))
     # Compute the scale consistency loss.
     scale_consistency_loss = tf.keras.layers.Lambda(
-        _compute_scale_consistency_loss
+        _compute_scale_consistency_loss, name="scale_consistency"
     )(count_head)
 
     model_outputs = dict(
         # Only include outputs for the largest scale.
-        has_flower=pac_head[0][:, 0, :, :, :],
-        count=count_head[0][:, 0, :, :],
+        has_flower=pac_head[0],
+        count=count_head[0],
         # Output the combined BCE and consistency losses also.
         combined_bce_loss=combined_bce_loss,
         scale_consistency_loss=scale_consistency_loss,

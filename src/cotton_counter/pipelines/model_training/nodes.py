@@ -76,6 +76,7 @@ def create_model(
     *,
     input_image_shape: Vector2I,
     patch_scale: float,
+    num_loss_scales: int,
     initial_output_bias: float,
 ) -> keras.Model:
     """
@@ -85,6 +86,8 @@ def create_model(
         input_image_shape: The shape of the input images, in the form
         (height, width)
         patch_scale: The scale factor to apply for the patches we extract.
+        num_loss_scales: The number of different scales to use when computing
+            the loss.
         initial_output_bias: The initial bias value to use for the model output.
 
     Returns:
@@ -98,7 +101,7 @@ def create_model(
 
     model = build_model(
         input_size=(patch_width, patch_height),
-        num_scales=3,
+        num_scales=num_loss_scales,
         output_bias=initial_output_bias,
     )
 
@@ -259,6 +262,7 @@ def train_model(
             },
             metrics=make_metrics(classify_counts=classify_counts),
         )
+        model.run_eagerly = True
 
         ran_epochs = 0
         epochs_to_run = min(phase["num_epochs"], rebalance_frequency)

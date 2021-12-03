@@ -59,9 +59,7 @@ def create_pipeline(**kwargs: Any):
                 dict(
                     input_image_shape="params:input_image_shape",
                     patch_scale="params:patch_scale",
-                    sub_patch_scale="params:sub_patch_scale",
-                    sub_patch_stride="params:sub_patch_stride",
-                    classify_counts="params:classify_counts",
+                    num_loss_scales="params:num_loss_scales",
                     initial_output_bias="initial_output_bias",
                 ),
                 "initial_model",

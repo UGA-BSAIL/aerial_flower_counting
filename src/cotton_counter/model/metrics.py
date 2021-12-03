@@ -25,7 +25,7 @@ def make_metrics(
 
     if classify_counts:
         # Add a standard accuracy metric for the classification.
-        metrics["discrete_count"] = [
+        metrics["has_flower"] = [
             keras.metrics.BinaryAccuracy(name="accuracy"),
             # Reverse the names of these metrics because we use 0 as the
             # positive class.

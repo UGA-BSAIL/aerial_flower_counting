@@ -120,7 +120,7 @@ def create_pipeline(**kwargs):
             node(
                 DatasetManager,
                 dict(
-                    point_dataset="training_data",
+                    point_dataset="training_data_no_sub_patch_target",
                     tag_dataset_positive="tagged_patch_data_positive",
                     tag_dataset_negative="tagged_patch_data_negative",
                     num_positive_patches="params:num_positive_patches",
@@ -131,22 +131,26 @@ def create_pipeline(**kwargs):
             # Add sub-patch targets to everything that needs them.
             node(
                 add_dummy_targets,
-                "training_data_no_sub_patch_target",
-                "training_data",
-            ),
-            node(
-                add_dummy_targets,
-                "testing_data_no_sub_patch_target",
+                dict(
+                    dataset="testing_data_no_sub_patch_target",
+                    batch_size="params:batch_size",
+                ),
                 "testing_data",
             ),
             node(
                 add_dummy_targets,
-                "testing_data_alt_no_sub_patch_target",
+                dict(
+                    dataset="testing_data_alt_no_sub_patch_target",
+                    batch_size="params:batch_size",
+                ),
                 "testing_data_alternate",
             ),
             node(
                 add_dummy_targets,
-                "validation_data_no_sub_patch_target",
+                dict(
+                    dataset="validation_data_no_sub_patch_target",
+                    batch_size="params:batch_size",
+                ),
                 "validation_data",
             ),
             # Calculate the initial output bias.

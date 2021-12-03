@@ -1,10 +1,7 @@
 # The scale factor to apply for the patches we extract.
 patch_scale: 0.125
-
-# The scale factor and stride to use for the sub-patches we extract
-# when computing the cross-scale consistency loss.
-sub_patch_scale: 0.5
-sub_patch_stride: 0.5
+# Number of scales to use when computing the loss.
+num_loss_scales: 3
 
 # Frequency at which to generate histograms for Tensorboard output.
 histogram_frequency: 1
@@ -31,7 +28,7 @@ learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
-      initial: 0.005
+      initial: 0.0001
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
@@ -51,6 +48,6 @@ learning_phases:
     # The loss weight to use for the PAC.
     pac_loss_weight: 1.0
     # The weight to use for the combined BCE loss.
-    combined_bce_loss_weight: 1.0
+    combined_bce_loss_weight: 0.05
     # The weight to use for the scale consistency loss.
-    scale_cosistency_loss_weight: 1.0
+    scale_consistency_loss_weight: 0.01

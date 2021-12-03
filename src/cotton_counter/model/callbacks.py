@@ -220,7 +220,7 @@ class LogClassActivations(_ImageLoggingCallback):
         self.__num_classes = num_classes
 
         # Extract the activations from the model.
-        activation_layer = self._model.get_layer("activation_maps")
+        activation_layer = self._model.get_layer("activation_maps_pac")
         activation_output = activation_layer.get_output_at(0)
         # This output will go through softmax after global average pooling
         # anyway, so applying softmax here should give us a reasonable
