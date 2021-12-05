@@ -262,7 +262,6 @@ def train_model(
             },
             metrics=make_metrics(classify_counts=classify_counts),
         )
-        model.run_eagerly = True
 
         ran_epochs = 0
         epochs_to_run = min(phase["num_epochs"], rebalance_frequency)
