@@ -46,9 +46,7 @@ def evaluate_model(
     """
     model.compile(
         # Disable focal loss for the evaluation.
-        loss=make_losses(
-            classify_counts=classify_counts, alpha=1.0, gamma=0.0
-        ),
+        loss=make_losses(alpha=1.0, gamma=0.0),
         metrics=make_metrics(classify_counts=classify_counts),
     )
 
@@ -253,20 +251,14 @@ def calculate_roc_points(
     """
     model.compile(
         # Disable focal loss for evaluation.
-        loss=make_losses(
-            classify_counts=classify_counts, alpha=1.0, gamma=0.0
-        ),
+        loss=make_losses(alpha=1.0, gamma=0.0),
         metrics=make_metrics(classify_counts=classify_counts),
     )
 
     # Obtain the labels and predictions.
-    labels = [t["discrete_count"].numpy() for _, t in eval_data.unbatch()]
+    labels = [t["has_flower"].numpy() for _, t in eval_data.unbatch()]
     model_results = model.predict(eval_data)
-    probabilities = model_results["discrete_count"].squeeze()
-
-    # Convert so that the positive class is 1.
-    labels = 1 - np.array(labels)
-    probabilities = 1.0 - probabilities
+    probabilities = model_results["has_flower"].squeeze()
 
     # Calculate the curve points.
     false_positives, true_positives, _ = sklearn.metrics.roc_curve(

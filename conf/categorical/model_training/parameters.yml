@@ -28,7 +28,7 @@ learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
-      initial: 0.0001
+      initial: 0.001
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
@@ -39,7 +39,7 @@ learning_phases:
       # Used to derive the initial learning rate of the i-th period.
       m_mul: 1.0
       # Minimum learning rate to hit.
-      min_learning_rate: 0.00001
+      min_learning_rate: 0.000001
     # The momentum to use for the phase.
     momentum: 0.9
     # Number of epochs to train for in this phase.

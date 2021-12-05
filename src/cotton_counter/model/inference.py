@@ -204,7 +204,7 @@ def _predict_with_activation_maps(
 
     """
     # Modify the model to produce activation maps.
-    activation_layer = model.get_layer("activation_maps")
+    activation_layer = model.get_layer("activation_maps_pac")
     activation_output = activation_layer.get_output_at(0)
     activation_model = tf.keras.Model(
         inputs=model.inputs, outputs=[activation_output]

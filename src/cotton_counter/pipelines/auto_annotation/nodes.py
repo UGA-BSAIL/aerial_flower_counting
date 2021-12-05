@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from loguru import logger
+
 from pycvat import Label, LabeledImage, Task
 
 from ...cvat_utils import get_main_job
@@ -229,8 +230,7 @@ def _update_cvat_annotations(
         label: The label we add to images to indicate a positive detection.
 
     """
-    # Our model annotates positive classes with 0.
-    positive_examples = annotations["classes"] == 0
+    positive_examples = annotations["classes"] == 1
     # CVAT names things using the file name.
     positive_examples_names = [
         Path(p).name for p in annotations[positive_examples]["paths"]

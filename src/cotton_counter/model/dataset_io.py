@@ -189,11 +189,7 @@ def _load_from_tag_feature_dict(
     # Assume the images have three channels.
     images = tf.ensure_shape(images, (None, None, None, 3))
 
-    # For discrete counts, class 0 is actually the positive class, so we just
-    # have to flip the tag annotations around.
-    discrete_counts = (
-        tf.constant(1, dtype=tf.int64) - feature_dict["has_flower"]
-    )
+    discrete_counts = feature_dict["has_flower"]
     # Coerce into the form that Keras likes.
     discrete_counts = discrete_counts[:, 0]
     discrete_counts = tf.cast(discrete_counts, tf.int32)
@@ -201,45 +197,19 @@ def _load_from_tag_feature_dict(
     return {"image": images}, {"has_flower": discrete_counts}
 
 
-def _discretize_counts(
-    counts: tf.Tensor, *, bucket_min_values: List[float]
-) -> tf.Tensor:
+def _binarize_counts(counts: tf.Tensor) -> tf.Tensor:
     """
-    Discretizes the count values into a fixed number of categories.
+    Binarizes the counts into positive and negative classes based on whether
+    there is a flower or not.
 
     Args:
         counts: The tensor containing raw count values.
-        bucket_min_values: A list of the minimum values that will go in each
-            bucket. Note that the highest bucket will contain anything that
-            falls between the largest minimum value and infinity.
 
     Returns:
         An integer tensor containing the categorical counts.
 
     """
-    # Cast to floats for easy comparison.
-    counts = tf.cast(counts, tf.float32)
-    # Make sure they're sorted from high to low.
-    bucket_min_values.sort(reverse=True)
-
-    # These masks will determine which counts fall in which buckets.
-    bucket_masks = []
-    for min_value in bucket_min_values:
-        bucket_mask = counts >= tf.constant(min_value, dtype=tf.float32)
-        bucket_masks.append(bucket_mask)
-
-    # Generate the category vector.
-    categorical_counts = tf.zeros_like(counts, dtype=tf.int32)
-    already_filled = tf.zeros_like(categorical_counts, dtype=tf.bool)
-    for i, bucket_mask in enumerate(bucket_masks):
-        fill_mask = tf.logical_and(tf.logical_not(already_filled), bucket_mask)
-        fill_mask_int = tf.cast(fill_mask, tf.int32)
-
-        categorical_counts += fill_mask_int * tf.constant(i, dtype=tf.int32)
-
-        already_filled = tf.logical_or(fill_mask, already_filled)
-
-    return categorical_counts
+    return tf.where(tf.greater(counts, 0), tf.constant(1), tf.constant(0))
 
 
 def _counts_from_feature_dict(
@@ -261,11 +231,7 @@ def _counts_from_feature_dict(
     count = tf.size(x_values)
 
     # Discretize the counts.
-    discrete_counts = _discretize_counts(
-        count,
-        # Use two classes for the MIL task.
-        bucket_min_values=[0.0, 1.0],
-    )
+    discrete_counts = _binarize_counts(count,)
 
     targets = dict(has_flower=discrete_counts)
     if include_counts:
