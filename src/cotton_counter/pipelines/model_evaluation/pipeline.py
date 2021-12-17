@@ -53,17 +53,6 @@ def create_pipeline(**kwargs):
                 dict(eval_data="validation_data", **eval_params),
                 "model_report_validate",
             ),
-            # Create example density maps.
-            node(
-                make_example_density_maps,
-                inference_params_valid,
-                "example_density_maps_valid",
-            ),
-            node(
-                make_example_density_maps,
-                inference_params_test_alt,
-                "example_density_maps_test_alt",
-            ),
             # Calculate overall count accuracy and write reports.
             node(
                 estimate_counting_accuracy,

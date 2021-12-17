@@ -131,10 +131,18 @@ def estimate_counting_accuracy(
         The true counts and the corresponding predicted counts.
 
     """
+    # We get activation maps and then combine them before manually taking the
+    # average to find the counts. This eliminates any bias from predicting
+    # with a smaller patch size.
+    activation_layer = model.get_layer("activation_maps_count")
+    activation_output = activation_layer.get_output_at(0)
+    activation_model = tf.keras.Model(
+        inputs=model.inputs, outputs=[activation_output]
+    )
+
     # Get the predicted counts for the data.
     eval_data = eval_data.unbatch().batch(batch_size)
-    outputs = model.predict(eval_data)
-    predicted_counts = outputs["count"].squeeze()
+    activation_maps = activation_model.predict(eval_data)
 
     # Save the actual counts too.
     actual_counts = []
@@ -142,15 +150,17 @@ def estimate_counting_accuracy(
         actual_counts.append(target_batch["count"])
     actual_counts = np.concatenate(actual_counts, axis=0)
 
-    # Group patch results by corresponding input images.
-    num_patches_per_image = (1.0 / patch_scale) ** 2
+    # Group patch results by corresponding input images and compute overall
+    # counts.
+    num_patches_per_image = int((1.0 / patch_scale) ** 2)
     logger.debug("Num patches/image: {}", num_patches_per_image)
     actual_counts = np.reshape(actual_counts, (num_patches_per_image, -1))
     actual_counts = np.sum(actual_counts, axis=0)
-    predicted_counts = np.reshape(
-        predicted_counts, (num_patches_per_image, -1)
+    grouped_maps = np.reshape(
+        activation_maps,
+        (-1, num_patches_per_image,) + activation_maps.shape[1:],
     )
-    predicted_counts = np.sum(predicted_counts, axis=0)
+    predicted_counts = np.mean(grouped_maps, axis=(1, 2, 3, 4))
     logger.debug("Generated counts for {} images.", len(actual_counts))
 
     return actual_counts, predicted_counts
@@ -221,7 +231,7 @@ def make_counting_histogram(
 
 
 def calculate_roc_points(
-    model: keras.Model, *, eval_data: tf.data.Dataset, classify_counts: bool
+    model: keras.Model, *, eval_data: tf.data.Dataset
 ) -> pd.DataFrame:
     """
     Calculates the points on an ROC.
@@ -229,8 +239,6 @@ def calculate_roc_points(
     Args:
         model: The model to generate the ROC curve for.
         eval_data: The dataset we want to use for generating the ROC curve.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
 
     Returns:
         The figure in which it plotted the ROC curve.
