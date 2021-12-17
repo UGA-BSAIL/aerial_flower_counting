@@ -296,7 +296,7 @@ def _build_pac_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
 
     """
     count_pool_1 = layers.GlobalAveragePooling2D()
-    count_sigmoid = layers.Activation("sigmoid", name="discrete_count")
+    count_sigmoid = layers.Activation("sigmoid", name="pac")
 
     # Apply the layers.
     for top_features in model_top:
@@ -315,7 +315,7 @@ def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
         A tensor representing the counts for each input.
 
     """
-    count_pool_1 = layers.GlobalAveragePooling2D()
+    count_pool_1 = layers.GlobalAveragePooling2D(name="count")
 
     # Apply the layers.
     for top_features in model_top:

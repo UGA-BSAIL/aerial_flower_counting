@@ -2,7 +2,7 @@
 Helpers for performing inference.
 """
 
-from typing import Dict, Iterable, Optional
+from typing import Any, Iterable, Optional
 
 import numpy as np
 import tensorflow as tf

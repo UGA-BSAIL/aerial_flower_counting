@@ -28,17 +28,13 @@ from ...model.visualization import visualize_heat_maps
 sns.set()
 
 
-def evaluate_model(
-    model: keras.Model, *, eval_data: tf.data.Dataset, classify_counts: bool
-) -> str:
+def evaluate_model(model: keras.Model, *, eval_data: tf.data.Dataset) -> str:
     """
     Evaluates a model and generates a text report.
 
     Args:
         model: The model to evaluate.
         eval_data: The data to evaluate the model on.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
 
     Returns:
         A human-readable report of the evaluation results.
@@ -47,7 +43,7 @@ def evaluate_model(
     model.compile(
         # Disable focal loss for the evaluation.
         loss=make_losses(alpha=1.0, gamma=0.0),
-        metrics=make_metrics(classify_counts=classify_counts),
+        metrics=make_metrics(include_count=True),
     )
 
     # Evaluate the model.
@@ -117,54 +113,45 @@ def estimate_counting_accuracy(
     *,
     model: keras.Model,
     eval_data: tf.data.Dataset,
-    patch_scale: float,
-    patch_stride: float,
     batch_size: int,
+    patch_scale: float,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Estimates the pure counting accuracy of the model on a dataset.
 
     Args:
         model: The model to use.
-        eval_data: The dataset to get the images from. It should produce full
-            images, and not patches. It should also contain a raw count target.
-        patch_scale: The scale factor to apply for the patches we extract.
-        patch_stride: The stride to use for extracting patches, provided in
-            frame fractions like the scale.
+        eval_data: The dataset to get the images from. It should contain a raw
+            count target.
         batch_size: The size of the batches to use for inference.
+        patch_scale: The patch scale that was used when extracting patches in
+            `eval_data`.
 
     Returns:
         The true counts and the corresponding predicted counts.
 
     """
-    # Store the predicted and actual counts for each image.
-    predicted_counts = []
-    actual_counts = []
-
+    # Get the predicted counts for the data.
     eval_data = eval_data.unbatch().batch(batch_size)
+    outputs = model.predict(eval_data)
+    predicted_counts = outputs["count"].squeeze()
 
-    for input_batch, target_batch in eval_data:
-        # Calculate the density maps.
-        activation_maps = predict_with_activation_maps_patched(
-            model, input_batch["image"], batch_size=batch_size
-        )
-        density_maps = count_with_patches(
-            activation_maps,
-            patch_scale=patch_scale,
-            patch_stride=patch_stride,
-        )
-
-        # Estimate the predicted counts for each image.
-        batch_predicted_counts = np.sum(density_maps, axis=(1, 2, 3))
-        predicted_counts.append(batch_predicted_counts)
-
-        # Save the actual counts too.
+    # Save the actual counts too.
+    actual_counts = []
+    for _, target_batch in eval_data:
         actual_counts.append(target_batch["count"])
-
-    # Calculate an overall count error.
-    predicted_counts = np.concatenate(predicted_counts, axis=0)
     actual_counts = np.concatenate(actual_counts, axis=0)
-    logger.debug("Generated counts for {} images.", len(predicted_counts))
+
+    # Group patch results by corresponding input images.
+    num_patches_per_image = (1.0 / patch_scale) ** 2
+    logger.debug("Num patches/image: {}", num_patches_per_image)
+    actual_counts = np.reshape(actual_counts, (num_patches_per_image, -1))
+    actual_counts = np.sum(actual_counts, axis=0)
+    predicted_counts = np.reshape(
+        predicted_counts, (num_patches_per_image, -1)
+    )
+    predicted_counts = np.sum(predicted_counts, axis=0)
+    logger.debug("Generated counts for {} images.", len(actual_counts))
 
     return actual_counts, predicted_counts
 
@@ -252,7 +239,7 @@ def calculate_roc_points(
     model.compile(
         # Disable focal loss for evaluation.
         loss=make_losses(alpha=1.0, gamma=0.0),
-        metrics=make_metrics(classify_counts=classify_counts),
+        metrics=make_metrics(),
     )
 
     # Obtain the labels and predictions.

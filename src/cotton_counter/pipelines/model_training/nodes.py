@@ -260,7 +260,7 @@ def train_model(
                 "combined_bce_loss": combined_bce_loss_weight,
                 "scale_consistency_loss": scale_consistency_loss_weight,
             },
-            metrics=make_metrics(classify_counts=classify_counts),
+            metrics=make_metrics(),
         )
 
         ran_epochs = 0

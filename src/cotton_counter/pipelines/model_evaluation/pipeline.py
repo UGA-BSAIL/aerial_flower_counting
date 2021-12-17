@@ -24,19 +24,16 @@ def create_pipeline(**kwargs):
         kwargs: Ignored by this function.
     """
     # Common parameters shared by evaluation nodes.
-    eval_params = dict(
-        model="trained_model", classify_counts="params:classify_counts"
-    )
+    eval_params = dict(model="trained_model")
     # Common parameters used by nodes that do inference on full images.
     inference_params_valid = dict(
         model="trained_model",
-        eval_data="validation_data_no_patches",
-        patch_scale="params:eval_patch_scale",
-        patch_stride="params:eval_patch_stride",
+        eval_data="validation_data",
         batch_size="params:eval_batch_size",
+        patch_scale="params:patch_scale",
     )
     inference_params_test_alt = inference_params_valid.copy()
-    inference_params_test_alt["eval_data"] = "testing_data_alt_no_patches"
+    inference_params_test_alt["eval_data"] = "testing_data_alternate"
 
     return Pipeline(
         [

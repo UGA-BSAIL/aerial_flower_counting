@@ -55,19 +55,19 @@ def create_pipeline(**kwargs):
                 "training_data_no_sub_patch_target",
             ),
             node(
-                pre_process_node_not_training,
+                pre_process_node_with_counts,
                 dict(raw_dataset="tfrecord_test", **pre_process_params),
                 "testing_data_no_sub_patch_target",
             ),
             node(
-                pre_process_node_not_training,
+                pre_process_node_with_counts,
                 dict(
                     raw_dataset="tfrecord_test_alternate", **pre_process_params
                 ),
                 "testing_data_alt_no_sub_patch_target",
             ),
             node(
-                pre_process_node_not_training,
+                pre_process_node_with_counts,
                 dict(raw_dataset="tfrecord_validate", **pre_process_params),
                 "validation_data_no_sub_patch_target",
             ),
