@@ -45,7 +45,7 @@ def test_point_dataset_integration(snapshot: Snapshot) -> None:
     # Extract all the target data.
     counts = [t["count"] for _, t in patch_data]
     counts = np.stack(counts, axis=1)
-    discrete_counts = [t["discrete_count"] for _, t in patch_data]
+    discrete_counts = [t["has_flower"] for _, t in patch_data]
     discrete_counts = np.stack(discrete_counts, axis=1)
 
     # Serialize the result.

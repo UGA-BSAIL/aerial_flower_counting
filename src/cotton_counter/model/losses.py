@@ -226,6 +226,14 @@ class FocalLoss(losses.Loss):
         )
         return alpha_t * point_loss
 
+    def get_config(self) -> Dict[str, Any]:
+        super_config = super().get_config()
+        return dict(
+            alpha=float(self._alpha.numpy()),
+            gamma=float(self._gamma.numpy()),
+            **super_config,
+        )
+
 
 def make_losses(
     *, alpha: float, gamma: float

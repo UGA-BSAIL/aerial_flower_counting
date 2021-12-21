@@ -12,7 +12,7 @@ from loguru import logger
 
 from src.cotton_counter.type_helpers import Vector2I
 
-from ..model.layers import DenseBlock, TransitionLayer
+from ..model.layers import CombinedFocalLoss, DenseBlock, TransitionLayer
 from ..model.patches import extract_standard_patches
 from .losses import FocalLoss
 
@@ -323,61 +323,6 @@ def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
         yield count_pool_1(top_features)
 
 
-def _compute_combined_bce_loss(
-    pac_predictions: Iterable[tf.Tensor],
-    count_predictions: Iterable[tf.Tensor],
-    bce_loss: tf.keras.losses.Loss = tf.keras.losses.BinaryCrossentropy(),
-) -> tf.Tensor:
-    """
-    Computes BCE between the PAC predictions and the count predictions,
-    in order to enforce that the count actually tracks the objects we care
-    about.
-
-    This is a sort of hack to get around Keras' inability to compute losses
-    from two separate model outputs. To get around this, we compute the
-    scale-consistency loss within the model, and then provide that as input
-    to a dummy loss which simply returns the predictions.
-
-    Args:
-        pac_predictions: The predictions from the PAC, at every scale. Each
-            item should be a vector, with a length of batch_size * num_patches.
-        count_predictions: The predicted counts, at every scale.
-            Should have the same shape as `pac_predictions`.
-        bce_loss: The loss function to use for computing the underlying
-            cross-entropy loss.
-
-    Returns:
-        The total computed BCE loss for every item in the batch. Will be
-        a vector with a length of the batch size.
-
-    """
-    total_loss = None
-    # Tracks the number of patches in each input image at this scale.
-    num_patches_per_image = 1
-    for pac_prediction, count_prediction in zip(
-        pac_predictions, count_predictions
-    ):
-        # Apply tanh to the counts, so they're directly comparable to the PAC
-        # outputs.
-        count_thresholded = tf.keras.activations.tanh(count_prediction)
-        # Compute cross-entropy loss.
-        scale_loss = bce_loss.call(pac_prediction, count_thresholded)
-
-        # Combine the losses for all patches from a given image.
-        loss_per_input = tf.reshape(scale_loss, (-1, num_patches_per_image))
-        loss_per_input = tf.reduce_mean(loss_per_input, axis=1)
-
-        if total_loss is None:
-            total_loss = loss_per_input
-        else:
-            total_loss += loss_per_input
-
-        num_patches_per_image *= 4
-
-    # Compute the total loss for all scales.
-    return total_loss
-
-
 def _compute_scale_consistency_loss(
     count_predictions: Iterable[tf.Tensor],
 ) -> tf.Tensor:
@@ -482,10 +427,9 @@ def build_model(
 
     # Compute the combined BCE loss.
     focal_loss = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
-    combined_bce_loss = tf.keras.layers.Lambda(
-        lambda i: _compute_combined_bce_loss(i[0], i[1], bce_loss=focal_loss),
-        name="combined_bce",
-    )((pac_head, count_head))
+    combined_bce_loss = CombinedFocalLoss(
+        name="combined_bce", bce_loss=focal_loss
+    )(dict(pac_predictions=pac_head, count_predictions=count_head))
     # Compute the scale consistency loss.
     scale_consistency_loss = tf.keras.layers.Lambda(
         _compute_scale_consistency_loss, name="scale_consistency"
