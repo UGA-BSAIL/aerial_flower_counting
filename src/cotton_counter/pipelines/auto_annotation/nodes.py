@@ -199,17 +199,20 @@ def predict_patches(
     """
     # Modify the model so that is passes the image path through to the output.
     path_input = tf.keras.Input(shape=(1,), dtype=tf.string, name="path")
+    new_outputs = {n: o for n, o in zip(model.output_names, model.outputs)}
+    new_outputs["path"] = path_input
     model_with_path = tf.keras.Model(
         inputs=model.inputs + [path_input],
         # We only care about the discrete count output here.
-        outputs=model.outputs + [path_input],
+        outputs=new_outputs,
     )
 
     # Predict on the patches.
     model_output = model_with_path.predict(patch_dataset)
 
     # Organize the resulting data.
-    patch_sigmoid, _, patch_paths = model_output
+    patch_paths = model_output["path"]
+    patch_sigmoid = model_output["discrete_count"]
     patch_classes = patch_sigmoid > 0.5
     patch_classes = patch_classes.squeeze().astype(np.int32)
     patch_paths = patch_paths.squeeze()

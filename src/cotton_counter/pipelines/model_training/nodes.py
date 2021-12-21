@@ -78,6 +78,8 @@ def create_model(
     patch_scale: float,
     num_loss_scales: int,
     initial_output_bias: float,
+    focal_loss_alpha: float,
+    focal_loss_gamma: float,
 ) -> keras.Model:
     """
     Builds the model to use.
@@ -89,6 +91,10 @@ def create_model(
         num_loss_scales: The number of different scales to use when computing
             the loss.
         initial_output_bias: The initial bias value to use for the model output.
+        focal_loss_alpha: The alpha parameter to use for the focal loss
+            between the PAC outputs and counts.
+        focal_loss_gamma: The gamma parameter to use for the focal loss
+            between the PAC outputs and counts.
 
     Returns:
         The model that it created.
@@ -103,6 +109,8 @@ def create_model(
         input_size=(patch_width, patch_height),
         num_scales=num_loss_scales,
         output_bias=initial_output_bias,
+        focal_alpha=focal_loss_alpha,
+        focal_gamma=focal_loss_gamma,
     )
 
     logger.info("Model has {} parameters.", model.count_params())
@@ -117,8 +125,6 @@ def make_callbacks(
     tensorboard_output_dir: str,
     histogram_frequency: int,
     visualization_period: int,
-    max_density_threshold: float,
-    classify_counts: bool,
     num_per_batch_to_visualize: int,
     max_num_batches_to_visualize: int,
 ) -> List[keras.callbacks.Callback]:
@@ -134,11 +140,6 @@ def make_callbacks(
             Tensorboard output.
         visualization_period: Period in epochs at which to generate density
             map visualizations.
-        max_density_threshold: Density threshold to use for colorization.
-                Any pixel with this density or more will show up as the maximum
-                density color.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
         num_per_batch_to_visualize: Number of images to visualize from each
             batch.
         max_num_batches_to_visualize: Maximum number of batches to visualize
@@ -156,29 +157,17 @@ def make_callbacks(
     )
     callbacks = [tensorboard_callback, tf.keras.callbacks.TerminateOnNaN()]
 
-    if not classify_counts:
-        # Create a callback for saving density map visualizations.
-        density_map_callback = LogDensityMaps(
-            log_dir=log_dir / "density_map",
-            model=model,
-            dataset=testing_data,
-            log_period=visualization_period,
-            max_density_threshold=max_density_threshold,
-            num_images_per_batch=num_per_batch_to_visualize,
-        )
-        callbacks.append(density_map_callback)
-    else:
-        # Create a callback for visualizing classification activations.
-        activation_callback = LogClassActivations(
-            log_dir=log_dir / "class_activations",
-            model=model,
-            dataset=testing_data,
-            log_period=visualization_period,
-            num_classes=1,
-            num_images_per_batch=num_per_batch_to_visualize,
-            max_num_batches=max_num_batches_to_visualize,
-        )
-        callbacks.append(activation_callback)
+    # Create a callback for visualizing classification activations.
+    activation_callback = LogClassActivations(
+        log_dir=log_dir / "class_activations",
+        model=model,
+        dataset=testing_data,
+        log_period=visualization_period,
+        num_classes=1,
+        num_images_per_batch=num_per_batch_to_visualize,
+        max_num_batches=max_num_batches_to_visualize,
+    )
+    callbacks.append(activation_callback)
 
     return callbacks
 
@@ -189,7 +178,6 @@ def train_model(
     training_data_manager: DatasetManager,
     testing_data: tf.data.Dataset,
     learning_phases: List[Dict[str, Any]],
-    classify_counts: bool,
     callbacks: List[keras.callbacks.Callback] = [],
     validation_frequency: int,
     rebalance_frequency: int,
@@ -208,8 +196,6 @@ def train_model(
         testing_data: The `Dataset` containing pre-processed testing data.
         learning_phases: List of hyperparameter configurations for each training
             stage, in order.
-        classify_counts: If true, will attempt to classify counts instead of
-            regressing them.
         callbacks: The callbacks to use when training.
         validation_frequency: Number of training epochs after which to run
             validation.

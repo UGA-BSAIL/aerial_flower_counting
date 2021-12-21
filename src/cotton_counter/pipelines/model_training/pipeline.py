@@ -39,7 +39,6 @@ def create_pipeline(**kwargs: Any):
     training_params = dict(
         training_data_manager="dataset_manager",
         testing_data="testing_data",
-        classify_counts="params:classify_counts",
         callbacks="callbacks",
         validation_frequency="params:validation_frequency",
         rebalance_frequency="params:rebalance_frequency",
@@ -61,6 +60,8 @@ def create_pipeline(**kwargs: Any):
                     patch_scale="params:patch_scale",
                     num_loss_scales="params:num_loss_scales",
                     initial_output_bias="initial_output_bias",
+                    focal_loss_alpha="params:focal_loss_alpha",
+                    focal_loss_gamma="params:focal_loss_gamma",
                 ),
                 "initial_model",
                 tags={PRE_PROCESS_TAG},
@@ -74,8 +75,6 @@ def create_pipeline(**kwargs: Any):
                     tensorboard_output_dir="params:tensorboard_output_dir",
                     histogram_frequency="params:histogram_frequency",
                     visualization_period="params:visualization_period",
-                    max_density_threshold="params:max_density_threshold",
-                    classify_counts="params:classify_counts",
                     num_per_batch_to_visualize="params"
                     ":num_per_batch_to_visualize",
                     max_num_batches_to_visualize="params"

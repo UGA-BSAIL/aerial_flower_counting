@@ -14,6 +14,7 @@ from src.cotton_counter.type_helpers import Vector2I
 
 from ..model.layers import DenseBlock, TransitionLayer
 from ..model.patches import extract_standard_patches
+from .losses import FocalLoss
 
 
 def _build_image_input(*, input_size: Vector2I) -> keras.Input:
@@ -325,6 +326,7 @@ def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
 def _compute_combined_bce_loss(
     pac_predictions: Iterable[tf.Tensor],
     count_predictions: Iterable[tf.Tensor],
+    bce_loss: tf.keras.losses.Loss = tf.keras.losses.BinaryCrossentropy(),
 ) -> tf.Tensor:
     """
     Computes BCE between the PAC predictions and the count predictions,
@@ -341,6 +343,8 @@ def _compute_combined_bce_loss(
             item should be a vector, with a length of batch_size * num_patches.
         count_predictions: The predicted counts, at every scale.
             Should have the same shape as `pac_predictions`.
+        bce_loss: The loss function to use for computing the underlying
+            cross-entropy loss.
 
     Returns:
         The total computed BCE loss for every item in the batch. Will be
@@ -357,9 +361,7 @@ def _compute_combined_bce_loss(
         # outputs.
         count_thresholded = tf.keras.activations.tanh(count_prediction)
         # Compute cross-entropy loss.
-        scale_loss = tf.keras.losses.binary_crossentropy(
-            pac_prediction, count_thresholded
-        )
+        scale_loss = bce_loss.call(pac_prediction, count_thresholded)
 
         # Combine the losses for all patches from a given image.
         loss_per_input = tf.reshape(scale_loss, (-1, num_patches_per_image))
@@ -441,6 +443,8 @@ def build_model(
     input_size: Vector2I,
     num_scales: int,
     output_bias: Optional[float] = None,
+    focal_alpha: float = 0.5,
+    focal_gamma: float = 1.0,
 ) -> keras.Model:
     """
     Creates the full SaNet model.
@@ -452,6 +456,8 @@ def build_model(
             counting.
         output_bias: Specify an initial bias to use for the output. This can
             be useful for unbalanced datasets.
+        focal_alpha: Alpha parameter to use for combined focal loss.
+        focal_gamma: Gamma parameter to use for combined focal loss.
 
     Returns:
         The model that it created.
@@ -475,8 +481,10 @@ def build_model(
     count_head = list(_build_count_head(count_multi_scale_features))
 
     # Compute the combined BCE loss.
+    focal_loss = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)
     combined_bce_loss = tf.keras.layers.Lambda(
-        lambda i: _compute_combined_bce_loss(i[0], i[1]), name="combined_bce"
+        lambda i: _compute_combined_bce_loss(i[0], i[1], bce_loss=focal_loss),
+        name="combined_bce",
     )((pac_head, count_head))
     # Compute the scale consistency loss.
     scale_consistency_loss = tf.keras.layers.Lambda(

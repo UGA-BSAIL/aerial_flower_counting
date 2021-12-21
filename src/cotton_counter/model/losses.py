@@ -194,9 +194,10 @@ class FocalLoss(losses.Loss):
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         one = tf.constant(1.0)
+        y_true = tf.cast(y_true, tf.float32)
 
         # Figure out which locations are positive and which are negative.
-        positive_mask = tf.equal(y_true, 1)
+        positive_mask = tf.greater(y_true, 0.5)
         positive_pred = tf.boolean_mask(y_pred, positive_mask)
         negative_pred = one - tf.boolean_mask(y_pred, ~positive_mask)
         tf.print("positive_pred", positive_pred)
