@@ -316,11 +316,13 @@ def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
         A tensor representing the counts for each input.
 
     """
-    count_pool_1 = layers.GlobalAveragePooling2D(name="count")
+    # It doesn't really make sense to have a count less than 0.
+    count_pool_1 = layers.GlobalAveragePooling2D()
+    count_activated = layers.Activation("swish", name="count")
 
     # Apply the layers.
     for top_features in model_top:
-        yield count_pool_1(top_features)
+        yield count_activated(count_pool_1(top_features))
 
 
 def _compute_scale_consistency_loss(
