@@ -275,7 +275,7 @@ def _build_neck(
         logger.debug("Using initial output bias {}.", output_bias)
         output_bias = keras.initializers.Constant(output_bias)
 
-        # Create the layers.
+    # Create the layers.
     count_conv_1 = _bn_relu_conv(3, 128, padding="same")(model_top)
     count_conv_2 = _bn_relu_conv(3, 128, padding="same")(count_conv_1)
     return layers.Conv2D(
@@ -304,13 +304,16 @@ def _build_pac_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
         yield count_sigmoid(count_pool_1(top_features))
 
 
-def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
+def _build_count_head_and_neck(
+    model_top: Iterable[tf.Tensor],
+) -> Iterable[tf.Tensor]:
     """
     Adds the head for counting the number of objects in an input.
 
     Args:
         model_top: The top model layer to build the head on. If provided
-            with multiple tensors, it will apply the same layers to each one.
+            with multiple tensors, it will apply the separate layers to each
+            one.
 
     Returns:
         A tensor representing the counts for each input.
@@ -318,11 +321,12 @@ def _build_count_head(model_top: Iterable[tf.Tensor]) -> Iterable[tf.Tensor]:
     """
     # It doesn't really make sense to have a count less than 0.
     count_pool_1 = layers.GlobalAveragePooling2D()
-    count_activated = layers.Activation("swish", name="count")
 
     # Apply the layers.
-    for top_features in model_top:
-        yield count_activated(count_pool_1(top_features))
+    for i, top_features in enumerate(model_top):
+        # Build the neck.
+        count_neck = _build_neck(top_features, name=f"count_{i}")
+        yield count_pool_1(count_neck)
 
 
 def _compute_scale_consistency_loss(
@@ -374,6 +378,12 @@ def _compute_scale_consistency_loss(
         # Compute total counts.
         large_scale_total_counts = tf.reduce_sum(large_scale_grouped, axis=1)
         small_scale_total_counts = tf.reduce_sum(small_scale_grouped, axis=1)
+        tf.print(
+            "large_scale",
+            large_scale_total_counts,
+            "small_scale",
+            small_scale_total_counts,
+        )
 
         # Compute MSE.
         total_mse += tf.keras.losses.mse(
@@ -412,20 +422,21 @@ def build_model(
     """
     image_input = _build_image_input(input_size=input_size)
     backbone = _build_model_backbone(image_input=image_input)
-    # Create the necks.
+    # Create the PAC neck.
     pac_neck = _build_neck(backbone, output_bias=output_bias, name="pac")
-    count_neck = _build_neck(backbone, name="count")
     # Compute multi-scale features.
     pac_multi_scale_features = _get_sub_patch_features(
         pac_neck, num_scales=num_scales
     )
-    count_multi_scale_features = _get_sub_patch_features(
-        count_neck, num_scales=num_scales
+    backbone_multi_scale_features = _get_sub_patch_features(
+        backbone, num_scales=num_scales
     )
 
     # Create the heads.
     pac_head = list(_build_pac_head(pac_multi_scale_features))
-    count_head = list(_build_count_head(count_multi_scale_features))
+    count_head = list(
+        _build_count_head_and_neck(backbone_multi_scale_features)
+    )
 
     # Compute the combined BCE loss.
     focal_loss = FocalLoss(alpha=focal_alpha, gamma=focal_gamma)

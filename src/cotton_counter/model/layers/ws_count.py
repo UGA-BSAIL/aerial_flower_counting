@@ -73,9 +73,11 @@ class CombinedBceLoss(tf.keras.layers.Layer):
         for pac_prediction, count_prediction in zip(
             pac_predictions, count_predictions
         ):
-            # Apply tanh to the counts, so they're directly comparable to the
+            # Apply sigmoid to the counts, so they're directly comparable to the
             # PAC outputs.
-            count_thresholded = tf.keras.activations.tanh(count_prediction)
+            count_thresholded = tf.keras.activations.sigmoid(
+                count_prediction * 8.0 - 4.0
+            )
             # Compute cross-entropy loss.
             scale_loss = self._bce_loss.call(pac_prediction, count_thresholded)
 

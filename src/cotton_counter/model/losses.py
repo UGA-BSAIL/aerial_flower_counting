@@ -202,8 +202,6 @@ class FocalLoss(losses.Loss):
         negative_pred = one - tf.boolean_mask(y_pred, ~positive_mask)
         tf.print("positive_pred", positive_pred)
         tf.print("negative_pred", negative_pred)
-        tf.print("num_positive_pred", tf.shape(positive_pred))
-        tf.print("num_negative_pred", tf.shape(negative_pred))
         pred_t = tf.concat([positive_pred, negative_pred], axis=-1)
 
         # Define the loss weight in the same fashion.
