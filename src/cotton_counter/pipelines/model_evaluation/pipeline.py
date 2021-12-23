@@ -28,12 +28,13 @@ def create_pipeline(**kwargs):
     # Common parameters used by nodes that do inference on full images.
     inference_params_valid = dict(
         model="trained_model",
-        eval_data="validation_data",
+        eval_data="validation_data_no_patches",
         batch_size="params:eval_batch_size",
-        patch_scale="params:patch_scale",
+        patch_scale="params:eval_patch_scale",
+        patch_stride="params:eval_patch_stride",
     )
     inference_params_test_alt = inference_params_valid.copy()
-    inference_params_test_alt["eval_data"] = "testing_data_alternate"
+    inference_params_test_alt["eval_data"] = "testing_data_alt_no_patches"
 
     return Pipeline(
         [

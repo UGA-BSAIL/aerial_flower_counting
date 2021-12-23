@@ -320,7 +320,7 @@ def _build_count_head_and_neck(
 
     """
     # It doesn't really make sense to have a count less than 0.
-    count_pool_1 = layers.GlobalAveragePooling2D()
+    count_pool_1 = layers.GlobalAveragePooling2D(name="count")
 
     # Apply the layers.
     for i, top_features in enumerate(model_top):

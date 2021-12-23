@@ -160,27 +160,6 @@ def _make_density_map(
     return np.expand_dims(density_map, axis=2)
 
 
-def _classes_to_counts(y_hat: np.ndarray) -> np.ndarray:
-    """
-    Converts raw predictions from the model to count estimates.
-
-    Args:
-        y_hat: The raw predictions from the model.
-
-    Returns:
-        The estimated counts.
-
-    """
-    y_hat = y_hat.squeeze()
-    # Convert from the sigmoid distribution to actual classes.
-    discrete_classes = y_hat > 0.5
-    discrete_classes = discrete_classes.astype(np.int32)
-
-    # In this case, we assume that class zero means there is one flower in the
-    # image.
-    return 1 - discrete_classes
-
-
 def _predict_with_activation_maps(
     model: tf.keras.Model, images: tf.Tensor, *, batch_size: int
 ) -> tf.Tensor:
@@ -204,7 +183,7 @@ def _predict_with_activation_maps(
 
     """
     # Modify the model to produce activation maps.
-    activation_layer = model.get_layer("activation_maps_pac")
+    activation_layer = model.get_layer("activation_maps_count_0")
     activation_output = activation_layer.get_output_at(0)
     activation_model = tf.keras.Model(
         inputs=model.inputs, outputs=[activation_output]
@@ -336,8 +315,9 @@ def count_with_patches(
     got_patches = patches.extract_standard_patches(
         activation_maps, patch_scale=patch_scale, patch_stride=patch_stride
     )
-    predictions = tf.nn.sigmoid(tf.reduce_mean(got_patches, axis=(1, 2, 3)))
-    predicted_counts = _classes_to_counts(predictions.numpy())
+    predicted_counts = tf.reduce_mean(got_patches, axis=(1, 2, 3))
+    tf.print("predicted_counts", predicted_counts)
+    tf.print("total batch count", tf.reduce_sum(predicted_counts))
 
     num_patches = tf.shape(got_patches).numpy()[0]
     num_patches_per_image = num_patches // num_images

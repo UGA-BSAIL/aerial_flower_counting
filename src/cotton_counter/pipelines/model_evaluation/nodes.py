@@ -113,55 +113,55 @@ def estimate_counting_accuracy(
     *,
     model: keras.Model,
     eval_data: tf.data.Dataset,
-    batch_size: int,
     patch_scale: float,
+    patch_stride: float,
+    batch_size: int,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Estimates the pure counting accuracy of the model on a dataset.
 
     Args:
         model: The model to use.
-        eval_data: The dataset to get the images from. It should contain a raw
-            count target.
+        eval_data: The dataset to get the images from. It should produce full
+            images, and not patches. It should also contain a raw count target.
+        patch_scale: The scale factor to apply for the patches we extract.
+        patch_stride: The stride to use for extracting patches, provided in
+            frame fractions like the scale.
         batch_size: The size of the batches to use for inference.
-        patch_scale: The patch scale that was used when extracting patches in
-            `eval_data`.
 
     Returns:
         The true counts and the corresponding predicted counts.
 
     """
-    # We get activation maps and then combine them before manually taking the
-    # average to find the counts. This eliminates any bias from predicting
-    # with a smaller patch size.
-    activation_layer = model.get_layer("activation_maps_count")
-    activation_output = activation_layer.get_output_at(0)
-    activation_model = tf.keras.Model(
-        inputs=model.inputs, outputs=[activation_output]
-    )
-
-    # Get the predicted counts for the data.
-    eval_data = eval_data.unbatch().batch(batch_size)
-    activation_maps = activation_model.predict(eval_data)
-
-    # Save the actual counts too.
+    # Store the predicted and actual counts for each image.
+    predicted_counts = []
     actual_counts = []
-    for _, target_batch in eval_data:
-        actual_counts.append(target_batch["count"])
-    actual_counts = np.concatenate(actual_counts, axis=0)
 
-    # Group patch results by corresponding input images and compute overall
-    # counts.
-    num_patches_per_image = int((1.0 / patch_scale) ** 2)
-    logger.debug("Num patches/image: {}", num_patches_per_image)
-    actual_counts = np.reshape(actual_counts, (num_patches_per_image, -1))
-    actual_counts = np.sum(actual_counts, axis=0)
-    grouped_maps = np.reshape(
-        activation_maps,
-        (-1, num_patches_per_image,) + activation_maps.shape[1:],
-    )
-    predicted_counts = np.mean(grouped_maps, axis=(1, 2, 3, 4))
-    logger.debug("Generated counts for {} images.", len(actual_counts))
+    eval_data = eval_data.unbatch().batch(batch_size)
+
+    for input_batch, target_batch in eval_data:
+        # Calculate the density maps.
+        activation_maps = predict_with_activation_maps_patched(
+            model, input_batch["image"], batch_size=batch_size
+        )
+        density_maps = count_with_patches(
+            activation_maps,
+            patch_scale=patch_scale,
+            patch_stride=patch_stride,
+        )
+
+        # Estimate the predicted counts for each image.
+        batch_predicted_counts = np.sum(density_maps, axis=(1, 2, 3))
+        predicted_counts.append(batch_predicted_counts)
+        print(f"Total counts: {batch_predicted_counts}")
+
+        # Save the actual counts too.
+        actual_counts.append(target_batch["count"])
+
+    # Calculate an overall count error.
+    predicted_counts = np.concatenate(predicted_counts, axis=0)
+    actual_counts = np.concatenate(actual_counts, axis=0)
+    logger.debug("Generated counts for {} images.", len(predicted_counts))
 
     return actual_counts, predicted_counts
 
