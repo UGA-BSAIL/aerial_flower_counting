@@ -153,7 +153,6 @@ def estimate_counting_accuracy(
         # Estimate the predicted counts for each image.
         batch_predicted_counts = np.sum(density_maps, axis=(1, 2, 3))
         predicted_counts.append(batch_predicted_counts)
-        print(f"Total counts: {batch_predicted_counts}")
 
         # Save the actual counts too.
         actual_counts.append(target_batch["count"])

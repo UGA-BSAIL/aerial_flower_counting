@@ -316,8 +316,6 @@ def count_with_patches(
         activation_maps, patch_scale=patch_scale, patch_stride=patch_stride
     )
     predicted_counts = tf.reduce_mean(got_patches, axis=(1, 2, 3))
-    tf.print("predicted_counts", predicted_counts)
-    tf.print("total batch count", tf.reduce_sum(predicted_counts))
 
     num_patches = tf.shape(got_patches).numpy()[0]
     num_patches_per_image = num_patches // num_images

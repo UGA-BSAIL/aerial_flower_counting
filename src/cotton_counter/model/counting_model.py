@@ -72,21 +72,21 @@ def _build_dense_net_backbone(normalized_input: tf.Tensor) -> tf.Tensor:
 
     """
     # Input convolution layers.
-    conv1_1 = _bn_relu_conv(48, 3, padding="same")(normalized_input)
-    conv1_2 = _bn_relu_conv(48, 3, padding="same")(conv1_1)
+    conv1_1 = _bn_relu_conv(64, 3, padding="same")(normalized_input)
+    conv1_2 = _bn_relu_conv(64, 3, padding="same")(conv1_1)
     pool1 = layers.MaxPool2D()(conv1_2)
 
     # Dense blocks.
-    dense1 = DenseBlock(3, growth_rate=4)(pool1)
+    dense1 = DenseBlock(6, growth_rate=8)(pool1)
     transition1 = TransitionLayer()(dense1)
 
-    dense2 = DenseBlock(6, growth_rate=4)(transition1)
+    dense2 = DenseBlock(12, growth_rate=8)(transition1)
     transition2 = TransitionLayer()(dense2)
 
-    dense3 = DenseBlock(12, growth_rate=4)(transition2)
+    dense3 = DenseBlock(12, growth_rate=8)(transition2)
     transition3 = TransitionLayer()(dense3)
 
-    dense4 = DenseBlock(8, growth_rate=4)(transition3)
+    dense4 = DenseBlock(8, growth_rate=8)(transition3)
 
     return dense4
 

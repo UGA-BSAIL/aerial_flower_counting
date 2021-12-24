@@ -50,4 +50,4 @@ learning_phases:
     # The weight to use for the combined BCE loss.
     combined_bce_loss_weight: 0.2
     # The weight to use for the scale consistency loss.
-    scale_consistency_loss_weight: 0.001
+    scale_consistency_loss_weight: 0.002
