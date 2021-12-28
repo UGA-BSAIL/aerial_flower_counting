@@ -1,6 +1,6 @@
 # The patch scale factor that we will use for generating density maps.
-eval_patch_scale: 0.2
+eval_patch_scale: 0.15
 # The patch stride that we will use for generating density maps.
-eval_patch_stride: 0.2
+eval_patch_stride: 0.15
 # Batch size to use for evaluation.
 eval_batch_size: 8

@@ -48,6 +48,6 @@ learning_phases:
     # The loss weight to use for the PAC.
     pac_loss_weight: 1.0
     # The weight to use for the combined BCE loss.
-    combined_bce_loss_weight: 0.2
+    combined_bce_loss_weight: 0.4
     # The weight to use for the scale consistency loss.
-    scale_consistency_loss_weight: 0.002
+    scale_consistency_loss_weight: 0.004
