@@ -212,7 +212,7 @@ def predict_patches(
 
     # Organize the resulting data.
     patch_paths = model_output["path"]
-    patch_sigmoid = model_output["discrete_count"]
+    patch_sigmoid = model_output["pac"]
     patch_classes = patch_sigmoid > 0.5
     patch_classes = patch_classes.squeeze().astype(np.int32)
     patch_paths = patch_paths.squeeze()

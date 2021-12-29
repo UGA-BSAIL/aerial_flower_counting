@@ -17,6 +17,8 @@ from .nodes import (
     upload_patches,
 )
 
+_SOURCE_DATASET = "cotton_part_b_2021_09_27"
+
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
     """
@@ -35,7 +37,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
             node(
                 unannotated_patch_dataset,
                 dict(
-                    cvat_task="cotton_part_b_2021_09_13",
+                    cvat_task=_SOURCE_DATASET,
                     image_shape="params:cvat_image_shape_phantom",
                     batch_size="params:batch_size",
                     num_prefetch_batches="params:num_prefetch_batches",
@@ -80,7 +82,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 upload_patches,
                 dict(
                     annotations="auto_patch_annotations",
-                    cvat_task="cotton_part_b_2021_09_13",
+                    cvat_task=_SOURCE_DATASET,
                 ),
                 None,
             ),

@@ -19,6 +19,11 @@ cotton_part_b_2021_09_13:
   task_id: 14
   << : *cvat_credentials
 
+cotton_part_b_2021_09_27:
+  type: pycvat.CvatDataSet
+  task_id: 16
+  << : *cvat_credentials
+
 # The images to use for the test and validation sets, which come
 # from a different session.
 cotton_part_a_test:
