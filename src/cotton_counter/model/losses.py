@@ -216,12 +216,6 @@ class FocalLoss(losses.Loss):
 
         # Compute the focal loss.
         point_loss = -tf.pow(one - pred_t, self._gamma) * tf.math.log(pred_t)
-        tf.print(
-            "point_loss",
-            point_loss,
-            "max_point_loss",
-            tf.reduce_max(point_loss),
-        )
         return alpha_t * point_loss
 
     def get_config(self) -> Dict[str, Any]:
