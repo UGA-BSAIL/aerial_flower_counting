@@ -96,11 +96,10 @@ def make_example_density_maps(
         )
 
         # Create a heatmap.
-        max_density = calculate_max_density(images, patch_scale=patch_scale)
         heatmaps = visualize_heat_maps(
             images=images,
             features=tf.constant(density_maps, dtype=tf.float32),
-            max_color_threshold=max_density,
+            max_color_threshold=density_maps.max(),
         )
 
         # Convert to a PIL image.
