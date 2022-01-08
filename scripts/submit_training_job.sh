@@ -12,7 +12,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=16:00:00
+#SBATCH --time=20:00:00
 #SBATCH --mem=20gb
 #SBATCH --mail-user=daniel.petti@uga.edu
 #SBATCH --mail-type=END,FAIL
