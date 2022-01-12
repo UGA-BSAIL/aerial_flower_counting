@@ -4,3 +4,5 @@ eval_patch_scale: 0.25
 eval_patch_stride: 0.25
 # Batch size to use for evaluation.
 eval_batch_size: 8
+# Flower threshold that will correspond to the "hottest" color in visualizations.
+max_num_flowers: 1

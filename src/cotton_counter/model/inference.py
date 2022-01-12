@@ -347,7 +347,7 @@ def count_with_patches(
 
 
 def calculate_max_density(
-    image_shape: Iterable[int], *, patch_scale: float
+    image_shape: Iterable[int], *, patch_scale: float, max_num_flowers: int = 1
 ) -> float:
     """
     Calculates the maximum value that can appear in a density map for a certain
@@ -356,6 +356,8 @@ def calculate_max_density(
     Args:
         image_shape: The shape of a single input image.
         patch_scale: The scale of the patches to extract.
+        max_num_flowers: The maximum number of flowers that we expect to see
+            in one patch.
 
     Returns:
         The maximum value that can appear in a density map.
@@ -367,4 +369,4 @@ def calculate_max_density(
 
     # The maximum density is just the reciprocal, because at most we can have
     # one flower per patch.
-    return 1.0 / np.prod(patch_shape)
+    return float(max_num_flowers) / np.prod(patch_shape)

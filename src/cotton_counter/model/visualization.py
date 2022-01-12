@@ -19,6 +19,8 @@ def _colorize_heat_maps(
 
     """
     max_color_threshold = tf.constant(max_color_threshold, dtype=tf.float32)
+    # Clip the features so that our maximum really is a maximum.
+    features = tf.minimum(features, max_color_threshold)
 
     # Low values should show up as blue.
     blue_channel = max_color_threshold - features

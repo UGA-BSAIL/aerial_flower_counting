@@ -111,7 +111,11 @@ def _display_image(image_tensor: tf.Tensor, *, window_name: str) -> None:
 
 
 def _infer_image(
-    model: tf.keras.Model, image: np.ndarray, patch_scale: float, **kwargs: Any
+    model: tf.keras.Model,
+    image: np.ndarray,
+    patch_scale: float,
+    max_num_flowers: int,
+    **kwargs: Any
 ) -> None:
     """
     Performs inference on an image and displays the results.
@@ -120,6 +124,8 @@ def _infer_image(
         model: The model to use for inference.
         image: The image to create a density map for.
         patch_scale: The scale factor to apply to the patches we extract.
+        max_num_flowers: Maximum number of flowers that we expect in a patch,
+            for visualization purposes.
         **kwargs: Will be forwarded to `_make_density_map`.
 
     """
@@ -129,8 +135,12 @@ def _infer_image(
     )
 
     # Create a heatmap.
-    max_density = calculate_max_density(image.shape, patch_scale=patch_scale)
     image_4d = tf.constant(np.expand_dims(image, 0))
+    max_density = calculate_max_density(
+        image_4d.shape[1:],
+        patch_scale=patch_scale,
+        max_num_flowers=max_num_flowers,
+    )
     heatmaps = visualize_heat_maps(
         images=image_4d,
         features=tf.constant(density_map, dtype=tf.float32),
@@ -181,6 +191,7 @@ def _load_and_infer(cli_args: Namespace) -> None:
     _infer_image(
         model=model,
         image=image,
+        max_num_flowers=cli_args.max_flowers,
         patch_scale=cli_args.patch_scale,
         patch_stride=cli_args.patch_stride,
     )
@@ -221,6 +232,14 @@ def _make_parser() -> ArgumentParser:
         type=float,
         default=0.03,
         help="The patch stride to use during inference.",
+    )
+    parser.add_argument(
+        "-f",
+        "--max-flowers",
+        type=int,
+        default=1,
+        help="Per-patch flower density that corresponds to the "
+        '"hottest" color in visualizations.',
     )
 
     return parser

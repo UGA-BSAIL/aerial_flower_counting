@@ -94,12 +94,18 @@ def create_pipeline(**kwargs):
             # Create example density maps.
             node(
                 make_example_density_maps,
-                inference_params_valid,
+                dict(
+                    max_num_flowers="params:max_num_flowers",
+                    **inference_params_valid,
+                ),
                 "example_density_maps_valid",
             ),
             node(
                 make_example_density_maps,
-                inference_params_test_alt,
+                dict(
+                    max_num_flowers="params:max_num_flowers",
+                    **inference_params_test_alt,
+                ),
                 "example_density_maps_test_alt",
             ),
             # Create an ROC curve.

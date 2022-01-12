@@ -64,6 +64,7 @@ def make_example_density_maps(
     patch_scale: float,
     patch_stride: float,
     batch_size: int,
+    max_num_flowers: int,
 ) -> Iterable[Image.Image]:
     """
     Creates an example pseudo-density-map from a trained model.
@@ -75,6 +76,8 @@ def make_example_density_maps(
         patch_stride: The stride to use for extracting patches, provided in
             frame fractions like the scale.
         batch_size: The size of the batches to use for inference.
+        max_num_flowers: The maximum number of flowers that we expect to see
+            in one patch.
 
     Yields:
         The density map for each image in the dataset.
@@ -96,10 +99,16 @@ def make_example_density_maps(
         )
 
         # Create a heatmap.
+        image_shape = tf.shape(images[1:]).numpy()
+        max_density = calculate_max_density(
+            image_shape,
+            patch_scale=patch_scale,
+            max_num_flowers=max_num_flowers,
+        )
         heatmaps = visualize_heat_maps(
             images=images,
             features=tf.constant(density_maps, dtype=tf.float32),
-            max_color_threshold=density_maps.max(),
+            max_color_threshold=max_density,
         )
 
         # Convert to a PIL image.
