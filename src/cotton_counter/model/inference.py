@@ -2,7 +2,7 @@
 Helpers for performing inference.
 """
 
-from typing import Any, Iterable, Optional
+from typing import Iterable, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -28,7 +28,7 @@ def _make_patch_indices_absolute(
             `tf.image.extract_patches`.
 
     Returns:
-        An array, where the rows correspond to the indices in each patch. If
+        An matrix, where the rows correspond to the indices in each patch. If
         the patches don't perfectly overlap the input, -1 will be used to
         indicate pixels that have no corresponding input value.
 
@@ -198,6 +198,58 @@ def _predict_with_activation_maps(
     return tf.image.resize(activation_maps, input_size)
 
 
+def recombine_patches(
+    patches_: tf.Tensor, *, images: tf.Tensor, kernel_size: Iterable[int],
+) -> tf.Tensor:
+    """
+    Recombines extracted patches back into a single image. It assumes that
+    patches were extracted in a non-overlapping manner.
+
+    Args:
+        patches_: The input patches.
+        images: The input images that we extracted patches from.
+        kernel_size: The shape of the kernel used for patch extraction.
+
+    Returns:
+        The recombined image.
+
+    """
+    image_batch_shape = tf.shape(images).numpy()
+    logger.debug("Input images have shape {}.", image_batch_shape)
+    image_size = image_batch_shape[1:3]
+
+    patch_indices = _make_patch_indices_absolute(
+        image_size=image_size, sizes=kernel_size, strides=kernel_size
+    )
+    # _make_patch_indices_absolute gives us the indices in the original image
+    # that correspond to the indices in the patches. However, we need the
+    # other way around, so we get this through a scatter operation.
+    patch_indices_flat = tf.reshape(patch_indices, (-1,))
+    num_indices = np.prod(image_size)
+    counter = tf.range(tf.shape(patch_indices_flat)[0])
+    # Patch locations that don't have a corresponding point in the original
+    # image will be -1, which we can't scatter to. To get around that, we shift
+    # the indices up by one, and scatter all such updates to a dummy
+    # element at index 0 that we later remove.
+    gather_indices = tf.scatter_nd(
+        tf.expand_dims(patch_indices_flat + 1, 1),
+        counter,
+        shape=(num_indices + 1,),
+    )
+    # Chop off the dummy element.
+    gather_indices = gather_indices[1:]
+    # Re-combine patches into a single image.
+    num_images = tf.shape(images)[0]
+    recombined_flat = tf.gather(
+        tf.reshape(patches_, (num_images, -1)), gather_indices, axis=1,
+    )
+
+    # The activation maps have only one channel.
+    return tf.expand_dims(
+        tf.reshape(recombined_flat, tf.shape(images)[:3]), axis=-1
+    )
+
+
 def predict_with_activation_maps_patched(
     model: tf.keras.Model, images: tf.Tensor, *, batch_size: int = 32,
 ) -> tf.Tensor:
@@ -228,10 +280,6 @@ def predict_with_activation_maps_patched(
         "Model has input size {}.", model_input_size,
     )
 
-    image_batch_shape = tf.shape(images).numpy()
-    logger.debug("Input images have shape {}.", image_batch_shape)
-    image_size = image_batch_shape[1:3]
-
     # Extract patches that are the same shape as we specified for the model
     # input.
     kernel_size = [1] + list(model_input_size) + [1]
@@ -253,33 +301,8 @@ def predict_with_activation_maps_patched(
         model, got_patches, batch_size=batch_size
     )
 
-    patch_indices = _make_patch_indices_absolute(
-        image_size=image_size, sizes=kernel_size, strides=kernel_size
-    )
-    # _make_patch_indices_absolute gives us the indices in the original image
-    # that correspond to the indices in the patches. However, we need the
-    # other way around, so we get this through a scatter operation.
-    patch_indices_flat = tf.reshape(patch_indices, (-1,))
-    # Remove indices that don't correspond to input locations.
-    patch_indices_flat = tf.boolean_mask(
-        patch_indices_flat, patch_indices_flat >= 0,
-    )
-    num_indices = tf.reduce_prod(tf.shape(patch_indices_flat))
-    counter = tf.range(num_indices)
-    gather_indices = tf.scatter_nd(
-        tf.expand_dims(patch_indices_flat, 1), counter, shape=(num_indices,),
-    )
-    # Re-combine patches into a single image.
-    num_images = tf.shape(images)[0]
-    activation_maps_flat = tf.gather(
-        tf.reshape(activation_patches, (num_images, -1)),
-        gather_indices,
-        axis=1,
-    )
-
-    # The activation maps have only one channel.
-    return tf.expand_dims(
-        tf.reshape(activation_maps_flat, tf.shape(images)[:3]), axis=-1
+    return recombine_patches(
+        activation_patches, images=images, kernel_size=kernel_size
     )
 
 

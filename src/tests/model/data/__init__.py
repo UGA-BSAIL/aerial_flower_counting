@@ -16,3 +16,8 @@ TEST_DATASET_PATH = _PACKAGE_PATH / "testing_dataset.tfrecord"
 """
 Path to an example TFRecord dataset that we can use for testing.
 """
+
+TEST_IMAGE_PATH = _PACKAGE_PATH / "test_image.png"
+"""
+Path to an example image that we can use for testing.
+"""
