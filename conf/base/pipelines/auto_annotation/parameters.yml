@@ -1,5 +1,6 @@
 # The expected input image height and width of the images from CVAT.
-cvat_image_shape_matrice: [3456, 4608]
+cvat_image_shape_g6: [3456, 4608]
+cvat_image_shape_g7: [3448, 4592]
 cvat_image_shape_phantom: [3648, 5472]  # Phantom 4 images
 cvat_image_shape_phantom_video: [1520, 2704]  # Phantom 4 video
 # This is the shape that we will try to coerce the resulting patches to. It

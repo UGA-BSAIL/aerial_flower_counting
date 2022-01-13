@@ -17,7 +17,14 @@ from .nodes import (
     upload_patches,
 )
 
-_SOURCE_DATASET = "cotton_part_b_2021_09_27"
+_SOURCE_DATASET = "cotton_part_b_2021_10_25"
+"""
+The name of the dataset to draw images from.
+"""
+_IMAGE_SHAPE_PARAM = "cvat_image_shape_g7"
+"""
+The parameter to use for the expected image shape.
+"""
 
 
 def create_pipeline(**kwargs: Any) -> Pipeline:
@@ -38,7 +45,7 @@ def create_pipeline(**kwargs: Any) -> Pipeline:
                 unannotated_patch_dataset,
                 dict(
                     cvat_task=_SOURCE_DATASET,
-                    image_shape="params:cvat_image_shape_phantom",
+                    image_shape=f"params:{_IMAGE_SHAPE_PARAM}",
                     batch_size="params:batch_size",
                     num_prefetch_batches="params:num_prefetch_batches",
                     patch_scale="params:annotation_patch_scale",
