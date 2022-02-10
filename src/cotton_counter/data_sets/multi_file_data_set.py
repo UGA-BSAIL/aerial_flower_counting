@@ -24,9 +24,10 @@ class MultiFileDataSet(AbstractVersionedDataSet):
     def __init__(
         self,
         filepath: PurePosixPath,
-        version: Optional[Version],
         dataset: str,
         extension: str,
+        version: Optional[Version] = None,
+        prefix: str = "data",
         **kwargs: Any,
     ):
         """
@@ -35,6 +36,7 @@ class MultiFileDataSet(AbstractVersionedDataSet):
             version: The version information for the `DataSet`.
             dataset: The name of the dataset module that we are wrapping.
             extension: Extension to use for created files.
+            prefix: The prefix to use for the files saved in the dataset.
             **kwargs: Will be forwarded to the internal datasets.
         """
         super().__init__(PurePosixPath(filepath), version)
@@ -42,6 +44,7 @@ class MultiFileDataSet(AbstractVersionedDataSet):
         self.__dataset_type = dataset
         self.__version = version
         self.__dataset_config = kwargs
+        self.__prefix = prefix
         self.__extension = extension
 
         # The internal datasets that we use for saving and loading.
@@ -63,7 +66,7 @@ class MultiFileDataSet(AbstractVersionedDataSet):
 
         """
         # Construct the file path.
-        filepath = base_path / f"data_{index}{self.__extension}"
+        filepath = base_path / f"{self.__prefix}_{index}{self.__extension}"
         logger.debug(
             "Creating {} to save data at {}.", self.__dataset_type, filepath
         )
@@ -73,12 +76,17 @@ class MultiFileDataSet(AbstractVersionedDataSet):
             **self.__dataset_config,
         )
 
-        return AbstractVersionedDataSet.from_config(
-            f"{self.__dataset_type}_{index}",
-            config,
-            load_version=self.__version.load,
-            save_version=self.__version.save,
-        )
+        common_config = [f"{self.__dataset_type}_{index}", config]
+        if self.__version is None:
+            # Assume internal datasets are not versioned.
+            return AbstractDataSet.from_config(*common_config)
+        else:
+            # Assume they are.
+            return AbstractVersionedDataSet.from_config(
+                *common_config,
+                load_version=self.__version.load,
+                save_version=self.__version.save,
+            )
 
     def __iter_datasets(
         self, base_path: Optional[Path] = None

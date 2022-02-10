@@ -1,0 +1,14 @@
+# Location where the detection model weights are saved.
+model_weights_file: "yolov5s_flower.pt"
+
+# Minimum confidence we allow for flower detections.
+min_confidence: 0.5
+
+# Total number of rows in the field.
+field_num_rows: 43
+# Initial row number.
+field_first_row_num: 18
+# Initial plot number.
+field_first_plot_num: 26
+# Set of empty rows.
+field_empty_rows: [41, 42]

@@ -11,6 +11,7 @@ from .pipelines import (
     auto_annotation,
     build_tfrecords_patches,
     build_tfrecords_points,
+    count_plots,
     data_cleaning,
     eda,
     model_data_load,
@@ -38,6 +39,7 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
     data_loading_pipeline = model_data_load.create_pipeline()
     auto_annotation_pipeline = auto_annotation.create_pipeline()
     reupload_pipeline = annotation_reupload.create_pipeline()
+    plot_counting_pipeline = count_plots.create_pipeline()
 
     return {
         "model_training": data_loading_pipeline + training_pipeline,
@@ -50,4 +52,5 @@ def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
         "__default__": data_loading_pipeline
         + training_pipeline
         + evaluation_pipeline,
+        "count_plots": plot_counting_pipeline,
     }
