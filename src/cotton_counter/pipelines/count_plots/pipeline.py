@@ -31,6 +31,9 @@ SESSIONS = {
     "2021-10-18",
     "2021-10-22",
     "2021-10-25",
+    "2021-10-29",
+    "2021-11-01",
+    "2021-11-05",
 }
 """
 The set of all the sessions that we want to process.

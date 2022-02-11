@@ -62,6 +62,18 @@ plots_2021-10-25:
   filepath: ${plot_image_dir}/2021-10-25
   << : *plot_image_params
 
+plots_2021-10-29:
+  filepath: ${plot_image_dir}/2021-10-29
+  << : *plot_image_params
+
+plots_2021-11-01:
+  filepath: ${plot_image_dir}/2021-11-01
+  << : *plot_image_params
+
+plots_2021-11-05:
+  filepath: ${plot_image_dir}/2021-11-05
+  << : *plot_image_params
+
 # Dataset containing all the detection results.
 detection_results:
   type: pandas.ParquetDataSet
