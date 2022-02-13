@@ -99,6 +99,7 @@ def create_pipeline(**kwargs):
                     min_confidence="params:min_confidence",
                 ),
                 "filtered_detection_results",
+                name="filter_results",
             ),
             # Create the output count table.
             node(
@@ -110,6 +111,7 @@ def create_pipeline(**kwargs):
                     empty_rows="params:field_empty_rows",
                 ),
                 "field_config",
+                name="field_config",
             ),
             node(
                 create_per_plot_table,

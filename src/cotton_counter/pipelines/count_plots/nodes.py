@@ -210,6 +210,10 @@ def create_per_plot_table(
 
     # Plots with no flowers will be set to NA. Fill these in with zero.
     counts_by_session.fillna(0, inplace=True)
+    # Sort the columns by date.
+    counts_by_session = counts_by_session.reindex(
+        sorted(counts_by_session.columns), axis=1
+    )
     # Turn the plot index into a column so that it shows up in the spreadsheet.
     counts_by_session.insert(0, "Plot", counts_by_session.index.values)
 
