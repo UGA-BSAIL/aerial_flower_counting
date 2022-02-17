@@ -428,7 +428,7 @@ def extract_standard_patches(
 
     Returns:
         A batch of all extracted patches. They will be in the same order as the
-        input, with the patches each image in the batch grouped together.
+        input, with the patches from each image in the batch grouped together.
 
     """
     image_shape = _static_image_shape(images)
