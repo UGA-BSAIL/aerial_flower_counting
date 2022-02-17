@@ -2,7 +2,9 @@
 model_weights_file: "yolov5s_flower.pt"
 
 # Minimum confidence we allow for flower detections.
-min_confidence: 0.5
+min_confidence: 0.6
+# Image size to use for inference. (h, w)
+inference_size: [1377, 484]
 
 # Total number of rows in the field.
 field_num_rows: 43

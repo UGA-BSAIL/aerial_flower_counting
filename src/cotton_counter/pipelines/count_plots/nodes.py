@@ -4,7 +4,7 @@ Contains nodes for the `count_plots` pipeline.
 
 
 from pathlib import Path
-from typing import Iterable, List, Optional, Set
+from typing import Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -97,7 +97,11 @@ def _to_field_plot_num(
 
 
 def detect_flowers(
-    images: Iterable[np.ndarray], *, weights_file: Path, session_name: str
+    images: Iterable[np.ndarray],
+    *,
+    weights_file: Path,
+    session_name: str,
+    image_size: Tuple[int, int] = (640, 640),
 ) -> pd.DataFrame:
     """
     Detects the flowers in a series of input images.
@@ -106,6 +110,7 @@ def detect_flowers(
         images: The images to detect flowers in.
         weights_file: The location of the file to load the model weights from.
         session_name: The name of this session.
+        image_size: The model input size to use for inference.
 
     Returns:
         The detections for all the images, as a Pandas dataframe.
@@ -118,7 +123,9 @@ def detect_flowers(
     results = []
     plot_num = 0
     for batch in _batch_iter(images, batch_size=_PREDICTION_BATCH_SIZE):
-        batch_results = model.predict(batch).pandas().xyxy
+        batch_results = (
+            model.predict(batch, size=max(image_size)).pandas().xyxy
+        )
 
         # Add a new column indicating the source image.
         for image_results in batch_results:

@@ -63,6 +63,7 @@ def _create_session_pipeline(session: str) -> Tuple[Pipeline, str]:
                     dict(
                         images=f"plots_{session}",
                         weights_file="params:model_weights_file",
+                        image_size="params:inference_size",
                     ),
                     output_node,
                 )
