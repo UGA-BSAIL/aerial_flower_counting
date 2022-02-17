@@ -14,3 +14,6 @@ field_first_row_num: 18
 field_first_plot_num: 26
 # Set of empty rows.
 field_empty_rows: [41, 42]
+
+# Date on which the field was planted.
+field_planted_date: 2021-06-18

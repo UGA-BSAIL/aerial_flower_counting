@@ -10,10 +10,15 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import (
     FieldConfig,
+    add_dap,
+    clean_genotypes,
     collect_session_results,
+    compute_counts,
+    compute_flowering_peak,
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
+    plot_peak_flowering_dist,
 )
 
 SESSIONS = {
@@ -102,7 +107,7 @@ def create_pipeline(**kwargs):
                 "filtered_detection_results",
                 name="filter_results",
             ),
-            # Create the output count table.
+            # Compute counts.
             node(
                 FieldConfig,
                 dict(
@@ -115,12 +120,48 @@ def create_pipeline(**kwargs):
                 name="field_config",
             ),
             node(
-                create_per_plot_table,
+                compute_counts,
                 dict(
-                    counting_results="filtered_detection_results",
+                    detection_results="filtered_detection_results",
                     field_config="field_config",
                 ),
-                "plot_counts",
+                "counting_results_no_dap",
+            ),
+            node(
+                add_dap,
+                dict(
+                    counting_results="counting_results_no_dap",
+                    field_planted_date="params:field_planted_date",
+                ),
+                "counting_results",
+            ),
+            # Create the output count table.
+            node(
+                create_per_plot_table,
+                dict(
+                    counting_results="counting_results",
+                    field_config="field_config",
+                ),
+                "human_readable_counts",
+            ),
+            # Perform genotype analysis.
+            node(
+                clean_genotypes,
+                "genotype_spreadsheet",
+                "cleaned_genotypes",
+                name="clean_genotypes",
+            ),
+            node(
+                compute_flowering_peak, "counting_results", "flowering_peaks"
+            ),
+            # Plot the results.
+            node(
+                plot_peak_flowering_dist,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    genotypes="cleaned_genotypes",
+                ),
+                "peak_flowering_histogram",
             ),
         ]
     )
