@@ -6,7 +6,7 @@ Contains nodes for the `count_plots` pipeline.
 import enum
 from datetime import date
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Tuple
+from typing import Any, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -99,7 +99,7 @@ class FieldConfig:
     Represents the configuration of the actual field.
 
     Attributes:
-        num_rows: The total number of rows.
+        num_rows: The total number of plots in each row.
 
         first_row_num: The number assigned to the first row.
         first_plot_num: The number assigned to the first plot in each row.
@@ -107,7 +107,7 @@ class FieldConfig:
         empty_rows: Set of rows that are not planted.
     """
 
-    num_rows: int
+    num_plots: int
 
     first_row_num: int
     first_plot_num: int
@@ -157,8 +157,8 @@ def _to_field_plot_num(
     """
     # The plot extraction method numbers plots in row-major order starting
     # from zero in the upper left.
-    row_num = plot_num // field_config.num_rows
-    column_num = plot_num % field_config.num_rows
+    row_num = plot_num // field_config.num_plots
+    column_num = field_config.num_plots - (plot_num % field_config.num_plots)
 
     # Assign the correct row and plot numbers.
     row_num += field_config.first_row_num
@@ -212,7 +212,7 @@ def detect_flowers(
 
     all_results = pd.concat(results, ignore_index=True)
     # Add a column for the session name.
-    all_results["session"] = session_name
+    all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
 
 
@@ -392,24 +392,89 @@ def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
         rows that represent the peak flower count for each plot.
 
     """
+
+    def _find_peak(plot_counts: pd.DataFrame) -> pd.DataFrame:
+        plot_counts.sort_values(by=CountingColumns.DAP.value, inplace=True)
+        return plot_counts.iloc[
+            plot_counts[CountingColumns.COUNT.value].argmax()
+        ]
+
     # Find the rows with the maximum count for each plot.
     plot_groups = counting_results.groupby([counting_results.index])
-    return plot_groups.apply(
-        lambda g: g.iloc[g[CountingColumns.COUNT.value].argmax()]
+    return plot_groups.apply(_find_peak)
+
+
+def compute_flowering_start_end(
+    counting_results: pd.DataFrame,
+    *,
+    start_threshold: float,
+    end_threshold: float,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Computes the flowering window for each plot.
+
+    Args:
+        counting_results: The complete counting results.
+        start_threshold: The threshold at which to consider flowering started.
+        end_threshold: The threshold at which to consider flowering to be over.
+
+    Returns:
+        Two dataframes in the same format as the input, but containing only the
+        rows that represent the start and end of flowering for each plot,
+        respectively.
+
+    """
+    counting_results.sort_values(by=CountingColumns.DAP.value, inplace=True)
+
+    def _get_flowering_start(plot_counts: pd.DataFrame) -> pd.DataFrame:
+        # Find the total number of flowers for this plot.
+        cumulative_counts = plot_counts[CountingColumns.COUNT.value].cumsum()
+        total_flowers = cumulative_counts.max()
+        # Find the thresholds.
+        start_flowers = total_flowers * start_threshold
+
+        # Filter to the correct row.
+        up_to_start = plot_counts[cumulative_counts <= start_flowers]
+        if up_to_start.empty:
+            # Edge case: start is as the beginning then.
+            return plot_counts.iloc[0]
+        return up_to_start.iloc[
+            up_to_start[CountingColumns.DAP.value].argmax()
+        ]
+
+    def _get_flowering_end(plot_counts: pd.DataFrame) -> pd.DataFrame:
+        # Find the total number of flowers for this plot.
+        cumulative_counts = plot_counts[CountingColumns.COUNT.value].cumsum()
+        total_flowers = cumulative_counts.max()
+        # Find the thresholds.
+        end_flowers = total_flowers * end_threshold
+
+        # Filter to the correct row.
+        end_and_after = plot_counts[cumulative_counts >= end_flowers]
+        return end_and_after.iloc[
+            end_and_after[CountingColumns.DAP.value].argmin()
+        ]
+
+    # Find the rows for each plot that signify the start of counting.
+    plot_groups = counting_results.groupby([counting_results.index])
+    return (
+        plot_groups.apply(_get_flowering_start),
+        plot_groups.apply(_get_flowering_end),
     )
 
 
-def plot_peak_flowering_dist(
-    *, peak_flowering_times: pd.DataFrame, genotypes: pd.DataFrame
+def _plot_flowering_time_histogram(
+    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
 ) -> plot.Figure:
     """
-    Draws a histogram of the peak flowering time for each plot. The histogram
-    will be colorized by population.
+    Draws a histogram of some flowering attribute, predicated on DAP and
+    colored by population.
 
     Args:
-        peak_flowering_times: The dataframe containing computed peak
-            flowering times.
+        flower_data: The flowering data we want to plot. Should have one row
+            for each plot and have a DAP column.
         genotypes: The dataframe containing genotype information.
+        title: The title to use for the plot.
 
     Returns:
         The plot that it made.
@@ -417,7 +482,7 @@ def plot_peak_flowering_dist(
     """
     # Merge flowering and genotype data together for easy plotting.
     combined_data = pd.merge(
-        peak_flowering_times, genotypes, left_index=True, right_index=True
+        flower_data, genotypes, left_index=True, right_index=True
     )
 
     # Plot it.
@@ -427,7 +492,67 @@ def plot_peak_flowering_dist(
         hue=GenotypeColumns.POPULATION.value,
         multiple="stack",
     )
-    axes.set_title("Peak Flowering Times")
+    axes.set_title(title)
     axes.set(xlabel="Days After Planting", ylabel="Count")
 
     return plot.gcf()
+
+
+def plot_peak_flowering_dist(
+    *, peak_flowering_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the peak flowering times.
+
+    Args:
+        peak_flowering_times: Dataset containing peak flowering times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+    )
+
+
+def plot_flowering_start_dist(
+    *, flowering_start_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering end times.
+
+    Args:
+        flowering_start_times: Dataset containing flowering start times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        flowering_start_times, **kwargs, title="Flowering Start Time"
+    )
+
+
+def plot_flowering_end_dist(
+    *, flowering_end_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering start times.
+
+    Args:
+        flowering_end_times: Dataset containing flowering start times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        flowering_end_times, **kwargs, title="Flowering End Time"
+    )

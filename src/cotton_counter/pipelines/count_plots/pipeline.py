@@ -15,9 +15,12 @@ from .nodes import (
     collect_session_results,
     compute_counts,
     compute_flowering_peak,
+    compute_flowering_start_end,
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
+    plot_flowering_end_dist,
+    plot_flowering_start_dist,
     plot_peak_flowering_dist,
 )
 
@@ -111,7 +114,7 @@ def create_pipeline(**kwargs):
             node(
                 FieldConfig,
                 dict(
-                    num_rows="params:field_num_rows",
+                    num_plots="params:field_num_plots",
                     first_row_num="params:field_first_row_num",
                     first_plot_num="params:field_first_plot_num",
                     empty_rows="params:field_empty_rows",
@@ -154,6 +157,15 @@ def create_pipeline(**kwargs):
             node(
                 compute_flowering_peak, "counting_results", "flowering_peaks"
             ),
+            node(
+                compute_flowering_start_end,
+                dict(
+                    counting_results="counting_results",
+                    start_threshold="params:flower_start_threshold",
+                    end_threshold="params:flower_end_threshold",
+                ),
+                ["flowering_starts", "flowering_ends"],
+            ),
             # Plot the results.
             node(
                 plot_peak_flowering_dist,
@@ -162,6 +174,22 @@ def create_pipeline(**kwargs):
                     genotypes="cleaned_genotypes",
                 ),
                 "peak_flowering_histogram",
+            ),
+            node(
+                plot_flowering_start_dist,
+                dict(
+                    flowering_start_times="flowering_starts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_start_histogram",
+            ),
+            node(
+                plot_flowering_end_dist,
+                dict(
+                    flowering_end_times="flowering_ends",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_end_histogram",
             ),
         ]
     )

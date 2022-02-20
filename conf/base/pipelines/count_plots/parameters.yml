@@ -6,8 +6,8 @@ min_confidence: 0.6
 # Image size to use for inference. (h, w)
 inference_size: [1377, 484]
 
-# Total number of rows in the field.
-field_num_rows: 43
+# Total number of plots in the field.
+field_num_plots: 50
 # Initial row number.
 field_first_row_num: 18
 # Initial plot number.
@@ -17,3 +17,9 @@ field_empty_rows: [41, 42]
 
 # Date on which the field was planted.
 field_planted_date: 2021-06-18
+# When we see this fraction of the total flowers, we will consider this
+# the start of flowering.
+flower_start_threshold: 0.05
+# When we see this fraction of the total flowers, we will consider this
+# the end of flowering.
+flower_end_threshold: 0.95
