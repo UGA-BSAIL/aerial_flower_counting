@@ -484,13 +484,22 @@ def _plot_flowering_time_histogram(
     combined_data = pd.merge(
         flower_data, genotypes, left_index=True, right_index=True
     )
+    # Ignore data from the extra populations, since they are too small
+    # to do anything useful with.
+    population = combined_data[GenotypeColumns.POPULATION.value]
+    combined_data = combined_data[
+        population.str.contains("Pima") | population.str.contains("Maxxa")
+    ]
 
     # Plot it.
     axes = sns.histplot(
         data=combined_data,
         x=CountingColumns.DAP.value,
         hue=GenotypeColumns.POPULATION.value,
-        multiple="stack",
+        multiple="dodge",
+        shrink=0.8,
+        # Use one bin for each session.
+        bins=len(combined_data[CountingColumns.SESSION.value].unique()),
     )
     axes.set_title(title)
     axes.set(xlabel="Days After Planting", ylabel="Count")
