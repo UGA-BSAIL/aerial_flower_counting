@@ -117,3 +117,12 @@ flowering_end_histogram:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/flowering_end_histogram.png
   versioned: True
+
+# Individual flowering curves for each plot.
+flowering_curves:
+  type: cotton_counter.data_sets.MultiFileDataSet
+  versioned: True
+  dataset: matplotlib.MatplotlibWriter
+  prefix: plot
+  extension: .png
+  filepath: data/08_reporting/flowering_curves

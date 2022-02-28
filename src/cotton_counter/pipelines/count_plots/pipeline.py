@@ -19,6 +19,7 @@ from .nodes import (
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
+    plot_flowering_curves,
     plot_flowering_end_dist,
     plot_flowering_start_dist,
     plot_peak_flowering_dist,
@@ -190,6 +191,9 @@ def create_pipeline(**kwargs):
                     genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_histogram",
+            ),
+            node(
+                plot_flowering_curves, "counting_results", "flowering_curves",
             ),
         ]
     )

@@ -16,7 +16,7 @@ from loguru import logger
 class MultiFileDataSet(AbstractVersionedDataSet):
     """
     This is actually a sort of meta-dataset that is designed to wrap other
-    datasets which produce a file. It take an arbitrary number of the outputs
+    datasets which produce a file. It takes an arbitrary number of the outputs
     from one of these datasets and save them to (or load them from) a single
     directory.
     """

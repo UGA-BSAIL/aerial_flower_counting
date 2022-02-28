@@ -502,7 +502,7 @@ def _plot_flowering_time_histogram(
         bins=len(combined_data[CountingColumns.SESSION.value].unique()),
     )
     axes.set_title(title)
-    axes.set(xlabel="Days After Planting", ylabel="Count")
+    axes.set(xlabel="Days After Planting", ylabel="# of Plots")
 
     return plot.gcf()
 
@@ -565,3 +565,35 @@ def plot_flowering_end_dist(
     return _plot_flowering_time_histogram(
         flowering_end_times, **kwargs, title="Flowering End Time"
     )
+
+
+def plot_flowering_curves(
+    counting_results: pd.DataFrame,
+) -> Iterable[plot.Figure]:
+    """
+    Creates a flowering curve for each individual plot.
+
+    Args:
+        counting_results: The complete counting results.
+
+    Yields:
+        The curves for each plot, in order.
+
+    """
+    plot_groups = counting_results.groupby([counting_results.index])
+    for plot_num, plot_indices in plot_groups.indices.items():
+        # Get the rows pertaining to this plot.
+        plot_rows = counting_results.iloc[plot_indices]
+        # Seaborn doesn't like it if all the values in the index are the same.
+        plot_rows.reset_index(inplace=True)
+
+        # Plot the curve.
+        axes = sns.lineplot(
+            data=plot_rows,
+            x=CountingColumns.DAP.value,
+            y=CountingColumns.COUNT.value,
+        )
+        axes.set_title(f"Plot {int(plot_num)}")
+        axes.set(xlabel="Days After Planting", ylabel="# of Flowers")
+
+        yield plot.gcf()
