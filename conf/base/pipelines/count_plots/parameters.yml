@@ -1,5 +1,5 @@
 # Location where the detection model weights are saved.
-model_weights_file: "yolov5s_flower.pt"
+model_weights_file: "yolov5s_flower_active_2.pt"
 
 # Minimum confidence we allow for flower detections.
 min_confidence: 0.6

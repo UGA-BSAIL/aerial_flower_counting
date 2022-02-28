@@ -4,4 +4,4 @@ output_data_dir: output_data
 log_dir: logs
 
 # Base directory containing plot images.
-plot_image_dir: "/var/lab_data/share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction/m100"
+plot_image_dir: "/var/lab_data/share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"

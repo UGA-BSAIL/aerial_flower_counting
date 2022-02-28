@@ -6,72 +6,92 @@ _plot_image_params: &plot_image_params
   extension: .tif
   prefix: plot
 
+plots_2021-08-09:
+  filepath: ${plot_image_dir}/p4/2021-08-09
+  << : *plot_image_params
+
+plots_2021-08-13:
+  filepath: ${plot_image_dir}/p4/2021-08-13
+  << : *plot_image_params
+
+plots_2021-08-16:
+  filepath: ${plot_image_dir}/p4/2021-08-16
+  << : *plot_image_params
+
+plots_2021-08-20:
+  filepath: ${plot_image_dir}/p4/2021-08-20
+  << : *plot_image_params
+
+plots_2021-08-27:
+  filepath: ${plot_image_dir}/m100/2021-08-27
+  << : *plot_image_params
+
 plots_2021-08-30:
-  filepath: ${plot_image_dir}/2021-08-30
+  filepath: ${plot_image_dir}/m100/2021-08-30
   << : *plot_image_params
 
 plots_2021-09-03:
-  filepath: ${plot_image_dir}/2021-09-03
+  filepath: ${plot_image_dir}/m100/2021-09-03
   << : *plot_image_params
 
 plots_2021-09-06:
-  filepath: ${plot_image_dir}/2021-09-06
+  filepath: ${plot_image_dir}/m100/2021-09-06
   << : *plot_image_params
 
 plots_2021-09-10:
-  filepath: ${plot_image_dir}/2021-09-10
+  filepath: ${plot_image_dir}/m100/2021-09-10
   << : *plot_image_params
 
 plots_2021-09-13:
-  filepath: ${plot_image_dir}/2021-09-13
+  filepath: ${plot_image_dir}/m100/2021-09-13
   << : *plot_image_params
 
 plots_2021-09-17:
-  filepath: ${plot_image_dir}/2021-09-17
+  filepath: ${plot_image_dir}/m100/2021-09-17
   << : *plot_image_params
 
 plots_2021-09-24:
-  filepath: ${plot_image_dir}/2021-09-24
+  filepath: ${plot_image_dir}/m100/2021-09-24
   << : *plot_image_params
 
 plots_2021-09-27:
-  filepath: ${plot_image_dir}/2021-09-27
+  filepath: ${plot_image_dir}/m100/2021-09-27
   << : *plot_image_params
 
 plots_2021-10-01:
-  filepath: ${plot_image_dir}/2021-10-01
+  filepath: ${plot_image_dir}/m100/2021-10-01
   << : *plot_image_params
 
 plots_2021-10-11:
-  filepath: ${plot_image_dir}/2021-10-11
+  filepath: ${plot_image_dir}/m100/2021-10-11
   << : *plot_image_params
 
 plots_2021-10-15:
-  filepath: ${plot_image_dir}/2021-10-15
+  filepath: ${plot_image_dir}/m100/2021-10-15
   << : *plot_image_params
 
 plots_2021-10-18:
-  filepath: ${plot_image_dir}/2021-10-18
+  filepath: ${plot_image_dir}/m100/2021-10-18
   << : *plot_image_params
 
 plots_2021-10-22:
-  filepath: ${plot_image_dir}/2021-10-22
+  filepath: ${plot_image_dir}/m100/2021-10-22
   << : *plot_image_params
 
 plots_2021-10-25:
-  filepath: ${plot_image_dir}/2021-10-25
+  filepath: ${plot_image_dir}/m100/2021-10-25
   << : *plot_image_params
 
 plots_2021-10-29:
-  filepath: ${plot_image_dir}/2021-10-29
+  filepath: ${plot_image_dir}/m100/2021-10-29
   << : *plot_image_params
 
 plots_2021-11-01:
-  filepath: ${plot_image_dir}/2021-11-01
+  filepath: ${plot_image_dir}/m100/2021-11-01
   << : *plot_image_params
 
 plots_2021-11-05:
-  filepath: ${plot_image_dir}/2021-11-05
+  filepath: ${plot_image_dir}/m100/2021-11-05
   << : *plot_image_params
 
 # Dataset containing all the detection results.
