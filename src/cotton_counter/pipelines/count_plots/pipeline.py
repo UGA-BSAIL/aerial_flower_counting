@@ -197,9 +197,9 @@ def create_pipeline(**kwargs):
                 ),
                 "flowering_end_histogram",
             ),
-            node(
-                plot_flowering_curves, "counting_results", "flowering_curves",
-            ),
+            # node(
+            #     plot_flowering_curves, "counting_results", "flowering_curves",
+            # ),
         ]
     )
 

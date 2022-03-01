@@ -490,6 +490,11 @@ def _plot_flowering_time_histogram(
     combined_data = combined_data[
         population.str.contains("Pima") | population.str.contains("Maxxa")
     ]
+    # Average the replicates for each genotype together.
+    combined_data = combined_data.groupby(
+        [GenotypeColumns.GENOTYPE.value, GenotypeColumns.POPULATION.value],
+        as_index=False,
+    ).agg("mean")
 
     # Plot it.
     axes = sns.histplot(
@@ -499,10 +504,10 @@ def _plot_flowering_time_histogram(
         multiple="dodge",
         shrink=0.8,
         # Use one bin for each session.
-        bins=len(combined_data[CountingColumns.SESSION.value].unique()),
+        bins=len(flower_data[CountingColumns.SESSION.value].unique()),
     )
     axes.set_title(title)
-    axes.set(xlabel="Days After Planting", ylabel="# of Plots")
+    axes.set(xlabel="Days After Planting", ylabel="# of Genotypes")
 
     return plot.gcf()
 
