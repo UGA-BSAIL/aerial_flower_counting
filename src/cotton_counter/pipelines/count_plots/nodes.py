@@ -285,8 +285,12 @@ def compute_counts(
 
     # Remove null values.
     counts_per_plot.dropna(inplace=True)
+    counts_per_plot[CountingColumns.PLOT.value] = counts_per_plot[
+        CountingColumns.PLOT.value
+    ].astype("uint64")
     # Use plot number as an index.
     counts_per_plot.set_index(CountingColumns.PLOT.value, inplace=True)
+    counts_per_plot.index.name = CountingColumns.PLOT.value
     counts_per_plot.sort_index(inplace=True)
 
     return counts_per_plot
@@ -573,32 +577,54 @@ def plot_flowering_end_dist(
 
 
 def plot_flowering_curves(
-    counting_results: pd.DataFrame,
+    *, counting_results: pd.DataFrame, genotypes: pd.DataFrame
 ) -> Iterable[plot.Figure]:
     """
     Creates a flowering curve for each individual plot.
 
     Args:
         counting_results: The complete counting results.
+        genotypes: The cleaned genotype information.
 
     Yields:
         The curves for each plot, in order.
 
     """
-    plot_groups = counting_results.groupby([counting_results.index])
-    for plot_num, plot_indices in plot_groups.indices.items():
-        # Get the rows pertaining to this plot.
-        plot_rows = counting_results.iloc[plot_indices]
-        # Seaborn doesn't like it if all the values in the index are the same.
-        plot_rows.reset_index(inplace=True)
+    # Get all the sessions to use as a common index.
+    all_daps = counting_results[CountingColumns.DAP.value].unique()
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        counting_results, genotypes, left_index=True, right_index=True
+    )
+    # Group by genotype, and plot all replicates on the same axes.
+    genotype_groups = combined_data.groupby([GenotypeColumns.GENOTYPE.value])
 
+    for genotype, genotype_indices in genotype_groups.indices.items():
+        # Get the rows pertaining to this genotype.
+        genotype_rows = combined_data.iloc[genotype_indices]
+        # Re-index by DAP.
+        genotype_rows.set_index(
+            CountingColumns.DAP.value, append=True, inplace=True
+        )
+        # Expand the index with any sessions we don't have data for.
+        new_index = pd.MultiIndex.from_product(
+            [genotype_rows.index.levels[0], all_daps],
+            names=[CountingColumns.PLOT.value, CountingColumns.DAP.value],
+        )
+        genotype_rows = genotype_rows.reindex(
+            new_index, fill_value=0, columns=[CountingColumns.COUNT.value],
+        )
+
+        # Extract the index as columns, so we can plot it.
+        genotype_rows.reset_index(inplace=True)
         # Plot the curve.
         axes = sns.lineplot(
-            data=plot_rows,
+            data=genotype_rows,
             x=CountingColumns.DAP.value,
             y=CountingColumns.COUNT.value,
+            hue=CountingColumns.PLOT.value,
         )
-        axes.set_title(f"Plot {int(plot_num)}")
+        axes.set_title(f"Genotype {genotype}")
         axes.set(xlabel="Days After Planting", ylabel="# of Flowers")
 
         yield plot.gcf()

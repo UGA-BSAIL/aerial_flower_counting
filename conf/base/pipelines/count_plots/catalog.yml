@@ -143,6 +143,6 @@ flowering_curves:
   type: cotton_counter.data_sets.MultiFileDataSet
   versioned: True
   dataset: matplotlib.MatplotlibWriter
-  prefix: plot
+  prefix: genotype
   extension: .png
   filepath: data/08_reporting/flowering_curves
