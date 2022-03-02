@@ -158,7 +158,9 @@ def _to_field_plot_num(
     # The plot extraction method numbers plots in row-major order starting
     # from zero in the upper left.
     row_num = plot_num // field_config.num_plots
-    column_num = field_config.num_plots - (plot_num % field_config.num_plots)
+    column_num = (field_config.num_plots - 1) - (
+        plot_num % field_config.num_plots
+    )
 
     # Assign the correct row and plot numbers.
     row_num += field_config.first_row_num
