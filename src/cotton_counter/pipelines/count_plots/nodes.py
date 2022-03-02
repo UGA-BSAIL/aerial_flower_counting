@@ -518,6 +518,45 @@ def _plot_flowering_time_histogram(
     return plot.gcf()
 
 
+def _plot_flowering_time_means(
+    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
+) -> plot.Figure:
+    """
+    Creates a bar plot that facilitates the analysis of whether there are
+    significant differences between the flowering time attributes of each
+    population.
+
+    Args:
+        flower_data: The flowering data we want to plot. Should have one row
+            for each plot and have a DAP column.
+        genotypes: The dataframe containing genotype information.
+        title: The title to use for the plot.
+
+    Returns:
+        The plot that it made.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flower_data, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=CountingColumns.DAP.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title(title)
+    axes.set(xlabel="Population", ylabel="Days After Planting")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
+
+
 def plot_peak_flowering_dist(
     *, peak_flowering_times: pd.DataFrame, **kwargs: Any
 ) -> plot.Figure:
@@ -534,6 +573,26 @@ def plot_peak_flowering_dist(
 
     """
     return _plot_flowering_time_histogram(
+        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+    )
+
+
+def plot_peak_flowering_comparison(
+    *, peak_flowering_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a comparison of the peak flowering times of different populations.
+
+    Args:
+        peak_flowering_times: Dataset containing peak flowering times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_means(
         peak_flowering_times, **kwargs, title="Peak Flowering Time"
     )
 
@@ -558,6 +617,26 @@ def plot_flowering_start_dist(
     )
 
 
+def plot_flowering_start_comparison(
+    *, flowering_start_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering start times of different populations.
+
+    Args:
+        flowering_start_times: Dataset containing flowering start times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_means(
+        flowering_start_times, **kwargs, title="Flowering Start Time"
+    )
+
+
 def plot_flowering_end_dist(
     *, flowering_end_times: pd.DataFrame, **kwargs: Any
 ) -> plot.Figure:
@@ -575,6 +654,26 @@ def plot_flowering_end_dist(
     """
     return _plot_flowering_time_histogram(
         flowering_end_times, **kwargs, title="Flowering End Time"
+    )
+
+
+def plot_flowering_end_comparison(
+    *, flowering_end_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering end times of different populations.
+
+    Args:
+        flowering_end_times: Dataset containing flowering end times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_means(
+        flowering_end_times, **kwargs, title="Flowering Start Time"
     )
 
 

@@ -20,8 +20,11 @@ from .nodes import (
     detect_flowers,
     filter_low_confidence,
     plot_flowering_curves,
+    plot_flowering_end_comparison,
     plot_flowering_end_dist,
+    plot_flowering_start_comparison,
     plot_flowering_start_dist,
+    plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
 )
 
@@ -182,6 +185,14 @@ def create_pipeline(**kwargs):
                 "peak_flowering_histogram",
             ),
             node(
+                plot_peak_flowering_comparison,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    genotypes="cleaned_genotypes",
+                ),
+                "peak_flowering_comparison",
+            ),
+            node(
                 plot_flowering_start_dist,
                 dict(
                     flowering_start_times="flowering_starts",
@@ -190,12 +201,28 @@ def create_pipeline(**kwargs):
                 "flowering_start_histogram",
             ),
             node(
+                plot_flowering_start_comparison,
+                dict(
+                    flowering_start_times="flowering_starts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_start_comparison",
+            ),
+            node(
                 plot_flowering_end_dist,
                 dict(
                     flowering_end_times="flowering_ends",
                     genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_histogram",
+            ),
+            node(
+                plot_flowering_end_comparison,
+                dict(
+                    flowering_end_times="flowering_ends",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_end_comparison",
             ),
             node(
                 plot_flowering_curves,
