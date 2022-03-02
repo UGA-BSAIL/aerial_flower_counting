@@ -15,6 +15,7 @@ from .nodes import (
     collect_session_results,
     compute_counts,
     compute_flowering_peak,
+    compute_flowering_ramps,
     compute_flowering_start_end,
     create_per_plot_table,
     detect_flowers,
@@ -22,6 +23,8 @@ from .nodes import (
     plot_flowering_curves,
     plot_flowering_end_comparison,
     plot_flowering_end_dist,
+    plot_flowering_slope_comparison,
+    plot_flowering_slope_dist,
     plot_flowering_start_comparison,
     plot_flowering_start_dist,
     plot_peak_flowering_comparison,
@@ -175,6 +178,15 @@ def create_pipeline(**kwargs):
                 ),
                 ["flowering_starts", "flowering_ends"],
             ),
+            node(
+                compute_flowering_ramps,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    flowering_start_times="flowering_starts",
+                    counting_results="counting_results",
+                ),
+                "flowering_slopes",
+            ),
             # Plot the results.
             node(
                 plot_peak_flowering_dist,
@@ -223,6 +235,22 @@ def create_pipeline(**kwargs):
                     genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_comparison",
+            ),
+            node(
+                plot_flowering_slope_dist,
+                dict(
+                    flowering_slopes="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_slope_histogram",
+            ),
+            node(
+                plot_flowering_slope_comparison,
+                dict(
+                    flowering_slopes="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_slope_comparison",
             ),
             node(
                 plot_flowering_curves,

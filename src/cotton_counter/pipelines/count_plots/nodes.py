@@ -11,7 +11,9 @@ from typing import Any, Iterable, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import statsmodels.formula.api as sm
 from matplotlib import pyplot as plot
+from pandarallel import pandarallel
 from pydantic.dataclasses import dataclass
 from yolov5 import YOLOv5
 
@@ -22,6 +24,8 @@ Size of batches to use for prediction. This mostly impacts memory use.
 
 
 sns.set()
+
+pandarallel.initialize()
 
 
 @enum.unique
@@ -90,6 +94,22 @@ class CountingColumns(enum.Enum):
     DAP = "days_after_planting"
     """
     The number of days after planting that this count was taken at.
+    """
+
+
+@enum.unique
+class FloweringSlopeColumns(enum.Enum):
+    """
+    Names of the columns in the flowering slope dataframe.
+    """
+
+    SLOPE = "slope"
+    """
+    The slope of the line fitted to the flowering curve.
+    """
+    INTERCEPT = "intercept"
+    """
+    The intercept of the line fitted to the flowering curve.
     """
 
 
@@ -464,9 +484,93 @@ def compute_flowering_start_end(
     # Find the rows for each plot that signify the start of counting.
     plot_groups = counting_results.groupby([counting_results.index])
     return (
-        plot_groups.apply(_get_flowering_start),
-        plot_groups.apply(_get_flowering_end),
+        plot_groups.parallel_apply(_get_flowering_start),
+        plot_groups.parallel_apply(_get_flowering_end),
     )
+
+
+def compute_flowering_ramps(
+    *,
+    peak_flowering_times: pd.DataFrame,
+    flowering_start_times: pd.DataFrame,
+    counting_results: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Computes the slope of the initial ramp in flowering.
+
+    Args:
+        peak_flowering_times: The peak flowering time data.
+        flowering_start_times: The flowering start time data.
+        counting_results: The complete counting results.
+
+    Returns:
+        A `DataFrame` indexed by plot with flowering ramp information.
+
+    """
+
+    def _fit_line_for_plot(plot_counts: pd.DataFrame) -> pd.Series:
+        # All plots should be the same in this DF.
+        plot_num = plot_counts.index[0]
+        # Filter the counting results to only those between the flowering
+        # start and end.
+        start_dap = flowering_start_times.loc[plot_num][
+            CountingColumns.DAP.value
+        ]
+        peak_dap = peak_flowering_times.loc[plot_num][
+            CountingColumns.DAP.value
+        ]
+        plot_daps = plot_counts[CountingColumns.DAP.value]
+        plot_counts_ramp = plot_counts[
+            (plot_daps >= start_dap) & (plot_daps <= peak_dap)
+        ]
+
+        # Fit a line to the resulting counts.
+        model = sm.ols(
+            f"{CountingColumns.COUNT.value} ~ {CountingColumns.DAP.value}",
+            data=plot_counts_ramp,
+        ).fit()
+
+        return pd.Series(
+            {
+                FloweringSlopeColumns.SLOPE.value: model.params[1],
+                FloweringSlopeColumns.INTERCEPT.value: model.params[0],
+            },
+        )
+
+    plot_groups = counting_results.groupby([counting_results.index])
+    return plot_groups.parallel_apply(_fit_line_for_plot)
+
+
+def _merge_genotype_info(
+    *, flower_data: pd.DataFrame, genotypes: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Merges a dataframe indexed by plot with genotype information, filters out
+    the extraneous genotypes, and averages all the replicates.
+
+    Args:
+        flower_data: The flowering data, indexed by plot number.
+        genotypes: The dataframe containing genotype information.
+
+    Returns:
+        The merged data.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flower_data, genotypes, left_index=True, right_index=True
+    )
+    # Ignore data from the extra populations, since they are too small
+    # to do anything useful with.
+    population = combined_data[GenotypeColumns.POPULATION.value]
+    combined_data = combined_data[
+        population.str.contains("Pima") | population.str.contains("Maxxa")
+    ]
+    # Average the replicates for each genotype together.
+    return combined_data.groupby(
+        [GenotypeColumns.GENOTYPE.value, GenotypeColumns.POPULATION.value],
+        as_index=False,
+    ).agg("mean")
 
 
 def _plot_flowering_time_histogram(
@@ -486,21 +590,9 @@ def _plot_flowering_time_histogram(
         The plot that it made.
 
     """
-    # Merge flowering and genotype data together for easy plotting.
-    combined_data = pd.merge(
-        flower_data, genotypes, left_index=True, right_index=True
+    combined_data = _merge_genotype_info(
+        flower_data=flower_data, genotypes=genotypes
     )
-    # Ignore data from the extra populations, since they are too small
-    # to do anything useful with.
-    population = combined_data[GenotypeColumns.POPULATION.value]
-    combined_data = combined_data[
-        population.str.contains("Pima") | population.str.contains("Maxxa")
-    ]
-    # Average the replicates for each genotype together.
-    combined_data = combined_data.groupby(
-        [GenotypeColumns.GENOTYPE.value, GenotypeColumns.POPULATION.value],
-        as_index=False,
-    ).agg("mean")
 
     # Plot it.
     axes = sns.histplot(
@@ -557,6 +649,74 @@ def _plot_flowering_time_means(
     return figure
 
 
+def plot_flowering_slope_dist(
+    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a histogram of the slopes of the initial flowering ramp-up for each
+    genotype.
+
+    Args:
+        flowering_slopes: The extracted flowering slope data.
+        genotypes: The dataframe containing genotype information.
+
+    Returns:
+        The plot that it created.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=flowering_slopes, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=FloweringSlopeColumns.SLOPE.value,
+        hue=GenotypeColumns.POPULATION.value,
+        multiple="dodge",
+        shrink=0.8,
+    )
+    axes.set_title("Flowering Slope")
+    axes.set(xlabel="Slope (flowers/day)", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_flowering_slope_comparison(
+    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering slopes of different populations.
+
+    Args:
+        flowering_slopes: The extracted flowering slope data.
+        genotypes: The dataframe containing genotype information.
+
+    Returns:
+        The plot that it created.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flowering_slopes, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=FloweringSlopeColumns.SLOPE.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title("Mean Flowering Slope")
+    axes.set(xlabel="Population", ylabel="Slope (flowers/day)")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
+
+
 def plot_peak_flowering_dist(
     *, peak_flowering_times: pd.DataFrame, **kwargs: Any
 ) -> plot.Figure:
@@ -593,7 +753,7 @@ def plot_peak_flowering_comparison(
 
     """
     return _plot_flowering_time_means(
-        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+        peak_flowering_times, **kwargs, title="Mean Peak Flowering Time"
     )
 
 
@@ -633,7 +793,7 @@ def plot_flowering_start_comparison(
 
     """
     return _plot_flowering_time_means(
-        flowering_start_times, **kwargs, title="Flowering Start Time"
+        flowering_start_times, **kwargs, title="Mean Flowering Start Time"
     )
 
 
@@ -673,7 +833,7 @@ def plot_flowering_end_comparison(
 
     """
     return _plot_flowering_time_means(
-        flowering_end_times, **kwargs, title="Flowering Start Time"
+        flowering_end_times, **kwargs, title="Mean Flowering End Time"
     )
 
 
