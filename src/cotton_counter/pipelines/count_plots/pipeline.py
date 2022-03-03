@@ -10,8 +10,10 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import (
     FieldConfig,
-    add_dap,
+    add_dap_counting,
+    add_dap_ground_truth,
     clean_genotypes,
+    clean_ground_truth,
     collect_session_results,
     compute_counts,
     compute_flowering_peak,
@@ -20,6 +22,7 @@ from .nodes import (
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
+    merge_ground_truth,
     plot_flowering_curves,
     plot_flowering_end_comparison,
     plot_flowering_end_dist,
@@ -27,6 +30,8 @@ from .nodes import (
     plot_flowering_slope_dist,
     plot_flowering_start_comparison,
     plot_flowering_start_dist,
+    plot_ground_truth_regression,
+    plot_ground_truth_vs_predicted,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
 )
@@ -143,7 +148,7 @@ def create_pipeline(**kwargs):
                 "counting_results_no_dap",
             ),
             node(
-                add_dap,
+                add_dap_counting,
                 dict(
                     counting_results="counting_results_no_dap",
                     field_planted_date="params:field_planted_date",
@@ -259,6 +264,42 @@ def create_pipeline(**kwargs):
                     genotypes="cleaned_genotypes",
                 ),
                 "flowering_curves",
+            ),
+            # Compare with ground-truth.
+            node(
+                clean_ground_truth,
+                "ground_truth_spreadsheet",
+                "cleaned_ground_truth_no_dap",
+                name="clean_ground_truth",
+            ),
+            node(
+                add_dap_ground_truth,
+                dict(
+                    ground_truth="cleaned_ground_truth_no_dap",
+                    field_planted_date="params:field_planted_date",
+                ),
+                "cleaned_ground_truth",
+            ),
+            node(
+                merge_ground_truth,
+                dict(
+                    counting_results="counting_results",
+                    ground_truth="cleaned_ground_truth",
+                ),
+                "counts_with_gt",
+            ),
+            node(
+                plot_ground_truth_regression,
+                "counts_with_gt",
+                "ground_truth_regression_plot",
+            ),
+            node(
+                plot_ground_truth_vs_predicted,
+                dict(
+                    counts_with_gt="counts_with_gt",
+                    genotypes="cleaned_genotypes",
+                ),
+                "ground_truth_vs_predicted",
             ),
         ]
     )

@@ -1,3 +1,19 @@
+# Dataset containing the genotype information.
+genotype_spreadsheet:
+  type: pandas.ExcelDataSet
+  filepath: data/01_raw/IHF_NILs_Genotype_Information.xlsx
+  versioned: False
+  load_args:
+    engine: openpyxl
+
+# Dataset containing the ground-truth data.
+ground_truth_spreadsheet:
+  type: pandas.ExcelDataSet
+  filepath: data/01_raw/ground_truth_counts.xlsx
+  versioned: False
+  load_args:
+    engine: openpyxl
+
 # Datasets containing extracted plot images to process.
 _plot_image_params: &plot_image_params
   type: cotton_counter.data_sets.MultiFileDataSet
@@ -112,14 +128,6 @@ human_readable_counts:
   filepath: data/08_reporting/plot_counts.xlsx
   versioned: True
 
-# Dataset containing the genotype information.
-genotype_spreadsheet:
-  type: pandas.ExcelDataSet
-  filepath: data/01_raw/IHF_NILs_Genotype_Information.xlsx
-  versioned: False
-  load_args:
-    engine: openpyxl
-
 # Histogram of the peak flowering times.
 peak_flowering_histogram:
   type: matplotlib.MatplotlibWriter
@@ -176,3 +184,15 @@ flowering_curves:
   prefix: genotype
   extension: .png
   filepath: data/08_reporting/flowering_curves
+
+# Plot of the regression with the ground-truth counts.
+ground_truth_regression_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/ground_truth_regression.png
+  versioned: True
+
+# Plot of ground-truth vs. predicted data.
+ground_truth_vs_predicted:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/ground_truth_vs_predicted.png
+  versioned: True
