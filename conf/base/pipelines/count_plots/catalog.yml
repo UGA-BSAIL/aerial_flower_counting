@@ -78,6 +78,10 @@ plots_2021-10-01:
   filepath: ${plot_image_dir}/m100/2021-10-01
   << : *plot_image_params
 
+plots_2021-10-08:
+  filepath: ${plot_image_dir}/p4/2021-10-08
+  << : *plot_image_params
+
 plots_2021-10-11:
   filepath: ${plot_image_dir}/m100/2021-10-11
   << : *plot_image_params
