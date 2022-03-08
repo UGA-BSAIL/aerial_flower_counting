@@ -16,6 +16,7 @@ from .nodes import (
     clean_ground_truth,
     collect_session_results,
     compute_counts,
+    compute_cumulative_counts,
     compute_flowering_peak,
     compute_flowering_ramps,
     compute_flowering_start_end,
@@ -173,6 +174,11 @@ def create_pipeline(**kwargs):
                 name="clean_genotypes",
             ),
             node(
+                compute_cumulative_counts,
+                "counting_results",
+                "cumulative_counts",
+            ),
+            node(
                 compute_flowering_peak, "counting_results", "flowering_peaks"
             ),
             node(
@@ -189,7 +195,7 @@ def create_pipeline(**kwargs):
                 dict(
                     peak_flowering_times="flowering_peaks",
                     flowering_start_times="flowering_starts",
-                    counting_results="counting_results",
+                    cumulative_counts="cumulative_counts",
                 ),
                 "flowering_slopes",
             ),
@@ -261,7 +267,7 @@ def create_pipeline(**kwargs):
             node(
                 plot_flowering_curves,
                 dict(
-                    counting_results="counting_results",
+                    cumulative_counts="cumulative_counts",
                     genotypes="cleaned_genotypes",
                 ),
                 "flowering_curves",

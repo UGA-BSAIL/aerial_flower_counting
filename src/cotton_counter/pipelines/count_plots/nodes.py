@@ -632,11 +632,37 @@ def compute_flowering_start_end(
     )
 
 
+def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
+    """
+    Computes cumulative flower counts for each plot.
+
+    Args:
+        counting_results: The complete counting results.
+
+    Returns:
+        The same counting results, but the "count" column is now cumulative.
+
+    """
+
+    def _count_cumulative(plot_counts: pd.DataFrame) -> pd.DataFrame:
+        # Sort by DAP.
+        plot_counts.sort_values(by=[CountingColumns.DAP.value], inplace=True)
+        # Calculate cumulative counts.
+        plot_counts[CountingColumns.COUNT.value] = plot_counts[
+            CountingColumns.COUNT.value
+        ].cumsum()
+
+        return plot_counts
+
+    plot_groups = counting_results.groupby([counting_results.index])
+    return plot_groups.parallel_apply(_count_cumulative)
+
+
 def compute_flowering_ramps(
     *,
     peak_flowering_times: pd.DataFrame,
     flowering_start_times: pd.DataFrame,
-    counting_results: pd.DataFrame,
+    cumulative_counts: pd.DataFrame,
 ) -> pd.DataFrame:
     """
     Computes the slope of the initial ramp in flowering.
@@ -644,7 +670,8 @@ def compute_flowering_ramps(
     Args:
         peak_flowering_times: The peak flowering time data.
         flowering_start_times: The flowering start time data.
-        counting_results: The complete counting results.
+        cumulative_counts: The complete counting results, with cumulative
+            counts.
 
     Returns:
         A `DataFrame` indexed by plot with flowering ramp information.
@@ -680,7 +707,7 @@ def compute_flowering_ramps(
             },
         )
 
-    plot_groups = counting_results.groupby([counting_results.index])
+    plot_groups = cumulative_counts.groupby([cumulative_counts.index])
     return plot_groups.parallel_apply(_fit_line_for_plot)
 
 
@@ -1041,13 +1068,14 @@ def plot_ground_truth_vs_predicted(
 
 
 def plot_flowering_curves(
-    *, counting_results: pd.DataFrame, genotypes: pd.DataFrame
+    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
 ) -> Iterable[plot.Figure]:
     """
     Creates a flowering curve for each individual plot.
 
     Args:
-        counting_results: The complete counting results.
+        cumulative_counts: The complete counting results, with cumulative
+            counts.
         genotypes: The cleaned genotype information.
 
     Yields:
@@ -1055,29 +1083,61 @@ def plot_flowering_curves(
 
     """
     # Get all the sessions to use as a common index.
-    all_daps = counting_results[CountingColumns.DAP.value].unique()
+    all_daps = cumulative_counts[CountingColumns.DAP.value].unique()
+    all_daps.sort()
+
     # Merge flowering and genotype data together for easy plotting.
     combined_data = pd.merge(
-        counting_results, genotypes, left_index=True, right_index=True
+        cumulative_counts, genotypes, left_index=True, right_index=True
     )
+    combined_data.index.name = CountingColumns.PLOT.value
+    # Drop columns we don't need to save memory.
+    genotype_columns = {e.value for e in GenotypeColumns}
+    counting_columns = {e.value for e in CountingColumns}
+    combined_data.drop(
+        columns=genotype_columns
+        | counting_columns
+        - {
+            CountingColumns.DAP.value,
+            CountingColumns.COUNT.value,
+            GenotypeColumns.GENOTYPE.value,
+        },
+        errors="ignore",
+    )
+
+    # Re-index by DAP.
+    combined_data.set_index(
+        CountingColumns.DAP.value, append=True, inplace=True
+    )
+    combined_data.sort_index(inplace=True)
+
+    def _add_missing_sessions(plot_counts: pd.DataFrame) -> pd.DataFrame:
+        plot_genotype = plot_counts[GenotypeColumns.GENOTYPE.value].iloc[0]
+        # Expand the index with any sessions we don't have data for.
+        plot_counts.reset_index(
+            level=CountingColumns.PLOT.value, inplace=True, drop=True
+        )
+        new_index = pd.Index(all_daps, name=CountingColumns.DAP.value)
+        plot_counts = plot_counts.reindex(
+            new_index, method="ffill", fill_value=0
+        )
+        # Keep the genotype consistent, in case it was filled with zeros.
+        plot_counts[GenotypeColumns.GENOTYPE.value] = plot_genotype
+        return plot_counts
+
+    # Group by plot, which is now the first level of the index.
+    plot_groups = combined_data.groupby(lambda row: row[0])
+    combined_data = plot_groups.parallel_apply(_add_missing_sessions)
+    combined_data.index.set_names(
+        [CountingColumns.PLOT.value, CountingColumns.DAP.value], inplace=True
+    )
+
     # Group by genotype, and plot all replicates on the same axes.
     genotype_groups = combined_data.groupby([GenotypeColumns.GENOTYPE.value])
 
     for genotype, genotype_indices in genotype_groups.indices.items():
         # Get the rows pertaining to this genotype.
         genotype_rows = combined_data.iloc[genotype_indices]
-        # Re-index by DAP.
-        genotype_rows.set_index(
-            CountingColumns.DAP.value, append=True, inplace=True
-        )
-        # Expand the index with any sessions we don't have data for.
-        new_index = pd.MultiIndex.from_product(
-            [genotype_rows.index.levels[0], all_daps],
-            names=[CountingColumns.PLOT.value, CountingColumns.DAP.value],
-        )
-        genotype_rows = genotype_rows.reindex(
-            new_index, fill_value=0, columns=[CountingColumns.COUNT.value],
-        )
 
         # Extract the index as columns, so we can plot it.
         genotype_rows.reset_index(inplace=True)
