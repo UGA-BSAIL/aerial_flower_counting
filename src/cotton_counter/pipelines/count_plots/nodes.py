@@ -507,6 +507,12 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
         GroundTruthColumns.SESSION.value
     ].apply(lambda d: d.date().isoformat())
 
+    # Remove counts that have NA in the manual count column. These are
+    # generally for plots that have invalid data.
+    cleaned.dropna(
+        subset=GroundTruthColumns.MANUAL_IMAGE_COUNT.value, inplace=True
+    )
+
     # Remove Jeevan's counts.
     cleaned = cleaned[cleaned[GroundTruthColumns.PERSON.value] != "JA"]
 
