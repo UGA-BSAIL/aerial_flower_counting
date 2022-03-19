@@ -668,8 +668,8 @@ def compute_flowering_duration(
     flowering_ends.sort_index(inplace=True)
 
     durations = (
-        flowering_starts[CountingColumns.DAP.value]
-        - flowering_ends[CountingColumns.DAP.value]
+        flowering_ends[CountingColumns.DAP.value]
+        - flowering_starts[CountingColumns.DAP.value]
     )
     return pd.DataFrame(data={FloweringTimeColumns.DURATION.value: durations})
 
@@ -1052,6 +1052,75 @@ def plot_flowering_end_comparison(
     return _plot_flowering_time_means(
         flowering_end_times, **kwargs, title="Mean Flowering End Time"
     )
+
+
+def plot_flowering_duration_dist(
+    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering start times.
+
+    Args:
+        flowering_durations: Dataset containing flowering durations for each
+            plot.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it made.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=flowering_durations, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=FloweringTimeColumns.DURATION.value,
+        hue=GenotypeColumns.POPULATION.value,
+        multiple="dodge",
+        shrink=0.8,
+    )
+    axes.set_title("Flowering Duration")
+    axes.set(xlabel="Days", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_flowering_duration_comparison(
+    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering end times of different populations.
+
+    Args:
+        flowering_durations: Dataset containing flowering durations for
+            each plot.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it made.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flowering_durations, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=FloweringTimeColumns.DURATION.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title("Mean Flowering Duration")
+    axes.set(xlabel="Population", ylabel="Days")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
 
 
 def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:

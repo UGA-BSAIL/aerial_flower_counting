@@ -17,6 +17,7 @@ from .nodes import (
     collect_session_results,
     compute_counts,
     compute_cumulative_counts,
+    compute_flowering_duration,
     compute_flowering_peak,
     compute_flowering_ramps,
     compute_flowering_start_end,
@@ -25,6 +26,8 @@ from .nodes import (
     filter_low_confidence,
     merge_ground_truth,
     plot_flowering_curves,
+    plot_flowering_duration_comparison,
+    plot_flowering_duration_dist,
     plot_flowering_end_comparison,
     plot_flowering_end_dist,
     plot_flowering_slope_comparison,
@@ -192,6 +195,14 @@ def create_pipeline(**kwargs):
                 ["flowering_starts", "flowering_ends"],
             ),
             node(
+                compute_flowering_duration,
+                dict(
+                    flowering_starts="flowering_starts",
+                    flowering_ends="flowering_ends",
+                ),
+                "flowering_durations",
+            ),
+            node(
                 compute_flowering_ramps,
                 dict(
                     peak_flowering_times="flowering_peaks",
@@ -250,6 +261,22 @@ def create_pipeline(**kwargs):
                 "flowering_end_comparison",
             ),
             node(
+                plot_flowering_duration_dist,
+                dict(
+                    flowering_durations="flowering_durations",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_duration_histogram",
+            ),
+            node(
+                plot_flowering_duration_comparison,
+                dict(
+                    flowering_durations="flowering_durations",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_duration_comparison",
+            ),
+            node(
                 plot_flowering_slope_dist,
                 dict(
                     flowering_slopes="flowering_slopes",
@@ -265,14 +292,14 @@ def create_pipeline(**kwargs):
                 ),
                 "flowering_slope_comparison",
             ),
-            # node(
-            #     plot_flowering_curves,
-            #     dict(
-            #         cumulative_counts="cumulative_counts",
-            #         genotypes="cleaned_genotypes",
-            #     ),
-            #     "flowering_curves",
-            # ),
+            node(
+                plot_flowering_curves,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_curves",
+            ),
             node(
                 plot_mean_flowering_curve,
                 dict(
