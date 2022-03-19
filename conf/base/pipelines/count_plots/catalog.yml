@@ -189,6 +189,12 @@ flowering_curves:
   extension: .png
   filepath: data/08_reporting/flowering_curves
 
+# Mean flowering curve for each population.
+mean_flowering_curve:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/mean_flowering_curve.png
+  versioned: True
+
 # Plot of the regression with the ground-truth counts.
 ground_truth_regression_plot:
   type: matplotlib.MatplotlibWriter

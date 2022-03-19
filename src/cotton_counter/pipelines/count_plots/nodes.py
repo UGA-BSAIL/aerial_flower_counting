@@ -141,6 +141,18 @@ class FloweringSlopeColumns(enum.Enum):
     """
 
 
+@enum.unique
+class FloweringTimeColumns(enum.Enum):
+    """
+    Names of the columns in the flowering time dataframe.
+    """
+
+    DURATION = "duration"
+    """
+    The total flowering duration, in days.
+    """
+
+
 @dataclass
 class FieldConfig:
     """
@@ -638,6 +650,30 @@ def compute_flowering_start_end(
     )
 
 
+def compute_flowering_duration(
+    *, flowering_starts: pd.DataFrame, flowering_ends: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Computes the total flowering duration.
+
+    Args:
+        flowering_starts: The flowering start times.
+        flowering_ends: The flowering end times.
+
+    Returns:
+        Dataframe containing the flowering durations.
+
+    """
+    flowering_starts.sort_index(inplace=True)
+    flowering_ends.sort_index(inplace=True)
+
+    durations = (
+        flowering_starts[CountingColumns.DAP.value]
+        - flowering_ends[CountingColumns.DAP.value]
+    )
+    return pd.DataFrame(data={FloweringTimeColumns.DURATION.value: durations})
+
+
 def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
     """
     Computes cumulative flower counts for each plot.
@@ -742,11 +778,16 @@ def _merge_genotype_info(
     combined_data = combined_data[
         population.str.contains("Pima") | population.str.contains("Maxxa")
     ]
+
     # Average the replicates for each genotype together.
-    return combined_data.groupby(
-        [GenotypeColumns.GENOTYPE.value, GenotypeColumns.POPULATION.value],
-        as_index=False,
-    ).agg("mean")
+    group_columns = [
+        GenotypeColumns.GENOTYPE.value,
+        GenotypeColumns.POPULATION.value,
+    ]
+    if CountingColumns.DAP.value in combined_data.columns:
+        # Group by DAP too if the data are temporal.
+        group_columns.append(CountingColumns.DAP.value)
+    return combined_data.groupby(group_columns, as_index=False,).agg("mean")
 
 
 def _plot_flowering_time_histogram(
@@ -1155,6 +1196,41 @@ def plot_flowering_curves(
             hue=CountingColumns.PLOT.value,
         )
         axes.set_title(f"Genotype {genotype}")
-        axes.set(xlabel="Days After Planting", ylabel="# of Flowers")
+        axes.set(
+            xlabel="Days After Planting", ylabel="Cumulative # of Flowers"
+        )
 
         yield plot.gcf()
+
+
+def plot_mean_flowering_curve(
+    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Creates mean flowering curves for each population.
+
+    Args:
+        cumulative_counts: The complete counting results, with cumulative
+            counts.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot of the flowering curves.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = _merge_genotype_info(
+        flower_data=cumulative_counts, genotypes=genotypes
+    )
+
+    # Plot the curve.
+    axes = sns.lineplot(
+        data=combined_data,
+        x=CountingColumns.DAP.value,
+        y=CountingColumns.COUNT.value,
+        hue=GenotypeColumns.POPULATION.value,
+    )
+    axes.set_title("Average Flowering Curves")
+    axes.set(xlabel="Days After Planting", ylabel="Cumulative # of Flowers")
+
+    return plot.gcf()

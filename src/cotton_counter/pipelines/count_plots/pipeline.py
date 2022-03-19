@@ -33,6 +33,7 @@ from .nodes import (
     plot_flowering_start_dist,
     plot_ground_truth_regression,
     plot_ground_truth_vs_predicted,
+    plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
 )
@@ -264,13 +265,21 @@ def create_pipeline(**kwargs):
                 ),
                 "flowering_slope_comparison",
             ),
+            # node(
+            #     plot_flowering_curves,
+            #     dict(
+            #         cumulative_counts="cumulative_counts",
+            #         genotypes="cleaned_genotypes",
+            #     ),
+            #     "flowering_curves",
+            # ),
             node(
-                plot_flowering_curves,
+                plot_mean_flowering_curve,
                 dict(
                     cumulative_counts="cumulative_counts",
                     genotypes="cleaned_genotypes",
                 ),
-                "flowering_curves",
+                "mean_flowering_curve",
             ),
             # Compare with ground-truth.
             node(
