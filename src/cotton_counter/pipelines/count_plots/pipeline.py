@@ -39,6 +39,7 @@ from .nodes import (
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
+    find_empty_plots,
 )
 
 SESSIONS = {
@@ -161,6 +162,19 @@ def create_pipeline(**kwargs):
                 ),
                 "counting_results",
             ),
+            node(
+                compute_cumulative_counts,
+                "counting_results",
+                "cumulative_counts",
+            ),
+            node(
+                find_empty_plots,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    num_empty_plots="params:num_empty_plots",
+                ),
+                "empty_plots",
+            ),
             # Create the output count table.
             node(
                 create_per_plot_table,
@@ -176,11 +190,6 @@ def create_pipeline(**kwargs):
                 "genotype_spreadsheet",
                 "cleaned_genotypes",
                 name="clean_genotypes",
-            ),
-            node(
-                compute_cumulative_counts,
-                "counting_results",
-                "cumulative_counts",
             ),
             node(
                 compute_flowering_peak, "counting_results", "flowering_peaks"

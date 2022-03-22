@@ -537,6 +537,32 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
     return cleaned
 
 
+def find_empty_plots(
+    *, cumulative_counts: pd.DataFrame, num_empty_plots: int
+) -> List[int]:
+    """
+    Uses a very simple approach to find the plots that are probably empty. 
+    Basically, it just assumes that the plots with the lowest number of total
+    flowers are empty.
+    
+    Args:
+        cumulative_counts: The cumulative counting results. 
+        num_empty_plots: The total number of empty plots in the field.
+
+    Returns:
+        List of the plots that are probably empty.
+
+    """
+    # Keep only the final counts for each plot.
+    only_counts = cumulative_counts[CountingColumns.COUNT.value]
+    plot_groups = only_counts.groupby([only_counts.index])
+    total_counts = plot_groups.agg("max")
+
+    # Find the smallest ones.
+    total_counts.sort_values(CountingColumns.COUNT.value, inplace=True)
+    return total_counts.index.tolist()[:num_empty_plots]
+
+
 def merge_ground_truth(
     *, counting_results: pd.DataFrame, ground_truth: pd.DataFrame
 ) -> pd.DataFrame:

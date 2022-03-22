@@ -17,6 +17,8 @@ field_empty_rows: [41, 42]
 
 # Date on which the field was planted.
 field_planted_date: 2021-06-18
+# Number of plots that failed to germinate.
+num_empty_plots: 286
 # When we see this fraction of the total flowers, we will consider this
 # the start of flowering.
 flower_start_threshold: 0.05
