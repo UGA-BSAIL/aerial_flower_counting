@@ -12,6 +12,7 @@ from .nodes import (
     FieldConfig,
     add_dap_counting,
     add_dap_ground_truth,
+    clean_empty_plots,
     clean_genotypes,
     clean_ground_truth,
     collect_session_results,
@@ -24,6 +25,7 @@ from .nodes import (
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
+    find_empty_plots,
     merge_ground_truth,
     plot_flowering_curves,
     plot_flowering_duration_comparison,
@@ -39,7 +41,6 @@ from .nodes import (
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
-    find_empty_plots,
 )
 
 SESSIONS = {
@@ -160,20 +161,37 @@ def create_pipeline(**kwargs):
                     counting_results="counting_results_no_dap",
                     field_planted_date="params:field_planted_date",
                 ),
-                "counting_results",
+                "counting_results_with_empty",
             ),
             node(
                 compute_cumulative_counts,
-                "counting_results",
-                "cumulative_counts",
+                "counting_results_with_empty",
+                "cumulative_counts_with_empty",
             ),
+            # Clean data from empty plots.
             node(
                 find_empty_plots,
                 dict(
-                    cumulative_counts="cumulative_counts",
+                    cumulative_counts="cumulative_counts_with_empty",
                     num_empty_plots="params:num_empty_plots",
                 ),
                 "empty_plots",
+            ),
+            node(
+                clean_empty_plots,
+                dict(
+                    plot_df="counting_results_with_empty",
+                    empty_plots="empty_plots",
+                ),
+                "counting_results",
+            ),
+            node(
+                clean_empty_plots,
+                dict(
+                    plot_df="cumulative_counts_with_empty",
+                    empty_plots="empty_plots",
+                ),
+                "cumulative_counts",
             ),
             # Create the output count table.
             node(
