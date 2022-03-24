@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Dict
 
 import numpy as np
-import tensorflow as tf
 from kedro.framework.context import KedroContext, load_package_context
 from kedro.pipeline import Pipeline
 from loguru import logger
@@ -41,7 +40,6 @@ def _set_seeds() -> None:
     """
     np.random.seed(1337)
     random.seed(1337)
-    tf.random.set_seed(1337)
 
 
 @logger.catch

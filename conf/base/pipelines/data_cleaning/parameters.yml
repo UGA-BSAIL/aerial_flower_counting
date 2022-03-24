@@ -1,6 +1,0 @@
-# Annotations with these attributes set to these values will be removed.
-remove_with_attributes:
-  # Annoyingly, I've been inconsistent with how I signify pollination.
-  pollination: pollinated
-  # Stringification is necessary here because that's how CVAT reports bools.
-  pollinated: "true"

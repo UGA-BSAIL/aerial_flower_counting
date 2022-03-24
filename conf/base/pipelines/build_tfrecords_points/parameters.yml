@@ -1,3 +1,0 @@
-# Fractions of the cotton_part_a_test dataset to use as the testing and validation set,
-# respectively.
-test_split_fractions: [0.5, 0.5]

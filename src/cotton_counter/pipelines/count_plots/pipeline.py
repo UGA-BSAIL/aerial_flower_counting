@@ -319,14 +319,14 @@ def create_pipeline(**kwargs):
                 ),
                 "flowering_slope_comparison",
             ),
-            node(
-                plot_flowering_curves,
-                dict(
-                    cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
-                ),
-                "flowering_curves",
-            ),
+            # node(
+            #     plot_flowering_curves,
+            #     dict(
+            #         cumulative_counts="cumulative_counts",
+            #         genotypes="cleaned_genotypes",
+            #     ),
+            #     "flowering_curves",
+            # ),
             node(
                 plot_mean_flowering_curve,
                 dict(

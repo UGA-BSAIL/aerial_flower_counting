@@ -740,7 +740,9 @@ def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
 
         return plot_counts
 
-    plot_groups = counting_results.groupby([counting_results.index])
+    plot_groups = counting_results.groupby(
+        [counting_results.index], group_keys=False
+    )
     return plot_groups.parallel_apply(_count_cumulative)
 
 
