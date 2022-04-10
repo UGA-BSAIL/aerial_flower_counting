@@ -12,6 +12,7 @@ from .nodes import (
     FieldConfig,
     add_dap_counting,
     add_dap_ground_truth,
+    add_plot_index_for_heights,
     clean_empty_plots,
     clean_genotypes,
     clean_ground_truth,
@@ -22,6 +23,8 @@ from .nodes import (
     compute_flowering_peak,
     compute_flowering_ramps,
     compute_flowering_start_end,
+    compute_heights,
+    create_height_table,
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
@@ -38,6 +41,8 @@ from .nodes import (
     plot_flowering_start_dist,
     plot_ground_truth_regression,
     plot_ground_truth_vs_predicted,
+    plot_height_comparison,
+    plot_height_dist,
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
@@ -137,13 +142,8 @@ def create_pipeline(**kwargs):
             ),
             # Compute counts.
             node(
-                FieldConfig,
-                dict(
-                    num_plots="params:field_num_plots",
-                    first_row_num="params:field_first_row_num",
-                    first_plot_num="params:field_first_plot_num",
-                    empty_rows="params:field_empty_rows",
-                ),
+                FieldConfig.from_dict,
+                "field_config_params",
                 "field_config",
                 name="field_config",
             ),
@@ -167,6 +167,16 @@ def create_pipeline(**kwargs):
                 compute_cumulative_counts,
                 "counting_results_with_empty",
                 "cumulative_counts_with_empty",
+            ),
+            # Compute heights.
+            node(compute_heights, "plots_dem", "detection_plot_heights",),
+            node(
+                add_plot_index_for_heights,
+                dict(
+                    plot_heights="detection_plot_heights",
+                    field_config="field_config",
+                ),
+                "plot_heights_with_empty",
             ),
             # Clean data from empty plots.
             node(
@@ -193,14 +203,23 @@ def create_pipeline(**kwargs):
                 ),
                 "cumulative_counts",
             ),
+            node(
+                clean_empty_plots,
+                dict(
+                    plot_df="plot_heights_with_empty",
+                    empty_plots="empty_plots",
+                ),
+                "plot_heights",
+            ),
             # Create the output count table.
             node(
                 create_per_plot_table,
-                dict(
-                    counting_results="counting_results",
-                    field_config="field_config",
-                ),
+                "counting_results",
                 "human_readable_counts",
+            ),
+            # Create the output height table.
+            node(
+                create_height_table, "plot_heights", "human_readable_heights",
             ),
             # Perform genotype analysis.
             node(
@@ -319,14 +338,28 @@ def create_pipeline(**kwargs):
                 ),
                 "flowering_slope_comparison",
             ),
-            # node(
-            #     plot_flowering_curves,
-            #     dict(
-            #         cumulative_counts="cumulative_counts",
-            #         genotypes="cleaned_genotypes",
-            #     ),
-            #     "flowering_curves",
-            # ),
+            node(
+                plot_height_dist,
+                dict(
+                    plot_heights="plot_heights", genotypes="cleaned_genotypes",
+                ),
+                "plot_height_histogram",
+            ),
+            node(
+                plot_height_comparison,
+                dict(
+                    plot_heights="plot_heights", genotypes="cleaned_genotypes",
+                ),
+                "plot_height_comparison",
+            ),
+            node(
+                plot_flowering_curves,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_curves",
+            ),
             node(
                 plot_mean_flowering_curve,
                 dict(

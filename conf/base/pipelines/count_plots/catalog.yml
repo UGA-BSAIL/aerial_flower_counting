@@ -1,3 +1,9 @@
+# Field configuration.
+field_config_params:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config.yml
+  versioned: False
+
 # Dataset containing the genotype information.
 genotype_spreadsheet:
   type: pandas.ExcelDataSet
@@ -114,6 +120,11 @@ plots_2021-11-05:
   filepath: ${plot_image_dir}/m100/2021-11-05
   << : *plot_image_params
 
+# This contains height data.
+plots_dem:
+  filepath: ${plot_image_dir}/m100/2021-12-13
+  <<: *plot_image_params
+
 # Dataset containing all the detection results.
 detection_results:
   type: pandas.ParquetDataSet
@@ -126,10 +137,22 @@ counting_results:
   filepath: data/03_primary/counting_results.parquet
   versioned: True
 
+# Dataset containing estimated heights for each plot.
+detection_plot_heights:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_plot_heights.parquet
+  versioned: True
+
 # Dataset containing the final counts in a human-readable format.
 human_readable_counts:
   type: pandas.ExcelDataSet
   filepath: data/08_reporting/plot_counts.xlsx
+  versioned: True
+
+# Dataset containing the final heights in a human-readable format.
+human_readable_heights:
+  type: pandas.ExcelDataSet
+  filepath: data/08_reporting/plot_heights.xlsx
   versioned: True
 
 # Histogram of the peak flowering times.
@@ -162,6 +185,12 @@ flowering_slope_histogram:
   filepath: data/08_reporting/flowering_slope_histogram.png
   versioned: True
 
+# Histogram of final plot heights.
+plot_height_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/plot_height_histogram.png
+  versioned: True
+
 # Comparison of the peak flowering times for different populations.
 peak_flowering_comparison:
   type: matplotlib.MatplotlibWriter
@@ -190,6 +219,12 @@ flowering_duration_comparison:
 flowering_slope_comparison:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/flowering_slope_comparison.png
+  versioned: True
+
+# Comparison of final plot heights for different populations.
+plot_height_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/plot_height_comparison.png
   versioned: True
 
 # Individual flowering curves for each plot.

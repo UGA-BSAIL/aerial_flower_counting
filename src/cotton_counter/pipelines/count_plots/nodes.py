@@ -6,7 +6,7 @@ Contains nodes for the `count_plots` pipeline.
 import enum
 from datetime import date
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -126,6 +126,22 @@ class CountingColumns(enum.Enum):
 
 
 @enum.unique
+class HeightColumns(enum.Enum):
+    """
+    Names of the columns in the plot height dataframe.
+    """
+
+    PLOT = CountingColumns.PLOT.value
+    """
+    The field plot number that these heights are from.
+    """
+    HEIGHT = "height"
+    """
+    The computed height value for this plot.
+    """
+
+
+@enum.unique
 class FloweringSlopeColumns(enum.Enum):
     """
     Names of the columns in the flowering slope dataframe.
@@ -173,6 +189,20 @@ class FieldConfig:
     first_plot_num: int
 
     empty_rows: Set[int] = frozenset()
+
+    @classmethod
+    def from_dict(cls, parameters: Dict[str, Any]) -> "FieldConfig":
+        """
+        Initialize from a dictionary of values.
+
+        Args:
+            parameters: The parameter values.
+
+        Returns:
+            The initialized dataclass.
+
+        """
+        return cls(**parameters)
 
 
 def _batch_iter(iterable: Iterable, *, batch_size: int) -> Iterable[List]:
@@ -276,6 +306,69 @@ def detect_flowers(
     # Add a column for the session name.
     all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
+
+
+def compute_heights(height_maps: Iterable[np.ndarray]) -> pd.DataFrame:
+    """
+    Computes the heights of each plot based on the elevation map for that plot.
+
+    Args:
+        height_maps: The plot elevation maps.
+
+    Returns:
+        A `DataFrame` with the columns in `HeightColumns`.
+
+    """
+    plot_heights = []
+    for height_map in height_maps:
+        # It uses negative values to signify invalid data, so we will just
+        # remove those.
+        height_map = np.reshape(height_map, (-1,))
+        height_map = height_map[height_map >= 0]
+
+        # Our height algorithm is very simple: We just take the highest point
+        # and subtract the lowest point, assuming that the ground is locally
+        # flat.
+        plot_height = height_map.max() - height_map.min()
+        plot_heights.append(plot_height)
+
+    # Create the DataFrame.
+    results = pd.DataFrame(
+        data={
+            HeightColumns.HEIGHT.value: plot_heights,
+            HeightColumns.PLOT.value: range(len(plot_heights)),
+        },
+    )
+
+    return results
+
+
+def add_plot_index_for_heights(
+    plot_heights: pd.DataFrame, field_config: FieldConfig
+) -> pd.DataFrame:
+    """
+    Adds the correct field plot index to the height data.
+
+    Args:
+        plot_heights: The raw plot height data, with a detection plot number
+            column.
+        field_config: The field configuration to use.
+
+    Returns:
+        The same data, indexed by field plot number.
+
+    """
+    # Compute field plot numbers.
+    plot_heights[HeightColumns.PLOT.value] = plot_heights[
+        HeightColumns.PLOT.value
+    ].apply(_to_field_plot_num, field_config=field_config)
+
+    # Set the index.
+    plot_heights.set_index(HeightColumns.PLOT.value, inplace=True)
+    plot_heights.index.name = HeightColumns.PLOT.value
+    plot_heights.sort_index(inplace=True)
+
+    return plot_heights
 
 
 def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
@@ -429,15 +522,12 @@ def add_dap_ground_truth(
     )
 
 
-def create_per_plot_table(
-    counting_results: pd.DataFrame, *, field_config: FieldConfig
-) -> pd.DataFrame:
+def create_per_plot_table(counting_results: pd.DataFrame) -> pd.DataFrame:
     """
     Converts the counting results to a table with per-plot counts.
 
     Args:
         counting_results: The complete counting results.
-        field_config: Represents the configuration of the field.
 
     Returns:
         A table, where each row is a field plot number, and each column
@@ -467,6 +557,29 @@ def create_per_plot_table(
     counts_by_session.insert(0, "Plot", counts_by_session.index.values)
 
     return counts_by_session
+
+
+def create_height_table(plot_heights: pd.DataFrame) -> pd.DataFrame:
+    """
+    Creates a table containing human-readable height data.
+
+    Args:
+        plot_heights: The plot height data.
+
+    Returns:
+        A table containing plot numbers and corresponding heights.
+
+    """
+    # Make the headers a little more descriptive.
+    plot_heights.rename(
+        {HeightColumns.HEIGHT.value: "Height (m)"},
+        axis="columns",
+        inplace=True,
+    )
+    # Turn the plot index into a column so that it shows up in the spreadsheet.
+    plot_heights.insert(0, "Plot", plot_heights.index.values)
+
+    return plot_heights
 
 
 def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
@@ -1162,6 +1275,73 @@ def plot_flowering_duration_comparison(
     )
     axes.set_title("Mean Flowering Duration")
     axes.set(xlabel="Population", ylabel="Days")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
+
+
+def plot_height_dist(
+    *, plot_heights: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a histogram of the plot heights.
+
+    Args:
+        plot_heights: Dataset containing heights for each plot.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it made.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=plot_heights, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=HeightColumns.HEIGHT.value,
+        hue=GenotypeColumns.POPULATION.value,
+        multiple="dodge",
+        shrink=0.8,
+    )
+    axes.set_title("Final Plot Heights")
+    axes.set(xlabel="Height (m)", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_height_comparison(
+    *, plot_heights: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering end times of different populations.
+
+    Args:
+        plot_heights: Dataset containing heights for each plot.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it made.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        plot_heights, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=HeightColumns.HEIGHT.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title("Mean Final Plot Heights")
+    axes.set(xlabel="Population", ylabel="Height (m)")
 
     figure = plot.gcf()
     # Make it wider so the x labels don't overlap.

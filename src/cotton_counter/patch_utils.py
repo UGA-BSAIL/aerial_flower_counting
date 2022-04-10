@@ -3,16 +3,56 @@ Utility for extracting patches from images.
 """
 
 
+import itertools
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 import cv2
 import numpy as np
-import tensorflow as tf
 from loguru import logger
 
-from .model.patches import extract_standard_patches
+
+def _extract_standard_patches(
+    image: np.ndarray,
+    *,
+    patch_scale: float,
+    patch_stride: Optional[float] = None,
+) -> np.ndarray:
+    """
+    Extracts all patches of an input image with a given scale and stride.
+
+    Args:
+        image: The image to extract patches from.
+        patch_scale: The scale factor to use for the patches.
+        patch_stride: The stride to use for the patches.
+
+    Returns:
+        All the patches it extracted, batched along the first dimension.
+
+    """
+    if patch_stride is None:
+        # Default to a stride the same as the size.
+        patch_stride = patch_scale
+
+    # Figure out the size and stride in pixels.
+    input_size_px = np.array(image.shape[:2])
+    patch_size_px = np.floor(input_size_px * patch_scale).astype(int)
+    patch_stride_px = np.floor(input_size_px * patch_stride).astype(int)
+    logger.debug("Extracting patches of size {} pixels.", patch_size_px)
+    input_x, input_y = input_size_px
+    size_x, size_y = patch_size_px
+    stride_x, stride_y = patch_stride_px
+
+    patches = []
+    for start_x, start_y in itertools.product(
+        range(0, input_x, stride_x), range(0, input_y, stride_y)
+    ):
+        end_x = start_x + size_x
+        end_y = start_y + size_y
+        patches.append(image[start_x:end_x, start_y:end_y])
+
+    return np.stack(patches)
 
 
 def _iter_images(image_dir: Path) -> Iterable[Tuple[str, np.ndarray]]:
@@ -68,10 +108,9 @@ def _extract_all_patches(
 
     for image_name, image in _iter_images(input_dir):
         # Extract the patches.
-        image_4d = tf.expand_dims(image, axis=0)
-        patches = extract_standard_patches(
-            image_4d, patch_scale=patch_scale, patch_stride=patch_stride
-        ).numpy()
+        patches = _extract_standard_patches(
+            image, patch_scale=patch_scale, patch_stride=patch_stride
+        )
 
         # Save the patches.
         for i, patch in enumerate(patches):

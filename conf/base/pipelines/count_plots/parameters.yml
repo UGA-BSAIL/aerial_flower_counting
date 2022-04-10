@@ -6,15 +6,6 @@ min_confidence: 0.5
 # Image size to use for inference. (h, w)
 inference_size: [1377, 484]
 
-# Total number of plots in the field.
-field_num_plots: 50
-# Initial row number.
-field_first_row_num: 18
-# Initial plot number.
-field_first_plot_num: 26
-# Set of empty rows.
-field_empty_rows: [41, 42]
-
 # Date on which the field was planted.
 field_planted_date: 2021-06-18
 # Number of plots that failed to germinate.
