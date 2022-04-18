@@ -392,8 +392,13 @@ def add_plot_index_for_heights(
         HeightColumns.PLOT.value
     ].apply(_to_field_plot_num, field_config=field_config)
 
+    # Remove NaN values, because these are for empty plots.
+    plot_heights = plot_heights[
+        ~plot_heights[HeightColumns.PLOT.value].isnull()
+    ]
+
     # Set the index.
-    plot_heights.set_index(HeightColumns.PLOT.value, inplace=True)
+    plot_heights = plot_heights.set_index(HeightColumns.PLOT.value)
     plot_heights.index.name = HeightColumns.PLOT.value
     plot_heights.sort_index(inplace=True)
 
