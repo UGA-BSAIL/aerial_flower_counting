@@ -706,6 +706,11 @@ def clean_height_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
     # Remove "no plant" indicators.
     cleaned = cleaned.apply(pd.to_numeric, errors="coerce")
 
+    # Convert to meters.
+    cleaned[HeightGtColumns.PLANT_1_HEIGHT.value] *= 0.01
+    cleaned[HeightGtColumns.PLANT_2_HEIGHT.value] *= 0.01
+    cleaned[HeightGtColumns.PLANT_3_HEIGHT.value] *= 0.01
+
     # Add the max column.
     height_columns = cleaned.drop(columns=HeightGtColumns.PLOT.value)
     average_height = height_columns.max(axis=1, numeric_only=True)
@@ -1485,7 +1490,9 @@ def plot_height_ground_truth_regression(
         data=heights_with_gt,
     )
     axes.fig.suptitle("Estimated Height vs. Measured")
-    axes.set_axis_labels(x_var="Estimated Height", y_var="Measured Height")
+    axes.set_axis_labels(
+        x_var="Estimated Height (m)", y_var="Measured Height (m)"
+    )
 
     # Add R^2 value.
     def annotate(data: pd.DataFrame, **_: Any) -> None:
