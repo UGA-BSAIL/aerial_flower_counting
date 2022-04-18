@@ -16,6 +16,7 @@ from .nodes import (
     clean_empty_plots,
     clean_genotypes,
     clean_ground_truth,
+    clean_height_ground_truth,
     collect_session_results,
     compute_counts,
     compute_cumulative_counts,
@@ -30,6 +31,7 @@ from .nodes import (
     filter_low_confidence,
     find_empty_plots,
     merge_ground_truth,
+    merge_height_ground_truth,
     plot_flowering_curves,
     plot_flowering_duration_comparison,
     plot_flowering_duration_dist,
@@ -43,6 +45,7 @@ from .nodes import (
     plot_ground_truth_vs_predicted,
     plot_height_comparison,
     plot_height_dist,
+    plot_height_ground_truth_regression,
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
@@ -352,14 +355,14 @@ def create_pipeline(**kwargs):
                 ),
                 "plot_height_comparison",
             ),
-            node(
-                plot_flowering_curves,
-                dict(
-                    cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
-                ),
-                "flowering_curves",
-            ),
+            # node(
+            #     plot_flowering_curves,
+            #     dict(
+            #         cumulative_counts="cumulative_counts",
+            #         genotypes="cleaned_genotypes",
+            #     ),
+            #     "flowering_curves",
+            # ),
             node(
                 plot_mean_flowering_curve,
                 dict(
@@ -403,6 +406,25 @@ def create_pipeline(**kwargs):
                     genotypes="cleaned_genotypes",
                 ),
                 "ground_truth_vs_predicted",
+            ),
+            # Compare with ground-truth height data.
+            node(
+                clean_height_ground_truth,
+                "ground_truth_height_spreadsheet",
+                "clean_gt_heights",
+            ),
+            node(
+                merge_height_ground_truth,
+                dict(
+                    plot_heights="plot_heights",
+                    ground_truth_heights="clean_gt_heights",
+                ),
+                "heights_with_gt",
+            ),
+            node(
+                plot_height_ground_truth_regression,
+                "heights_with_gt",
+                "height_ground_truth_regression_plot",
             ),
         ]
     )

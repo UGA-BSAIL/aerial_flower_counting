@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 import seaborn as sns
 import statsmodels.formula.api as sm
 from matplotlib import pyplot as plot
@@ -77,6 +78,34 @@ class GroundTruthColumns(enum.Enum):
     PERSON = "Person measured"
     """
     The initials of the person who took the GT measurement.
+    """
+
+
+@enum.unique
+class HeightGtColumns(enum.Enum):
+    """
+    Names of the columns in the height ground-truth table.
+    """
+
+    PLOT = "Plot Number"
+    """
+    The field plot number.
+    """
+    PLANT_1_HEIGHT = "Plant 1 ht"
+    """
+    The height of the first plant.
+    """
+    PLANT_2_HEIGHT = "Plant 2 ht"
+    """
+    The height of the second plant.
+    """
+    PLANT_3_HEIGHT = "Plant 3 ht"
+    """
+    The height of the third plant.
+    """
+    MAX_HEIGHT = "mean_height"
+    """
+    The max height of the plants.
     """
 
 
@@ -650,6 +679,40 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
     return cleaned
 
 
+def clean_height_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans up the height ground truth data and adds plot maximums.
+
+    Args:
+        raw_ground_truth: The raw ground-truth height information that was
+            loaded.
+
+    Returns:
+        The cleaned ground-truth table.
+
+    """
+    # Remove the extra header row.
+    first_col_name = raw_ground_truth.columns[0]
+    # The extra header row is the only row with a value in the first column.
+    cleaned = raw_ground_truth[raw_ground_truth[first_col_name].isnull()]
+
+    # Drop the first column, since it's just the field name.
+    cleaned = cleaned.drop(columns=first_col_name)
+    # Remove "no plant" indicators.
+    cleaned = cleaned.apply(pd.to_numeric, errors="coerce")
+
+    # Add the max column.
+    height_columns = cleaned.drop(columns=HeightGtColumns.PLOT.value)
+    average_height = height_columns.max(axis=1, numeric_only=True)
+    cleaned[HeightGtColumns.MAX_HEIGHT.value] = average_height
+
+    # Index by plot number.
+    cleaned.set_index(HeightGtColumns.PLOT.value, inplace=True)
+    cleaned.sort_index(inplace=True)
+
+    return cleaned
+
+
 def find_empty_plots(
     *, cumulative_counts: pd.DataFrame, num_empty_plots: int
 ) -> List[int]:
@@ -721,6 +784,29 @@ def merge_ground_truth(
 
     return pd.merge(
         counting_results, ground_truth, left_index=True, right_index=True
+    )
+
+
+def merge_height_ground_truth(
+    *, plot_heights: pd.DataFrame, ground_truth_heights: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Merges the ground-truth heights and estimated heights into a single
+    `DataFrame` for easy comparison.
+
+    Args:
+        plot_heights: The estimated plot heights.
+        ground_truth_heights: The ground-truth plot heights.
+
+    Returns:
+        The merged data, indexed by plot.
+
+    """
+    # Make sure the indices are named the same.
+    ground_truth_heights.index.name = plot_heights.index.name
+    # Merge the data for easy plotting.
+    return pd.merge(
+        plot_heights, ground_truth_heights, left_index=True, right_index=True
     )
 
 
@@ -1369,6 +1455,48 @@ def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:
     )
     axes.set_title("Counting Residuals")
     axes.set(xlabel="Ground-Truth", ylabel="Automatic")
+
+    return plot.gcf()
+
+
+def plot_height_ground_truth_regression(
+    heights_with_gt: pd.DataFrame,
+) -> plot.Figure:
+    """
+    Plots the regression between the height estimation results and the
+    ground-truth heights.
+
+    Args:
+        heights_with_gt: The merged height results and ground-truth data.
+
+    Returns:
+        The plot that it created.
+
+    """
+    # Plot the regression.
+    axes = sns.lmplot(
+        x=HeightColumns.HEIGHT.value,
+        y=HeightGtColumns.MAX_HEIGHT.value,
+        data=heights_with_gt,
+    )
+    axes.fig.suptitle("Estimated Height vs. Measured")
+    axes.set_axis_labels(x_var="Estimated Height", y_var="Measured Height")
+
+    # Add R^2 value.
+    def annotate(data: pd.DataFrame, **_: Any) -> None:
+        r, p = stats.pearsonr(
+            data[HeightColumns.HEIGHT.value],
+            data[HeightGtColumns.MAX_HEIGHT.value],
+        )
+        global_axes = plot.gca()
+        global_axes.text(
+            0.05,
+            0.8,
+            f"r^2={r ** 2:.2f}, p={p:.2g}",
+            transform=global_axes.transAxes,
+        )
+
+    axes.map_dataframe(annotate)
 
     return plot.gcf()
 

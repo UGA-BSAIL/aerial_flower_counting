@@ -12,10 +12,18 @@ genotype_spreadsheet:
   load_args:
     engine: openpyxl
 
-# Dataset containing the ground-truth data.
+# Dataset containing the ground-truth count data.
 ground_truth_spreadsheet:
   type: pandas.ExcelDataSet
   filepath: data/01_raw/ground_truth_counts.xlsx
+  versioned: False
+  load_args:
+    engine: openpyxl
+
+# Dataset containing the ground-truth height data.
+ground_truth_height_spreadsheet:
+  type: pandas.ExcelDataSet
+  filepath: data/01_raw/ground_truth_heights.xlsx
   versioned: False
   load_args:
     engine: openpyxl
@@ -246,6 +254,12 @@ mean_flowering_curve:
 ground_truth_regression_plot:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/ground_truth_regression.png
+  versioned: True
+
+# Plot of the regression with the ground-truth heights.
+height_ground_truth_regression_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/height_ground_truth_regression.png
   versioned: True
 
 # Plot of ground-truth vs. predicted data.
