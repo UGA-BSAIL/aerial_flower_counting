@@ -17,6 +17,7 @@ from .nodes import (
     clean_genotypes,
     clean_ground_truth,
     clean_height_ground_truth,
+    collect_plot_heights,
     collect_session_results,
     compute_counts,
     compute_cumulative_counts,
@@ -146,15 +147,19 @@ def create_pipeline(**kwargs):
             # Compute counts.
             node(
                 FieldConfig.from_dict,
-                "field_config_params",
-                "field_config",
-                name="field_config",
+                "j1_field_config_params",
+                "j1_field_config",
+            ),
+            node(
+                FieldConfig.from_dict,
+                "j2_field_config_params",
+                "j2_field_config",
             ),
             node(
                 compute_counts,
                 dict(
                     detection_results="filtered_detection_results",
-                    field_config="field_config",
+                    field_config="j2_field_config",
                 ),
                 "counting_results_no_dap",
             ),
@@ -172,13 +177,31 @@ def create_pipeline(**kwargs):
                 "cumulative_counts_with_empty",
             ),
             # Compute heights.
-            node(compute_heights, "plots_dem", "detection_plot_heights",),
+            node(
+                compute_heights, "plots_dem_j1", "detection_plot_heights_j1",
+            ),
             node(
                 add_plot_index_for_heights,
                 dict(
-                    plot_heights="detection_plot_heights",
-                    field_config="field_config",
+                    plot_heights="detection_plot_heights_j1",
+                    field_config="j1_field_config",
                 ),
+                "plot_heights_j1_with_empty",
+            ),
+            node(
+                compute_heights, "plots_dem_j2", "detection_plot_heights_j2",
+            ),
+            node(
+                add_plot_index_for_heights,
+                dict(
+                    plot_heights="detection_plot_heights_j2",
+                    field_config="j2_field_config",
+                ),
+                "plot_heights_j2_with_empty",
+            ),
+            node(
+                collect_plot_heights,
+                [f"plot_heights_{field}_with_empty" for field in ("j1", "j2")],
                 "plot_heights_with_empty",
             ),
             # Clean data from empty plots.

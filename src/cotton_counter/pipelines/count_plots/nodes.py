@@ -208,6 +208,8 @@ class FieldConfig:
 
         first_row_num: The number assigned to the first row.
         first_plot_num: The number assigned to the first plot in each row.
+        start_at_bottom: Whether the plot numbering starts at the bottom of the
+            field. Otherwise, it's assumed it starts at the top.
 
         empty_rows: Set of rows that are not planted.
     """
@@ -216,6 +218,7 @@ class FieldConfig:
 
     first_row_num: int
     first_plot_num: int
+    start_at_bottom: bool
 
     empty_rows: Set[int] = frozenset()
 
@@ -277,9 +280,13 @@ def _to_field_plot_num(
     # The plot extraction method numbers plots in row-major order starting
     # from zero in the upper left.
     row_num = plot_num // field_config.num_plots
-    column_num = (field_config.num_plots - 1) - (
-        plot_num % field_config.num_plots
-    )
+    if field_config.start_at_bottom:
+        # Large numbers should be at the top.
+        column_num = (field_config.num_plots - 1) - (
+            plot_num % field_config.num_plots
+        )
+    else:
+        column_num = plot_num % field_config.num_plots
 
     # Assign the correct row and plot numbers.
     row_num += field_config.first_row_num
@@ -290,7 +297,7 @@ def _to_field_plot_num(
         return None
 
     # Create the complete plot number.
-    return int(f"{row_num}{column_num}")
+    return int(f"{row_num:02}{column_num:02}")
 
 
 def detect_flowers(
@@ -418,6 +425,21 @@ def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
 
     """
     return pd.concat(session_results, ignore_index=True)
+
+
+def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
+    """
+    Collects the plot height results from multiple fields into a single
+    Pandas dataframe. It expects them to have non-overlapping indices.
+
+    Args:
+        *plot_heights: The plot heights from each field.
+
+    Returns:
+        The combined plot heights.
+
+    """
+    return pd.concat(plot_heights)
 
 
 def filter_low_confidence(

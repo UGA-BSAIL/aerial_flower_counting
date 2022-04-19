@@ -1,7 +1,12 @@
 # Field configuration.
-field_config_params:
+j1_field_config_params:
   type: yaml.YAMLDataSet
-  filepath: data/01_raw/field_config.yml
+  filepath: data/01_raw/field_config_j1.yml
+  versioned: False
+
+j2_field_config_params:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_j2.yml
   versioned: False
 
 # Dataset containing the genotype information.
@@ -129,8 +134,12 @@ plots_2021-11-05:
   << : *plot_image_params
 
 # This contains height data.
-plots_dem:
-  filepath: ${plot_image_dir}/m100/2021-12-13
+plots_dem_j1:
+  filepath: ${plot_image_dir}/m100/2021-12-13/j1
+  <<: *plot_image_params
+
+plots_dem_j2:
+  filepath: ${plot_image_dir}/m100/2021-12-13/j2
   <<: *plot_image_params
 
 # Dataset containing all the detection results.
@@ -146,9 +155,14 @@ counting_results:
   versioned: True
 
 # Dataset containing estimated heights for each plot.
-detection_plot_heights:
+detection_plot_heights_j1:
   type: pandas.ParquetDataSet
-  filepath: data/03_primary/detection_plot_heights.parquet
+  filepath: data/03_primary/detection_plot_heights_j1.parquet
+  versioned: True
+
+detection_plot_heights_j2:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_plot_heights_j2.parquet
   versioned: True
 
 # Dataset containing the final counts in a human-readable format.
