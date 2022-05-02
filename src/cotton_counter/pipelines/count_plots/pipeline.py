@@ -27,6 +27,7 @@ from .nodes import (
     compute_flowering_start_end,
     compute_heights,
     create_height_table,
+    create_metric_table,
     create_per_plot_table,
     detect_flowers,
     filter_low_confidence,
@@ -282,6 +283,19 @@ def create_pipeline(**kwargs):
                     cumulative_counts="cumulative_counts",
                 ),
                 "flowering_slopes",
+            ),
+            # Save the combined results.
+            node(
+                create_metric_table,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    flowering_starts="flowering_starts",
+                    flowering_ends="flowering_ends",
+                    flowering_durations="flowering_durations",
+                    flowering_slopes="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "human_readable_metrics",
             ),
             # Plot the results.
             node(
