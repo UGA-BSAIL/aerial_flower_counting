@@ -1,23 +1,11 @@
 # The expected input image height and width.
 input_image_shape: [3456, 4608]
-# The scale factor to apply for the patches we extract.
-patch_scale: 0.25
-
-# The height and width of the density maps to use.
-# (These are derived from the expected input dimensions, down-sampled by a factor of 8).
-density_map_shape: [432, 576]
-# The standard deviation to use for the gaussian kernel when creating density maps.
-density_map_sigma: 1
 
 # Number of training epochs after which to run validation.
 validation_frequency: 1
 
 # Directory to use for storing Tensorboard output.
 tensorboard_output_dir: ${log_dir}/tensorboard
-# Frequency at which to generate histograms for Tensorboard output.
-histogram_frequency: 20
-# Every time this many epochs elapse, it will generate new density map visualizations.
-visualization_period: 100
 # Density threshold to use for colorization. Any pixel with a density above this
 # threshold will show up as the maximum density color.
 max_density_threshold: 0.02
@@ -27,16 +15,45 @@ max_density_threshold: 0.02
 # that falls between the largest minimum value and infinity.
 bucket_min_values: []
 
+# The scale factor to apply for the patches we extract.
+patch_scale: 0.125
+
+# The scale factor and stride to use for the sub-patches we extract
+# when computing the cross-scale consistency loss.
+sub_patch_scale: 0.5
+sub_patch_stride: 0.5
+
+# Frequency at which to generate histograms for Tensorboard output.
+histogram_frequency: 1
+# Number of training epochs after which to rebalance the dataset.
+rebalance_frequency: 100
+# Every time this many epochs elapse, it will generate new density map visualizations.
+visualization_period: 10
+# How many images from each batch to visualize.
+num_per_batch_to_visualize: 1
+# Maximum number of testing batches to visualize data from.
+max_num_batches_to_visualize: 20
+
+# Focal loss parameters.
+focal_loss_alpha: 0.25
+focal_loss_gamma: 2.0
+
+# Whether to enable debugging checks for NaN and infinity. This
+# is very useful when trying to debug numerical issues, but it
+# slows down training a lot.
+enable_numeric_checks: false
+
 # Learning phases to use for training the model.
 learning_phases:
   # The initial learning rate to use for the phase.
   - learning_rate:
       # Initial learning rate value.
-      initial: 0.002
+      initial: 0.005
       # Specify that we want to decay over time.
       decay: true
       # Number of steps to decay over.
-      decay_steps: 90
+      # (1822 steps per epoch)
+      decay_steps: 9110
       # Used to derive the number of iterations in the i-th period.
       t_mul: 2.0
       # Used to derive the initial learning rate of the i-th period.
@@ -46,8 +63,12 @@ learning_phases:
     # The momentum to use for the phase.
     momentum: 0.9
     # The loss weight for density maps.
-    density_map_loss_weight: 1.0
-    # The loss weight for counts.
+    density_map_loss_weight: 0.0
+    # The loss weight for count regression.
     count_loss_weight: 0.0
+    # The loss weight for count categorization.
+    discrete_count_loss_weight: 1.0
+    # The loss weight for cross-scale consistency.
+    cross_scale_loss_weight: 0.25
     # Number of epochs to train for in this phase.
-    num_epochs: 630
+    num_epochs: 35

@@ -1,4 +1,0 @@
-# Whether we want to classify counts instead of regressing them.
-classify_counts: True
-# Batch size to use for training.
-batch_size: 16
