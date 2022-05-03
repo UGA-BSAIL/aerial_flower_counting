@@ -34,6 +34,8 @@ pytest_flake8 = "^1.0.6"
 kedro-viz = "^3.4.0"
 pytest_snapshot = "^0.4.2"
 pyyaml = "^5.3.1"
+jupyter = "^1.0.0"
+jupyterlab = "^3.4.0"
 
 [tool.black]
 line-length = 79

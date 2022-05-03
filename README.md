@@ -2,83 +2,73 @@
 
 ## Overview
 
-This is your new Kedro project, which was generated using `Kedro 0.16.4` by running:
+This project contains reference code for the following paper:
 
-```
-kedro new
-```
-
-Take a look at the [documentation](https://kedro.readthedocs.io) to get started.
-
-## Rules and guidelines
-
-In order to get the best out of the template:
-
- * Please don't remove any lines from the `.gitignore` file we provide
- * Make sure your results can be reproduced by following a data engineering convention, e.g. the one we suggest [here](https://kedro.readthedocs.io/en/stable/06_resources/01_faq.html#what-is-data-engineering-convention)
- * Don't commit any data to your repository
- * Don't commit any credentials or local configuration to your repository
- * Keep all credentials or local configuration in `conf/local/`
+[Weakly-supervised learning to automatically count cotton flowers from aerial imagery](https://www.sciencedirect.com/science/article/pii/S0168169922000515)
 
 ## Installing dependencies
 
-Declare any dependencies in `src/requirements.txt` for `pip` installation and `src/environment.yml` for `conda` installation.
+This code requires Python 3.8 and [Poetry](https://python-poetry.org/docs/).
 
-To install them, run:
-
+To install, run
 ```
-kedro install
-```
-
-## Running Kedro
-
-You can run your Kedro project with:
-
-```
-kedro run
+poetry install --no-root
 ```
 
-## Testing Kedro
+## Running Pipelines
 
-Have a look at the file `src/tests/test_run.py` for instructions on how to write your tests. You can run your tests with the following command:
-
+This project uses [Kedro](https://kedro.readthedocs.io/en/stable/introduction/introduction.html).
+It implements different pipelines for various tasks. A pipeline can be run with:
 ```
-kedro test
+poetry run kedro run --pipeline <pipeline name>
 ```
 
-To configure the coverage threshold, please have a look at the file `.coveragerc`.
+The pipelines are:
+- `model_training`: Trains the model from scratch using existing data.
+- `model_evaluation`: Performs evaluation on a trained model.
 
+### Training
+
+Training requires that you have access to the `TFRecords` files containing the
+dataset. These are specified in [`catalog.yml`](conf/base/catalog.yml), under
+`tfrecord_train`, `tfrecord_test`, `tfrecord_validate`, and 
+`tfrecord_test_alternate`. These are the training, testing, validation, and 
+supplemental testing datasets, respectively. (Only the first three are
+used for training. The last one is [part C](https://www.sciencedirect.com/science/article/pii/S0168169922000515#t0005)
+of the dataset used for extra evaluation.) Modify the `filepath` attribute of
+these catalog entries if necessary so that they point to the correct location
+on your computer.
+
+Once training is complete, the default location of the trained model is
+`output_data/06_models/fully_trained.hd5/`. Trained models will be versioned
+in subdirectories.
+
+### Model Evaluation
+
+Model evaluation requires a trained model to already have been saved. It will
+generate a variety of reports that are located by default under
+`output_data/08_reporting/`. See the [catalog](conf/base/pipelines/model_evaluation/catalog.yml)
+for some documentation on these reports.
 
 ## Working with Kedro from notebooks
 
-In order to use notebooks in your Kedro project, you need to install Jupyter:
+You can use Jupyter notebooks with this project. First, start a local 
+notebook server:
 
 ```
-pip install jupyter
-```
-
-For using Jupyter Lab, you need to install it:
-
-```
-pip install jupyterlab
-```
-
-After installing Jupyter, you can start a local notebook server:
-
-```
-kedro jupyter notebook
+poetry run kedro jupyter notebook
 ```
 
 You can also start Jupyter Lab:
 
 ```
-kedro jupyter lab
+poetry run kedro jupyter lab
 ```
 
 And if you want to run an IPython session:
 
 ```
-kedro ipython
+poetry run kedro ipython
 ```
 
 Running Jupyter or IPython this way provides the following variables in
@@ -104,35 +94,3 @@ kedro jupyter convert --all
 In order to automatically strip out all output cell contents before committing to `git`, you can run `kedro activate-nbstripout`. This will add a hook in `.git/config` which will run `nbstripout` before anything is committed to `git`.
 
 > *Note:* Your output cells will be left intact locally.
-
-## Package the project
-
-In order to package the project's Python code in `.egg` and / or a `.wheel` file, you can run:
-
-```
-kedro package
-```
-
-After running that, you can find the two packages in `src/dist/`.
-
-## Building API documentation
-
-To build API docs for your code using Sphinx, run:
-
-```
-kedro build-docs
-```
-
-See your documentation by opening `docs/build/html/index.html`.
-
-## Building the project requirements
-
-To generate or update the dependency requirements for your project, run:
-
-```
-kedro build-reqs
-```
-
-This will copy the contents of `src/requirements.txt` into a new file `src/requirements.in` which will be used as the source for `pip-compile`. You can see the output of the resolution by opening `src/requirements.txt`.
-
-After this, if you'd like to update your project requirements, please update `src/requirements.in` and re-run `kedro build-reqs`.
