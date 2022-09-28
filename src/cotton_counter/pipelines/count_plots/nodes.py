@@ -25,7 +25,9 @@ Size of batches to use for prediction. This mostly impacts memory use.
 """
 
 
-sns.set()
+sns.set_theme(
+    context="paper", palette="husl", rc={"savefig.dpi": 400}
+)
 
 pandarallel.initialize()
 
@@ -1712,6 +1714,8 @@ def plot_flowering_curves(
             x=CountingColumns.DAP.value,
             y=CountingColumns.COUNT.value,
             hue=CountingColumns.PLOT.value,
+            palette="husl",
+            linewidth=1.5,
         )
         axes.set_title(f"Genotype {genotype}")
         axes.set(
