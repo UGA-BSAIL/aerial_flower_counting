@@ -7,7 +7,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "~3.8"
-kedro = "^0.16.6"
+kedro = "0.16.6"
 loguru = "^0.5.2"
 seaborn = "^0.11.1"
 pandas = "^1.4.1"
@@ -26,6 +26,7 @@ torchvision = "^0.15.2"
 pydantic = "^1.9.0"
 ultralytics = "^8.0.117"
 wandb = "^0.15.4"
+segment-anything = {git = "https://github.com/facebookresearch/segment-anything.git"}
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"

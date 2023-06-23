@@ -7,7 +7,7 @@ import enum
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Callable
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,10 @@ import statsmodels.formula.api as sm
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
 from pydantic.dataclasses import dataclass
-from yolov5 import YOLOv5
+from ultralytics import YOLO
+from segment_anything import SamPredictor, sam_model_registry
+from PIL import Image
+from loguru import logger
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -25,9 +28,7 @@ Size of batches to use for prediction. This mostly impacts memory use.
 """
 
 
-sns.set_theme(
-    context="paper", palette="husl", rc={"savefig.dpi": 400}
-)
+sns.set_theme(context="paper", palette="husl", rc={"savefig.dpi": 400})
 
 pandarallel.initialize()
 
@@ -129,6 +130,23 @@ class DetectionColumns(enum.Enum):
     CONFIDENCE = "confidence"
     """
     The confidence score of the detection.
+    """
+
+    X1 = "x1"
+    """
+    The x-coordinate of the top left corner of the detection.
+    """
+    Y1 = "y1"
+    """
+    The y-coordinate of the top left corner of the detection.
+    """
+    X2 = "x2"
+    """
+    The x-coordinate of the bottom right corner of the detection.
+    """
+    Y2 = "y2"
+    """
+    The y-coordinate of the bottom right corner of the detection.
     """
 
 
@@ -324,27 +342,102 @@ def detect_flowers(
 
     """
     # Load the model.
-    model = YOLOv5(weights_file)
+    model = YOLO(weights_file)
 
     # Infer on batches.
     results = []
     plot_num = 0
     for batch in _batch_iter(images, batch_size=_PREDICTION_BATCH_SIZE):
-        batch_results = (
-            model.predict(batch, size=max(image_size)).pandas().xyxy
-        )
+        logger.debug("Predicting on batch...")
+        batch_results = model.predict(batch, imgsz=max(image_size))
 
         # Add a new column indicating the source image.
         for image_results in batch_results:
-            image_results[DetectionColumns.DETECTION_PLOT.value] = plot_num
+            results_df = pd.DataFrame(
+                data=image_results.boxes.xyxy.cpu().numpy(),
+                columns=[
+                    DetectionColumns.X1.value,
+                    DetectionColumns.Y1.value,
+                    DetectionColumns.X2.value,
+                    DetectionColumns.Y2.value,
+                ],
+            )
+            results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
             plot_num += 1
 
-        results.extend(batch_results)
+            results.append(results_df)
 
     all_results = pd.concat(results, ignore_index=True)
     # Add a column for the session name.
     all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
+
+
+def load_sam_model(*, model_type: str, weights_file: Path) -> SamPredictor:
+    """
+    Loads the SAM model to use for segmentation.
+
+    Args:
+        model_type: The model type to load.
+        weights_file: The checkpoint file to load weights from.
+
+    Returns:
+        The loaded `SamPredictor`.
+
+    """
+    logger.debug("Loading SAM weights from {}...", weights_file)
+    sam = sam_model_registry[model_type](checkpoint=weights_file.as_posix())
+    return SamPredictor(sam)
+
+
+def segment_flowers(
+    images: Iterable[np.ndarray],
+    *,
+    detections: pd.DataFrame,
+    segmentor: SamPredictor,
+) -> Dict[str, Callable[[], Image.Image]]:
+    """
+    Segments the flowers in a series of input images.
+
+    Args:
+        images: The images to segment flowers in.
+        detections: The detection bounding boxes to use as segmentation prompts.
+        segmentor: The model to use for segmentation.
+
+    Returns:
+        A large array with the segmentations for all the images, indexed by
+        detection plot number and box number.
+
+    """
+    by_plot = detections.set_index(DetectionColumns.DETECTION_PLOT.value)
+
+    # Segments a particular bounding box.
+    def _segment_box(image_: np.ndarray, row_: pd.Series) -> Image.Image:
+        logger.debug("Segmenting plot...")
+        segmentor.set_image(image_)
+
+        box = row_[
+            [
+                DetectionColumns.X1.value,
+                DetectionColumns.Y1.value,
+                DetectionColumns.X2.value,
+                DetectionColumns.Y2.value,
+            ]
+        ]
+        masks, _, _ = segmentor.predict(box.to_numpy())
+        # Combine all the masks into one.
+        mask = np.logical_or.reduce(masks, axis=0)
+        return Image.fromarray(mask, mode="1")
+
+    partitions = {}
+    for plot_num, image in enumerate(images):
+        boxes = by_plot.loc[plot_num]
+        for row_i, (_, row) in enumerate(boxes.iterrows()):
+            session = row[DetectionColumns.SESSION.value]
+            partitions[f"{session}_plot{plot_num:04}_box{row_i:02}"] = partial(
+                _segment_box, image, row
+            )
+    return partitions
 
 
 def compute_heights(height_maps: Iterable[np.ndarray]) -> pd.DataFrame:

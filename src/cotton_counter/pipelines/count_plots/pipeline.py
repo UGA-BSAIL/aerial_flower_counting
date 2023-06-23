@@ -4,7 +4,8 @@ Pipeline for auto-counting.
 
 
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Any, Iterable
+from itertools import chain
 
 from kedro.pipeline import Pipeline, node
 
@@ -51,6 +52,8 @@ from .nodes import (
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
+    segment_flowers,
+    load_sam_model,
 )
 
 SESSIONS = {
@@ -126,6 +129,9 @@ def create_pipeline(**kwargs):
         pipeline += session_pipeline
         session_detection_nodes.append(output_node)
 
+    def _chain_sessions(*args: Any) -> Iterable[Any]:
+        return chain(*args)
+
     # Create combined pipeline.
     pipeline += Pipeline(
         [
@@ -144,6 +150,29 @@ def create_pipeline(**kwargs):
                 ),
                 "filtered_detection_results",
                 name="filter_results",
+            ),
+            # Perform segmentation.
+            node(
+                _chain_sessions,
+                [f"plots_{s}" for s in SESSIONS],
+                "all_plot_images",
+            ),
+            node(
+                load_sam_model,
+                dict(
+                    model_type="params:sam_model_type",
+                    weights_file="params:sam_weights_file",
+                ),
+                "sam_model",
+            ),
+            node(
+                segment_flowers,
+                dict(
+                    images="all_plot_images",
+                    detections="filtered_detection_results",
+                    segmentor="sam_model",
+                ),
+                "mask_results",
             ),
             # Compute counts.
             node(
