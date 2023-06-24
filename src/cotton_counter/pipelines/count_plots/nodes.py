@@ -26,7 +26,7 @@ Size of batches to use for prediction. This mostly impacts memory use.
 
 
 sns.set_theme(
-    context="paper", palette="husl", rc={"savefig.dpi": 400}
+    context="paper", style="whitegrid", palette="husl", rc={"savefig.dpi": 600}
 )
 
 pandarallel.initialize()
