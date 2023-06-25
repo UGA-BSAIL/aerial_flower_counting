@@ -7,20 +7,20 @@ import enum
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Callable
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 import statsmodels.formula.api as sm
+from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
-from pydantic.dataclasses import dataclass
-from ultralytics import YOLO
-from segment_anything import SamPredictor, sam_model_registry
 from PIL import Image
-from loguru import logger
+from pydantic.dataclasses import dataclass
+from segment_anything import SamPredictor, sam_model_registry
+from ultralytics import YOLO
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -362,6 +362,9 @@ def detect_flowers(
                     DetectionColumns.Y2.value,
                 ],
             )
+            results_df[
+                DetectionColumns.CONFIDENCE.value
+            ] = image_results.boxes.conf.cpu().numpy()
             results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
             plot_num += 1
 
@@ -373,7 +376,7 @@ def detect_flowers(
     return all_results
 
 
-def load_sam_model(*, model_type: str, weights_file: Path) -> SamPredictor:
+def load_sam_model(*, model_type: str, weights_file: str) -> SamPredictor:
     """
     Loads the SAM model to use for segmentation.
 
@@ -386,7 +389,9 @@ def load_sam_model(*, model_type: str, weights_file: Path) -> SamPredictor:
 
     """
     logger.debug("Loading SAM weights from {}...", weights_file)
-    sam = sam_model_registry[model_type](checkpoint=weights_file.as_posix())
+    sam = sam_model_registry[model_type](
+        checkpoint=Path(weights_file).as_posix()
+    )
     return SamPredictor(sam)
 
 
@@ -508,7 +513,9 @@ def add_plot_index_for_heights(
     return plot_heights
 
 
-def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
+def collect_session_results(
+    *session_results: pd.DataFrame,
+) -> pd.DataFrame:
     """
     Collects the results from an entire set of sessions into a single Pandas
     DataFrame.
@@ -855,7 +862,8 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
 
     # Index by plot number.
     cleaned.set_index(
-        GroundTruthColumns.PLOT.value, inplace=True,
+        GroundTruthColumns.PLOT.value,
+        inplace=True,
     )
     cleaned.sort_index(inplace=True)
 
@@ -1220,7 +1228,10 @@ def _merge_genotype_info(
     if CountingColumns.DAP.value in combined_data.columns:
         # Group by DAP too if the data are temporal.
         group_columns.append(CountingColumns.DAP.value)
-    return combined_data.groupby(group_columns, as_index=False,).agg("mean")
+    return combined_data.groupby(
+        group_columns,
+        as_index=False,
+    ).agg("mean")
 
 
 def _plot_flowering_time_histogram(
