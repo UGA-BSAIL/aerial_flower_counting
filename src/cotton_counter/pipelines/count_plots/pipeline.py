@@ -54,6 +54,7 @@ from .nodes import (
     plot_peak_flowering_dist,
     segment_flowers,
     load_sam_model,
+merge_dicts
 )
 
 SESSIONS = {
@@ -86,9 +87,9 @@ The set of all the sessions that we want to process.
 """
 
 
-def _create_session_pipeline(session: str) -> Tuple[Pipeline, str]:
+def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
     """
-    Creates a pipeline that can be used to process one session's worth of data.
+    Creates a pipeline that can be used to detect one session's worth of data.
 
     Args:
         session: The session to make a pipeline for.
@@ -119,28 +120,60 @@ def _create_session_pipeline(session: str) -> Tuple[Pipeline, str]:
     )
 
 
+def _create_session_segmentation_pipeline(
+    session: str,
+) -> Tuple[Pipeline, str]:
+    """
+    Creates a pipeline that can be used to segment one session's worth of data.
+
+    Args:
+        session: The session to make a pipeline for.
+
+    Returns:
+        The pipeline that it created, as well as the name of the output node
+            for the detections.
+
+    """
+    segment_flowers_session = partial(segment_flowers, session_name=session)
+
+    output_node = f"masks_{session}"
+    return (
+        Pipeline(
+            [
+                node(
+                    segment_flowers_session,
+                    dict(
+                        images=f"plots_{session}",
+                        detections=f"detection_results",
+                        segmentor="sam_model",
+                    ),
+                    output_node,
+                )
+            ]
+        ),
+        output_node,
+    )
+
+
 def create_pipeline(**kwargs):
     pipeline = Pipeline([])
 
     # Create session-specific pipelines.
-    session_detection_nodes = []
-    for session in SESSIONS:
-        session_pipeline, output_node = _create_session_pipeline(session)
-        pipeline += session_pipeline
-        session_detection_nodes.append(output_node)
-
-    def _chain_sessions(*args: Any) -> Iterable[Any]:
-        return chain(*args)
+    # session_detection_nodes = []
+    # for session in SESSIONS:
+    #     session_pipeline, output_node = _create_session_pipeline(session)
+    #     pipeline += session_pipeline
+    #     session_detection_nodes.append(output_node)
 
     # Create combined pipeline.
     pipeline += Pipeline(
         [
             # Combine the session detections into a single table.
-            node(
-                collect_session_results,
-                session_detection_nodes,
-                "detection_results",
-            ),
+            # node(
+            #     collect_session_results,
+            #     session_detection_nodes,
+            #     "detection_results",
+            # ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,
@@ -151,29 +184,34 @@ def create_pipeline(**kwargs):
                 "filtered_detection_results",
                 name="filter_results",
             ),
-            # Perform segmentation.
-            node(
-                _chain_sessions,
-                [f"plots_{s}" for s in SESSIONS],
-                "all_plot_images",
-            ),
-            node(
-                load_sam_model,
-                dict(
-                    model_type="params:sam_model_type",
-                    weights_file="params:sam_weights_file",
-                ),
-                "sam_model",
-            ),
-            node(
-                segment_flowers,
-                dict(
-                    images="all_plot_images",
-                    detections="filtered_detection_results",
-                    segmentor="sam_model",
-                ),
-                "mask_results",
-            ),
+            # node(
+            #     load_sam_model,
+            #     dict(
+            #         model_type="params:sam_model_type",
+            #         weights_file="params:sam_weights_file",
+            #     ),
+            #     "sam_model",
+            # ),
+        ]
+    )
+
+    # Perform segmentation.
+    session_segmentation_nodes = []
+    # for session in SESSIONS:
+    #     session_pipeline, output_node = _create_session_segmentation_pipeline(
+    #         session
+    #     )
+    #     pipeline += session_pipeline
+    #     session_segmentation_nodes.append(output_node)
+
+    pipeline += Pipeline(
+        [
+            # Merge segmentations.
+            # node(
+            #     merge_dicts,
+            #     session_segmentation_nodes,
+            #     "mask_results",
+            # ),
             # Compute counts.
             node(
                 FieldConfig.from_dict,
@@ -207,9 +245,9 @@ def create_pipeline(**kwargs):
                 "cumulative_counts_with_empty",
             ),
             # Compute heights.
-            node(
-                compute_heights, "plots_dem_j1", "detection_plot_heights_j1",
-            ),
+            # node(
+            #     compute_heights, "plots_dem_j1", "detection_plot_heights_j1",
+            # ),
             node(
                 add_plot_index_for_heights,
                 dict(
@@ -218,9 +256,9 @@ def create_pipeline(**kwargs):
                 ),
                 "plot_heights_j1_with_empty",
             ),
-            node(
-                compute_heights, "plots_dem_j2", "detection_plot_heights_j2",
-            ),
+            # node(
+            #     compute_heights, "plots_dem_j2", "detection_plot_heights_j2",
+            # ),
             node(
                 add_plot_index_for_heights,
                 dict(

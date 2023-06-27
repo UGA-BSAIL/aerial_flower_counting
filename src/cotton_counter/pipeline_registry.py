@@ -9,7 +9,7 @@ from kedro.pipeline import Pipeline
 from .pipelines import count_plots
 
 
-def create_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
+def register_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
     """Create the project's pipeline.
 
     Args:

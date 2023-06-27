@@ -8,12 +8,14 @@ from datetime import date
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+import re
 
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 import statsmodels.formula.api as sm
+import torch.cuda
 from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
@@ -26,6 +28,9 @@ _PREDICTION_BATCH_SIZE = 50
 """
 Size of batches to use for prediction. This mostly impacts memory use.
 """
+
+# Regular expression to match plot keys.
+_PLOT_RE = re.compile(r"plot_(\d+)")
 
 
 sns.set_theme(context="paper", palette="husl", rc={"savefig.dpi": 400})
@@ -219,6 +224,12 @@ class FloweringTimeColumns(enum.Enum):
     """
 
 
+ImagePartitionType = Dict[str, Callable[[], Image.Image]]
+"""
+Type of a partitioned dataset of images.
+"""
+
+
 @dataclass
 class FieldConfig:
     """
@@ -321,8 +332,25 @@ def _to_field_plot_num(
     return int(f"{row_num:02}{column_num:02}")
 
 
+def merge_dicts(*args: Dict) -> Dict:
+    """
+    Small helper node to merge dictionaries.
+
+    Args:
+        *args: The dictionaries to merge.
+
+    Returns:
+        The merged dictionary.
+
+    """
+    merged = {}
+    for arg in args:
+        merged.update(arg)
+    return merged
+
+
 def detect_flowers(
-    images: Iterable[np.ndarray],
+    images: ImagePartitionType,
     *,
     weights_file: Path,
     session_name: str,
@@ -346,13 +374,15 @@ def detect_flowers(
 
     # Infer on batches.
     results = []
-    plot_num = 0
-    for batch in _batch_iter(images, batch_size=_PREDICTION_BATCH_SIZE):
+    for batch_keys in _batch_iter(
+        images.keys(), batch_size=_PREDICTION_BATCH_SIZE
+    ):
         logger.debug("Predicting on batch...")
+        batch = [np.array(images[key]()) for key in batch_keys]
         batch_results = model.predict(batch, imgsz=max(image_size))
 
         # Add a new column indicating the source image.
-        for image_results in batch_results:
+        for key, image_results in zip(batch_keys, batch_results):
             results_df = pd.DataFrame(
                 data=image_results.boxes.xyxy.cpu().numpy(),
                 columns=[
@@ -365,8 +395,9 @@ def detect_flowers(
             results_df[
                 DetectionColumns.CONFIDENCE.value
             ] = image_results.boxes.conf.cpu().numpy()
+
+            plot_num = int(_PLOT_RE.match(key).group(1))
             results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
-            plot_num += 1
 
             results.append(results_df)
 
@@ -392,14 +423,22 @@ def load_sam_model(*, model_type: str, weights_file: str) -> SamPredictor:
     sam = sam_model_registry[model_type](
         checkpoint=Path(weights_file).as_posix()
     )
+    if torch.cuda.is_available():
+        sam = sam.cuda().eval()
+    else:
+        logger.warning(
+            "Not using CUDA for SAM, because torch couldn't find it."
+        )
+        sam = sam.eval()
     return SamPredictor(sam)
 
 
 def segment_flowers(
-    images: Iterable[np.ndarray],
+    images: ImagePartitionType,
     *,
     detections: pd.DataFrame,
     segmentor: SamPredictor,
+    session_name: str,
 ) -> Dict[str, Callable[[], Image.Image]]:
     """
     Segments the flowers in a series of input images.
@@ -408,18 +447,25 @@ def segment_flowers(
         images: The images to segment flowers in.
         detections: The detection bounding boxes to use as segmentation prompts.
         segmentor: The model to use for segmentation.
+        session_name: The name of this session.
 
     Returns:
         A large array with the segmentations for all the images, indexed by
         detection plot number and box number.
 
     """
+    # Filter to only this session.
+    detections = detections[
+        detections[DetectionColumns.SESSION.value] == session_name
+    ]
     by_plot = detections.set_index(DetectionColumns.DETECTION_PLOT.value)
 
     # Segments a particular bounding box.
-    def _segment_box(image_: np.ndarray, row_: pd.Series) -> Image.Image:
+    def _segment_box(
+        image_: Callable[[], np.array], row_: pd.Series
+    ) -> Image.Image:
         logger.debug("Segmenting plot...")
-        segmentor.set_image(image_)
+        segmentor.set_image(np.array(image_().convert("RGB")))
 
         box = row_[
             [
@@ -429,14 +475,21 @@ def segment_flowers(
                 DetectionColumns.Y2.value,
             ]
         ]
-        masks, _, _ = segmentor.predict(box.to_numpy())
+        mask, _, _ = segmentor.predict(
+            box=box.to_numpy(), multimask_output=False
+        )
         # Combine all the masks into one.
-        mask = np.logical_or.reduce(masks, axis=0)
-        return Image.fromarray(mask, mode="1")
+        return Image.fromarray(mask[0].astype(np.uint8) * 255, mode="L")
 
     partitions = {}
-    for plot_num, image in enumerate(images):
-        boxes = by_plot.loc[plot_num]
+    for key, image in images.items():
+        plot_num = int(_PLOT_RE.match(key).group(1))
+        try:
+            boxes = by_plot.loc[[plot_num]]
+        except KeyError:
+            # No detections for this image.
+            continue
+
         for row_i, (_, row) in enumerate(boxes.iterrows()):
             session = row[DetectionColumns.SESSION.value]
             partitions[f"{session}_plot{plot_num:04}_box{row_i:02}"] = partial(
@@ -513,9 +566,7 @@ def add_plot_index_for_heights(
     return plot_heights
 
 
-def collect_session_results(
-    *session_results: pd.DataFrame,
-) -> pd.DataFrame:
+def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
     """
     Collects the results from an entire set of sessions into a single Pandas
     DataFrame.
@@ -862,8 +913,7 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
 
     # Index by plot number.
     cleaned.set_index(
-        GroundTruthColumns.PLOT.value,
-        inplace=True,
+        GroundTruthColumns.PLOT.value, inplace=True,
     )
     cleaned.sort_index(inplace=True)
 
@@ -1228,10 +1278,7 @@ def _merge_genotype_info(
     if CountingColumns.DAP.value in combined_data.columns:
         # Group by DAP too if the data are temporal.
         group_columns.append(CountingColumns.DAP.value)
-    return combined_data.groupby(
-        group_columns,
-        as_index=False,
-    ).agg("mean")
+    return combined_data.groupby(group_columns, as_index=False,).agg("mean")
 
 
 def _plot_flowering_time_histogram(
@@ -1740,7 +1787,7 @@ def plot_ground_truth_vs_predicted(
 
 def plot_flowering_curves(
     *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
-) -> Iterable[plot.Figure]:
+) -> Dict[str, Callable[[], plot.Figure]]:
     """
     Creates a flowering curve for each individual plot.
 
@@ -1749,8 +1796,8 @@ def plot_flowering_curves(
             counts.
         genotypes: The cleaned genotype information.
 
-    Yields:
-        The curves for each plot, in order.
+    Returns:
+        Partitioned dataset containing the figure for each genotype.
 
     """
     # Get all the sessions to use as a common index.
@@ -1806,9 +1853,11 @@ def plot_flowering_curves(
     # Group by genotype, and plot all replicates on the same axes.
     genotype_groups = combined_data.groupby([GenotypeColumns.GENOTYPE.value])
 
-    for genotype, genotype_indices in genotype_groups.indices.items():
+    def _plot_genotype(
+        genotype_: str, genotype_indices_: List[int]
+    ) -> plot.Figure:
         # Get the rows pertaining to this genotype.
-        genotype_rows = combined_data.iloc[genotype_indices]
+        genotype_rows = combined_data.iloc[genotype_indices_]
 
         # Extract the index as columns, so we can plot it.
         genotype_rows.reset_index(inplace=True)
@@ -1821,12 +1870,19 @@ def plot_flowering_curves(
             palette="husl",
             linewidth=1.5,
         )
-        axes.set_title(f"Genotype {genotype}")
+        axes.set_title(f"Genotype {genotype_}")
         axes.set(
             xlabel="Days After Planting", ylabel="Cumulative # of Flowers"
         )
 
-        yield plot.gcf()
+        return plot.gcf()
+
+    partitions = {}
+    for genotype, genotype_indices in genotype_groups.indices.items():
+        partitions[f"genotype_{genotype}"] = partial(
+            _plot_genotype, genotype, genotype_indices
+        )
+    return partitions
 
 
 def plot_mean_flowering_curve(
