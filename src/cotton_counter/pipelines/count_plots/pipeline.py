@@ -13,7 +13,7 @@ from .nodes import (
     FieldConfig,
     add_dap_counting,
     add_dap_ground_truth,
-    add_plot_index_for_heights,
+    add_plot_index,
     clean_empty_plots,
     clean_genotypes,
     clean_ground_truth,
@@ -54,7 +54,9 @@ from .nodes import (
     plot_peak_flowering_dist,
     segment_flowers,
     load_sam_model,
-merge_dicts
+    merge_dicts,
+    compute_flower_sizes,
+    plot_flower_size_comparison,
 )
 
 SESSIONS = {
@@ -158,60 +160,62 @@ def _create_session_segmentation_pipeline(
 def create_pipeline(**kwargs):
     pipeline = Pipeline([])
 
-    # Create session-specific pipelines.
-    # session_detection_nodes = []
-    # for session in SESSIONS:
-    #     session_pipeline, output_node = _create_session_pipeline(session)
-    #     pipeline += session_pipeline
-    #     session_detection_nodes.append(output_node)
+    # Create session-specific pipelines for detection.
+    session_detection_nodes = []
+    for session in SESSIONS:
+        session_pipeline, output_node = _create_session_detection_pipeline(
+            session
+        )
+        pipeline += session_pipeline
+        session_detection_nodes.append(output_node)
 
     # Create combined pipeline.
     pipeline += Pipeline(
         [
             # Combine the session detections into a single table.
-            # node(
-            #     collect_session_results,
-            #     session_detection_nodes,
-            #     "detection_results",
-            # ),
+            node(
+                collect_session_results,
+                session_detection_nodes,
+                "detection_results",
+            ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,
                 dict(
-                    counting_results="detection_results",
+                    detection_results="detection_results",
                     min_confidence="params:min_confidence",
                 ),
                 "filtered_detection_results",
                 name="filter_results",
             ),
-            # node(
-            #     load_sam_model,
-            #     dict(
-            #         model_type="params:sam_model_type",
-            #         weights_file="params:sam_weights_file",
-            #     ),
-            #     "sam_model",
-            # ),
+            node(
+                load_sam_model,
+                dict(
+                    model_type="params:sam_model_type",
+                    weights_file="params:sam_weights_file",
+                ),
+                "sam_model",
+            ),
         ]
     )
 
     # Perform segmentation.
     session_segmentation_nodes = []
-    # for session in SESSIONS:
-    #     session_pipeline, output_node = _create_session_segmentation_pipeline(
-    #         session
-    #     )
-    #     pipeline += session_pipeline
-    #     session_segmentation_nodes.append(output_node)
+    for session in SESSIONS:
+        session_pipeline, output_node = _create_session_segmentation_pipeline(
+            session
+        )
+        pipeline += session_pipeline
+        session_segmentation_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
             # Merge segmentations.
-            # node(
-            #     merge_dicts,
-            #     session_segmentation_nodes,
-            #     "mask_results",
-            # ),
+            node(
+                merge_dicts,
+                session_segmentation_nodes,
+                "mask_results",
+            ),
             # Compute counts.
             node(
                 FieldConfig.from_dict,
@@ -225,8 +229,13 @@ def create_pipeline(**kwargs):
             ),
             node(
                 compute_counts,
+                "filtered_detection_results",
+                "counting_results_no_dap_no_plot",
+            ),
+            node(
+                add_plot_index,
                 dict(
-                    detection_results="filtered_detection_results",
+                    plot_data="counting_results_no_dap_no_plot",
                     field_config="j2_field_config",
                 ),
                 "counting_results_no_dap",
@@ -244,25 +253,43 @@ def create_pipeline(**kwargs):
                 "counting_results_with_empty",
                 "cumulative_counts_with_empty",
             ),
-            # Compute heights.
-            # node(
-            #     compute_heights, "plots_dem_j1", "detection_plot_heights_j1",
-            # ),
+            # Compute flower sizes.
             node(
-                add_plot_index_for_heights,
+                compute_flower_sizes,
                 dict(
-                    plot_heights="detection_plot_heights_j1",
+                    detection_results="filtered_detection_results",
+                    flower_masks="mask_results",
+                    gsds="params:session_gsds",
+                ),
+                "flower_sizes_no_dap_no_plot",
+            ),
+            node(
+                add_plot_index,
+                dict(
+                    plot_data="flower_sizes_no_dap_no_plot",
+                    field_config="j2_field_config",
+                ),
+                "flower_sizes",
+            ),
+            # Compute heights.
+            node(
+                compute_heights, "plots_dem_j1", "detection_plot_heights_j1",
+            ),
+            node(
+                add_plot_index,
+                dict(
+                    plot_data="detection_plot_heights_j1",
                     field_config="j1_field_config",
                 ),
                 "plot_heights_j1_with_empty",
             ),
-            # node(
-            #     compute_heights, "plots_dem_j2", "detection_plot_heights_j2",
-            # ),
             node(
-                add_plot_index_for_heights,
+                compute_heights, "plots_dem_j2", "detection_plot_heights_j2",
+            ),
+            node(
+                add_plot_index,
                 dict(
-                    plot_heights="detection_plot_heights_j2",
+                    plot_data="detection_plot_heights_j2",
                     field_config="j2_field_config",
                 ),
                 "plot_heights_j2_with_empty",
@@ -458,6 +485,13 @@ def create_pipeline(**kwargs):
                     plot_heights="plot_heights", genotypes="cleaned_genotypes",
                 ),
                 "plot_height_comparison",
+            ),
+            node(
+                plot_flower_size_comparison,
+                dict(
+                    flower_sizes="flower_sizes", genotypes="cleaned_genotypes"
+                ),
+                "flower_size_comparison",
             ),
             node(
                 plot_flowering_curves,

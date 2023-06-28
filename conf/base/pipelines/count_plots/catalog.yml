@@ -272,6 +272,12 @@ plot_height_comparison:
   filepath: data/08_reporting/plot_height_comparison.png
   versioned: True
 
+# Comparison of the flower sizes for different populations.
+flower_size_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flower_size_comparison.png
+  versioned: True
+
 # Individual flowering curves for each plot.
 flowering_curves:
   type: PartitionedDataSet

@@ -132,6 +132,10 @@ class DetectionColumns(enum.Enum):
     """
     The (detection) plot number that these detections are from.
     """
+    BOX_NUM = "box_num"
+    """
+    The number of the box that these detections are from.
+    """
     CONFIDENCE = "confidence"
     """
     The confidence score of the detection.
@@ -166,7 +170,7 @@ class CountingColumns(enum.Enum):
     """
     The name of the session that this count is from.
     """
-    PLOT = "plot"
+    PLOT = "field_plot"
     """
     The field plot number that this count is from.
     """
@@ -186,6 +190,10 @@ class HeightColumns(enum.Enum):
     Names of the columns in the plot height dataframe.
     """
 
+    DETECTION_PLOT = DetectionColumns.DETECTION_PLOT.value
+    """
+    The detection plot number that these heights are from.
+    """
     PLOT = CountingColumns.PLOT.value
     """
     The field plot number that these heights are from.
@@ -221,6 +229,18 @@ class FloweringTimeColumns(enum.Enum):
     DURATION = "duration"
     """
     The total flowering duration, in days.
+    """
+
+
+@enum.unique
+class FlowerSizeColumns(enum.Enum):
+    """
+    Names of the columns in the flower size dataframe.
+    """
+
+    SIZE_CM = "size_cm"
+    """
+    The size of the flower, in cm^2.
     """
 
 
@@ -378,7 +398,7 @@ def detect_flowers(
         images.keys(), batch_size=_PREDICTION_BATCH_SIZE
     ):
         logger.debug("Predicting on batch...")
-        batch = [np.array(images[key]()) for key in batch_keys]
+        batch = [images[key]().convert("RGB") for key in batch_keys]
         batch_results = model.predict(batch, imgsz=max(image_size))
 
         # Add a new column indicating the source image.
@@ -395,6 +415,9 @@ def detect_flowers(
             results_df[
                 DetectionColumns.CONFIDENCE.value
             ] = image_results.boxes.conf.cpu().numpy()
+            results_df[DetectionColumns.BOX_NUM.value] = np.arange(
+                len(results_df)
+            )
 
             plot_num = int(_PLOT_RE.match(key).group(1))
             results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
@@ -526,21 +549,21 @@ def compute_heights(height_maps: Iterable[np.ndarray]) -> pd.DataFrame:
     results = pd.DataFrame(
         data={
             HeightColumns.HEIGHT.value: plot_heights,
-            HeightColumns.PLOT.value: range(len(plot_heights)),
+            HeightColumns.DETECTION_PLOT.value: range(len(plot_heights)),
         },
     )
 
     return results
 
 
-def add_plot_index_for_heights(
-    plot_heights: pd.DataFrame, field_config: FieldConfig
+def add_plot_index(
+    plot_data: pd.DataFrame, field_config: FieldConfig
 ) -> pd.DataFrame:
     """
-    Adds the correct field plot index to the height data.
+    Adds the correct field plot index to data that have only detection plots.
 
     Args:
-        plot_heights: The raw plot height data, with a detection plot number
+        plot_data: The raw plot data, with a detection plot number
             column.
         field_config: The field configuration to use.
 
@@ -549,21 +572,22 @@ def add_plot_index_for_heights(
 
     """
     # Compute field plot numbers.
-    plot_heights[HeightColumns.PLOT.value] = plot_heights[
-        HeightColumns.PLOT.value
+    plot_data[CountingColumns.PLOT.value] = plot_data[
+        DetectionColumns.DETECTION_PLOT.value
     ].apply(_to_field_plot_num, field_config=field_config)
 
     # Remove NaN values, because these are for empty plots.
-    plot_heights = plot_heights[
-        ~plot_heights[HeightColumns.PLOT.value].isnull()
-    ]
+    plot_data.dropna(inplace=True)
+    plot_data[CountingColumns.PLOT.value] = plot_data[
+        CountingColumns.PLOT.value
+    ].astype("uint64")
 
     # Set the index.
-    plot_heights = plot_heights.set_index(HeightColumns.PLOT.value)
-    plot_heights.index.name = HeightColumns.PLOT.value
-    plot_heights.sort_index(inplace=True)
+    plot_data = plot_data.set_index(CountingColumns.PLOT.value)
+    plot_data.index.name = CountingColumns.PLOT.value
+    plot_data.sort_index(inplace=True)
 
-    return plot_heights
+    return plot_data
 
 
 def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
@@ -597,33 +621,32 @@ def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_low_confidence(
-    counting_results: pd.DataFrame, *, min_confidence: float
+    detection_results: pd.DataFrame, *, min_confidence: float
 ) -> pd.DataFrame:
     """
     Filters the counting results to remove any detections with low confidence.
 
     Args:
-        counting_results: The complete counting results.
+        detection_results: The complete detection results.
         min_confidence: The minimum confidence value to keep.
 
     Returns:
         The filtered results.
 
     """
-    return counting_results[
-        counting_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
-    ]
+    return detection_results[
+        detection_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
+        ]
 
 
 def compute_counts(
-    detection_results: pd.DataFrame, *, field_config: FieldConfig
+    detection_results: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Computes the counts for each plot based on the detection results.
 
     Args:
         detection_results: The results from the detection stage.
-        field_config: Represents the configuration of the field.
 
     Returns:
         A DataFrame of the computed counts.
@@ -641,22 +664,6 @@ def compute_counts(
     counts_per_plot[
         CountingColumns.COUNT.value
     ] = counts_per_plot_series.values
-
-    # Convert the plot numbers used during detection to the plot numbers used
-    # in the field.
-    counts_per_plot[CountingColumns.PLOT.value] = counts_per_plot[
-        DetectionColumns.DETECTION_PLOT.value
-    ].apply(_to_field_plot_num, field_config=field_config)
-
-    # Remove null values.
-    counts_per_plot.dropna(inplace=True)
-    counts_per_plot[CountingColumns.PLOT.value] = counts_per_plot[
-        CountingColumns.PLOT.value
-    ].astype("uint64")
-    # Use plot number as an index.
-    counts_per_plot.set_index(CountingColumns.PLOT.value, inplace=True)
-    counts_per_plot.index.name = CountingColumns.PLOT.value
-    counts_per_plot.sort_index(inplace=True)
 
     return counts_per_plot
 
@@ -1244,6 +1251,61 @@ def compute_flowering_ramps(
     return plot_groups.parallel_apply(_fit_line_for_plot)
 
 
+def compute_flower_sizes(
+    *,
+    flower_masks: ImagePartitionType,
+    detection_results: pd.DataFrame,
+    gsds: Dict[str, float],
+) -> pd.DataFrame:
+    """
+    Computes the average flower size for each plot.
+
+    Args:
+        flower_masks: The flower masks for each plot.
+        detection_results: The detection results. These will be used to
+            determine what plot masks we look at.
+        gsds: A mapping of session names to GSD values for that session,
+            in cm/px.
+
+    Returns:
+        A dataframe containing the average flower size for each plot.
+
+    """
+
+    def _compute_size(detection_row: pd.Series) -> float:
+        """
+        Computes the average flower size for a single detection.
+
+        Args:
+            detection_row: The row of the detection results for the plot.
+
+        Returns:
+            The average flower size for the plot.
+
+        """
+        session = detection_row[DetectionColumns.SESSION.value]
+        plot_num = detection_row[DetectionColumns.DETECTION_PLOT.value]
+        box_num = detection_row[DetectionColumns.BOX_NUM.value]
+
+        # Compute the size based on the mask.
+        try:
+            mask_image = np.array(
+                flower_masks[f"{session}_plot{plot_num:04}_box{box_num:02}"]()
+            )
+        except KeyError as error:
+            logger.warning(f"Could not find mask for detection: {error}")
+            return np.nan
+        size_px = np.count_nonzero(mask_image)
+        size_cm_2 = size_px * (gsds[session] * gsds[session])
+
+        return size_cm_2
+
+    detection_results[
+        FlowerSizeColumns.SIZE_CM.value
+    ] = detection_results.parallel_apply(_compute_size, axis=1)
+    return detection_results.dropna()
+
+
 def _merge_genotype_info(
     *, flower_data: pd.DataFrame, genotypes: pd.DataFrame
 ) -> pd.DataFrame:
@@ -1543,6 +1605,41 @@ def plot_flowering_end_comparison(
     return _plot_flowering_time_means(
         flowering_end_times, **kwargs, title="Mean Flowering End Time"
     )
+
+
+def plot_flower_size_comparison(
+        *, flower_sizes: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering sizes of different populations.
+
+    Args:
+        flower_sizes: Dataset containing flower sizes for each plot.
+        genotypes: The genotype data.
+
+    Returns:
+        The plot that it made.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flower_sizes, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=FlowerSizeColumns.SIZE_CM.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title("Flower Size")
+    axes.set(xlabel="Population", ylabel="Size (cm^2)")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
 
 
 def plot_flowering_duration_dist(
