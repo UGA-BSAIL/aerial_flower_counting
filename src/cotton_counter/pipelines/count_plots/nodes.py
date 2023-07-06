@@ -2,7 +2,6 @@
 Contains nodes for the `count_plots` pipeline.
 """
 
-
 import enum
 from datetime import date
 from functools import partial
@@ -23,6 +22,7 @@ from PIL import Image
 from pydantic.dataclasses import dataclass
 from segment_anything import SamPredictor, sam_model_registry
 from ultralytics import YOLO
+from .visualization import draw_detections
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -31,7 +31,8 @@ Size of batches to use for prediction. This mostly impacts memory use.
 
 # Regular expression to match plot keys.
 _PLOT_RE = re.compile(r"plot_(\d+)")
-
+# Regular expression to match qualitative example plot image names.
+_QUAL_EXAMPLE_PLOT_RE = re.compile(r"(\d+-\d+-\d+)_plot_(\d+)_(.*)")
 
 sns.set_theme(context="paper", palette="husl", rc={"savefig.dpi": 400})
 
@@ -636,12 +637,10 @@ def filter_low_confidence(
     """
     return detection_results[
         detection_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
-        ]
+    ]
 
 
-def compute_counts(
-    detection_results: pd.DataFrame
-) -> pd.DataFrame:
+def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     """
     Computes the counts for each plot based on the detection results.
 
@@ -966,47 +965,32 @@ def clean_height_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
     return cleaned
 
 
-def find_empty_plots(
-    *, cumulative_counts: pd.DataFrame, num_empty_plots: int
-) -> List[int]:
-    """
-    Uses a very simple approach to find the plots that are probably empty.
-    Basically, it just assumes that the plots with the lowest number of total
-    flowers are empty.
-
-    Args:
-        cumulative_counts: The cumulative counting results.
-        num_empty_plots: The total number of empty plots in the field.
-
-    Returns:
-        List of the plots that are probably empty.
-
-    """
-    # Keep only the final counts for each plot.
-    only_counts = cumulative_counts[CountingColumns.COUNT.value]
-    plot_groups = only_counts.groupby([only_counts.index])
-    total_counts = plot_groups.agg("max")
-
-    # Find the smallest ones.
-    total_counts.sort_values(inplace=True)
-    return total_counts.index.tolist()[:num_empty_plots]
-
-
 def clean_empty_plots(
-    *, plot_df: pd.DataFrame, empty_plots: List[int]
+    *,
+    plot_df: pd.DataFrame,
+    empty_plots: pd.DataFrame,
+    field_config: FieldConfig,
 ) -> pd.DataFrame:
     """
     Removes rows from a dataframe that correspond to empty plots.
 
     Args:
         plot_df: The dataframe to clean, indexed by plot number.
-        empty_plots: The list of plots that are empty.
+        empty_plots: The list of (detection) plots that are empty.
+        field_config: The configuration for this field.
 
     Returns:
         The same dataframe, but without rows for empty plots.
 
     """
-    plot_df.drop(empty_plots, inplace=True)
+    empty_plots = empty_plots.to_numpy()[:, 0]
+    empty_plots = [
+        _to_field_plot_num(p, field_config=field_config) for p in empty_plots
+    ]
+    # Remove Nones that result from rows that are not planted.
+    empty_plots = [p for p in empty_plots if p is not None]
+
+    plot_df.drop(empty_plots, inplace=True, errors="ignore")
     return plot_df
 
 
@@ -1608,7 +1592,7 @@ def plot_flowering_end_comparison(
 
 
 def plot_flower_size_comparison(
-        *, flower_sizes: pd.DataFrame, genotypes: pd.DataFrame
+    *, flower_sizes: pd.DataFrame, genotypes: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the flowering sizes of different populations.
@@ -2013,3 +1997,65 @@ def plot_mean_flowering_curve(
     axes.set(xlabel="Days After Planting", ylabel="Cumulative # of Flowers")
 
     return plot.gcf()
+
+
+def draw_qualitative_results(
+    *,
+    qualitative_examples: ImagePartitionType,
+    detection_results: pd.DataFrame,
+    flower_masks: ImagePartitionType,
+) -> Dict[str, Image.Image]:
+    """
+    Draws the detection results for qualitative example plot images.
+
+    Args:
+        qualitative_examples: The qualitative example plot images.
+        detection_results: The detection results.
+        flower_masks: The flower segmentation masks.
+
+    Returns:
+        The same qualitative example images, with the results drawn on top.
+
+    """
+    detection_results = detection_results.set_index(
+        DetectionColumns.DETECTION_PLOT.value
+    )
+
+    partitions = {}
+    for example_name, example_image in qualitative_examples.items():
+        # Extract the plot information.
+        match = _QUAL_EXAMPLE_PLOT_RE.match(example_name)
+        session = match.group(1)
+        plot_number = int(match.group(2))
+
+        # Get the example's detection results.
+        example_detection_results = detection_results.loc[plot_number]
+        example_detection_results = example_detection_results[
+            example_detection_results[DetectionColumns.SESSION.value]
+            == session
+        ]
+
+        # Get the masks for the detections.
+        masks = []
+        for _, detection in example_detection_results.iterrows():
+            # Get the mask for this detection.
+            box_num = detection[DetectionColumns.BOX_NUM.value]
+            mask_key = f"{session}_plot{plot_number:04}_box{box_num:02}"
+            masks.append(flower_masks[mask_key]())
+
+        # Do the drawing.
+        detections = example_detection_results[
+            [
+                DetectionColumns.X1.value,
+                DetectionColumns.Y1.value,
+                DetectionColumns.X2.value,
+                DetectionColumns.Y2.value,
+                DetectionColumns.CONFIDENCE.value,
+            ]
+        ]
+        overlaid_image = draw_detections(
+            example_image(), detections=detections.to_numpy(), masks=masks
+        )
+        partitions[example_name] = overlaid_image
+
+    return partitions

@@ -33,6 +33,13 @@ ground_truth_height_spreadsheet:
   load_args:
     engine: openpyxl
 
+# Dataset containing the list of empty plots.
+empty_plots_j2:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/empty_plots_j2.csv
+  save_args:
+    index: false
+
 # Datasets containing extracted plot images to process.
 _plot_image_params: &plot_image_params
   type: PartitionedDataSet
@@ -145,6 +152,14 @@ plots_dem_j1:
 plots_dem_j2:
   path: ${plot_image_dir}/m100/2021-12-13/j2
   <<: *plot_image_params
+
+# This contains qualitative plot image examples.
+qualitative_examples:
+  type: PartitionedDataSet
+  path: data/01_raw/qualitative_examples
+  filename_suffix: ".tif"
+  dataset:
+    type: pillow.ImageDataSet
 
 # Dataset containing all the detection results.
 detection_results:
@@ -309,3 +324,11 @@ ground_truth_vs_predicted:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/ground_truth_vs_predicted.png
   versioned: True
+
+# Dateset containing qualitative examples with detections overlayed.
+qualitative_example_detections:
+  type: PartitionedDataSet
+  path: data/08_reporting/qualitative_example_detections
+  filename_suffix: ".png"
+  dataset:
+    type: pillow.ImageDataSet

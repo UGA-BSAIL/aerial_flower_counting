@@ -22,6 +22,8 @@ logs/**
 # Keep small data files.
 !data/01_raw/*.yml
 !data/01_raw/*.xlsx
+!data/01_raw/*.csv
+!data/01_raw/qualitative_examples/*
 
 
 ##########################
