@@ -50,6 +50,7 @@ def train(dataset: Path, *, model: str, name: Optional[str] = None) -> None:
         imgsz=720,
         project="flower_counting",
         name=name,
+        batch=-1,
     )
 
 

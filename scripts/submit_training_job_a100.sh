@@ -13,7 +13,9 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:a100:1
 #SBATCH --time=48:00:00
-#SBATCH --mem=16gb
+#SBATCH --mem=32gb
+#SBATCH --account=lift-phenomics
+#SBATCH --qos=lift-phenomics
 #SBATCH --mail-user=djpetti@gmail.com
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=yolo_model_train.%j.out    # Standard output log
@@ -22,9 +24,9 @@
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/blue/cli2/$(whoami)/job_scratch/"
+OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/blue/cli2/$(whoami)/aerial_flower/"
+LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.
@@ -53,4 +55,4 @@ function prepare_environment() {
 prepare_environment
 
 # Run the training.
-python -m src.yolov8_train -d /blue/cli2/daniel.petti/ssl/data/05_model_input/flower_dataset/dataset.yaml $@
+python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/dataset.yaml $@
