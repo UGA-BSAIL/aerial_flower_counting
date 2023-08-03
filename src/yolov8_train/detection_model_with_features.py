@@ -1,5 +1,5 @@
 from ultralytics.nn.tasks import DetectionModel
-from ultralytics.yolo.utils.plotting import feature_visualization
+from ultralytics.utils.plotting import feature_visualization
 from copy import deepcopy
 from torch import Tensor
 from typing import Tuple, Any
