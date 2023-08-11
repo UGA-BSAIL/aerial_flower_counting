@@ -55,4 +55,4 @@ function prepare_environment() {
 prepare_environment
 
 # Run the training.
-python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/dataset.yaml $@
+python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/ground_dataset.yaml $@
