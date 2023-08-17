@@ -41,6 +41,9 @@ pytest_flake8 = "^1.0.6"
 pytest_snapshot = "^0.4.2"
 pyyaml = "^6.0.1"
 
+[tool.poetry.group.dev.dependencies]
+black = "^23.7.0"
+
 [tool.black]
 line-length = 79
 exclude = '''
