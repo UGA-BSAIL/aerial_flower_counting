@@ -33,114 +33,133 @@ ground_truth_height_spreadsheet:
   load_args:
     engine: openpyxl
 
+# Dataset containing the list of empty plots.
+empty_plots_j2:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/empty_plots_j2.csv
+  save_args:
+    index: false
+
 # Datasets containing extracted plot images to process.
 _plot_image_params: &plot_image_params
-  type: cotton_counter.data_sets.MultiFileDataSet
-  versioned: False
-  dataset: pillow.ImageDataSet
-  extension: .tif
-  prefix: plot
+  type: PartitionedDataSet
+  filename_suffix: ".tif"
+  dataset:
+    type: pillow.ImageDataSet
 
 plots_2021-08-09:
-  filepath: ${plot_image_dir}/p4/2021-08-09
+  path: ${plot_image_dir}/p4/2021-08-09
   << : *plot_image_params
 
 plots_2021-08-13:
-  filepath: ${plot_image_dir}/p4/2021-08-13
+  path: ${plot_image_dir}/p4/2021-08-13
   << : *plot_image_params
 
 plots_2021-08-16:
-  filepath: ${plot_image_dir}/p4/2021-08-16
+  path: ${plot_image_dir}/p4/2021-08-16
   << : *plot_image_params
 
 plots_2021-08-20:
-  filepath: ${plot_image_dir}/p4/2021-08-20
+  path: ${plot_image_dir}/p4/2021-08-20
   << : *plot_image_params
 
 plots_2021-08-27:
-  filepath: ${plot_image_dir}/m100/2021-08-27
+  path: ${plot_image_dir}/m100/2021-08-27
   << : *plot_image_params
 
 plots_2021-08-30:
-  filepath: ${plot_image_dir}/m100/2021-08-30
+  path: ${plot_image_dir}/m100/2021-08-30
   << : *plot_image_params
 
 plots_2021-09-03:
-  filepath: ${plot_image_dir}/m100/2021-09-03
+  path: ${plot_image_dir}/m100/2021-09-03
   << : *plot_image_params
 
 plots_2021-09-06:
-  filepath: ${plot_image_dir}/m100/2021-09-06
+  path: ${plot_image_dir}/m100/2021-09-06
   << : *plot_image_params
 
 plots_2021-09-10:
-  filepath: ${plot_image_dir}/m100/2021-09-10
+  path: ${plot_image_dir}/m100/2021-09-10
   << : *plot_image_params
 
 plots_2021-09-13:
-  filepath: ${plot_image_dir}/m100/2021-09-13
+  path: ${plot_image_dir}/m100/2021-09-13
   << : *plot_image_params
 
 plots_2021-09-17:
-  filepath: ${plot_image_dir}/m100/2021-09-17
+  path: ${plot_image_dir}/m100/2021-09-17
   << : *plot_image_params
 
 plots_2021-09-24:
-  filepath: ${plot_image_dir}/m100/2021-09-24
+  path: ${plot_image_dir}/m100/2021-09-24
   << : *plot_image_params
 
 plots_2021-09-27:
-  filepath: ${plot_image_dir}/m100/2021-09-27
+  path: ${plot_image_dir}/m100/2021-09-27
   << : *plot_image_params
 
 plots_2021-10-01:
-  filepath: ${plot_image_dir}/m100/2021-10-01
+  path: ${plot_image_dir}/m100/2021-10-01
   << : *plot_image_params
 
 plots_2021-10-08:
-  filepath: ${plot_image_dir}/p4/2021-10-08
+  path: ${plot_image_dir}/p4/2021-10-08
   << : *plot_image_params
 
 plots_2021-10-11:
-  filepath: ${plot_image_dir}/m100/2021-10-11
+  path: ${plot_image_dir}/m100/2021-10-11
   << : *plot_image_params
 
 plots_2021-10-15:
-  filepath: ${plot_image_dir}/m100/2021-10-15
+  path: ${plot_image_dir}/m100/2021-10-15
   << : *plot_image_params
 
 plots_2021-10-18:
-  filepath: ${plot_image_dir}/m100/2021-10-18
+  path: ${plot_image_dir}/m100/2021-10-18
   << : *plot_image_params
 
 plots_2021-10-22:
-  filepath: ${plot_image_dir}/m100/2021-10-22
+  path: ${plot_image_dir}/m100/2021-10-22
   << : *plot_image_params
 
 plots_2021-10-25:
-  filepath: ${plot_image_dir}/m100/2021-10-25
+  path: ${plot_image_dir}/m100/2021-10-25
   << : *plot_image_params
 
 plots_2021-10-29:
-  filepath: ${plot_image_dir}/m100/2021-10-29
+  path: ${plot_image_dir}/m100/2021-10-29
   << : *plot_image_params
 
 plots_2021-11-01:
-  filepath: ${plot_image_dir}/m100/2021-11-01
+  path: ${plot_image_dir}/m100/2021-11-01
   << : *plot_image_params
 
 plots_2021-11-05:
-  filepath: ${plot_image_dir}/m100/2021-11-05
+  path: ${plot_image_dir}/m100/2021-11-05
   << : *plot_image_params
+
+# Dataset containing all plot images.
+all_plot_images:
+  type: MemoryDataSet
+  copy_mode: assign
 
 # This contains height data.
 plots_dem_j1:
-  filepath: ${plot_image_dir}/m100/2021-12-13/j1
+  path: ${plot_image_dir}/m100/2021-12-13/j1
   <<: *plot_image_params
 
 plots_dem_j2:
-  filepath: ${plot_image_dir}/m100/2021-12-13/j2
+  path: ${plot_image_dir}/m100/2021-12-13/j2
   <<: *plot_image_params
+
+# This contains qualitative plot image examples.
+qualitative_examples:
+  type: PartitionedDataSet
+  path: data/01_raw/qualitative_examples
+  filename_suffix: ".tif"
+  dataset:
+    type: pillow.ImageDataSet
 
 # Dataset containing all the detection results.
 detection_results:
@@ -153,6 +172,19 @@ counting_results:
   type: pandas.ParquetDataSet
   filepath: data/03_primary/counting_results.parquet
   versioned: True
+
+# Segment Anything model to use.
+sam_model:
+  type: MemoryDataSet
+  copy_mode: assign
+
+# Dateset containing the masks for each plot.
+mask_results:
+  type: PartitionedDataSet
+  path: data/03_primary/flower_masks
+  filename_suffix: ".png"
+  dataset:
+    type: pillow.ImageDataSet
 
 # Dataset containing estimated heights for each plot.
 detection_plot_heights_j1:
@@ -255,14 +287,19 @@ plot_height_comparison:
   filepath: data/08_reporting/plot_height_comparison.png
   versioned: True
 
+# Comparison of the flower sizes for different populations.
+flower_size_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flower_size_comparison.png
+  versioned: True
+
 # Individual flowering curves for each plot.
 flowering_curves:
-  type: cotton_counter.data_sets.MultiFileDataSet
-  versioned: True
-  dataset: matplotlib.MatplotlibWriter
-  prefix: genotype
-  extension: .png
-  filepath: data/08_reporting/flowering_curves
+  type: PartitionedDataSet
+  path: data/08_reporting/flowering_curves
+  dataset:
+    type: matplotlib.MatplotlibWriter
+  filename_suffix: .png
 
 # Mean flowering curve for each population.
 mean_flowering_curve:
@@ -287,3 +324,11 @@ ground_truth_vs_predicted:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/ground_truth_vs_predicted.png
   versioned: True
+
+# Dateset containing qualitative examples with detections overlayed.
+qualitative_example_detections:
+  type: PartitionedDataSet
+  path: data/08_reporting/qualitative_example_detections
+  filename_suffix: ".png"
+  dataset:
+    type: pillow.ImageDataSet

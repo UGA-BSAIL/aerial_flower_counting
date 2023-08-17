@@ -5,4 +5,5 @@ log_dir: logs
 
 # Base directory containing plot images.
 #plot_image_dir: "/var/lab_data/share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"
-plot_image_dir: "/run/user/1000/gvfs/smb-share:server=bsailn1.engr.uga.edu,share=bsail,user=daniel/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"
+plot_image_dir: "/home/daniel/lab_share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"
+#plot_image_dir: "/blue/cli2/daniel.petti/2021_flowering_analysis/plot_extraction/auto_extraction"

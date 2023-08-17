@@ -2,28 +2,37 @@
 Contains nodes for the `count_plots` pipeline.
 """
 
-
 import enum
 from datetime import date
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+import re
 
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 import statsmodels.formula.api as sm
+import torch.cuda
+from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
+from PIL import Image
 from pydantic.dataclasses import dataclass
-from yolov5 import YOLOv5
+from segment_anything import SamPredictor, sam_model_registry
+from ultralytics import YOLO
+from .visualization import draw_detections
 
 _PREDICTION_BATCH_SIZE = 50
 """
 Size of batches to use for prediction. This mostly impacts memory use.
 """
 
+# Regular expression to match plot keys.
+_PLOT_RE = re.compile(r"plot_(\d+)")
+# Regular expression to match qualitative example plot image names.
+_QUAL_EXAMPLE_PLOT_RE = re.compile(r"(\d+-\d+-\d+)_plot_(\d+)_(.*)")
 
 sns.set_theme(
     context="paper", style="whitegrid", palette="husl", rc={"savefig.dpi": 600}
@@ -126,9 +135,30 @@ class DetectionColumns(enum.Enum):
     """
     The (detection) plot number that these detections are from.
     """
+    BOX_NUM = "box_num"
+    """
+    The number of the box that these detections are from.
+    """
     CONFIDENCE = "confidence"
     """
     The confidence score of the detection.
+    """
+
+    X1 = "x1"
+    """
+    The x-coordinate of the top left corner of the detection.
+    """
+    Y1 = "y1"
+    """
+    The y-coordinate of the top left corner of the detection.
+    """
+    X2 = "x2"
+    """
+    The x-coordinate of the bottom right corner of the detection.
+    """
+    Y2 = "y2"
+    """
+    The y-coordinate of the bottom right corner of the detection.
     """
 
 
@@ -143,7 +173,7 @@ class CountingColumns(enum.Enum):
     """
     The name of the session that this count is from.
     """
-    PLOT = "plot"
+    PLOT = "field_plot"
     """
     The field plot number that this count is from.
     """
@@ -163,6 +193,10 @@ class HeightColumns(enum.Enum):
     Names of the columns in the plot height dataframe.
     """
 
+    DETECTION_PLOT = DetectionColumns.DETECTION_PLOT.value
+    """
+    The detection plot number that these heights are from.
+    """
     PLOT = CountingColumns.PLOT.value
     """
     The field plot number that these heights are from.
@@ -199,6 +233,24 @@ class FloweringTimeColumns(enum.Enum):
     """
     The total flowering duration, in days.
     """
+
+
+@enum.unique
+class FlowerSizeColumns(enum.Enum):
+    """
+    Names of the columns in the flower size dataframe.
+    """
+
+    SIZE_CM = "size_cm"
+    """
+    The size of the flower, in cm^2.
+    """
+
+
+ImagePartitionType = Dict[str, Callable[[], Image.Image]]
+"""
+Type of a partitioned dataset of images.
+"""
 
 
 @dataclass
@@ -303,8 +355,25 @@ def _to_field_plot_num(
     return int(f"{row_num:02}{column_num:02}")
 
 
+def merge_dicts(*args: Dict) -> Dict:
+    """
+    Small helper node to merge dictionaries.
+
+    Args:
+        *args: The dictionaries to merge.
+
+    Returns:
+        The merged dictionary.
+
+    """
+    merged = {}
+    for arg in args:
+        merged.update(arg)
+    return merged
+
+
 def detect_flowers(
-    images: Iterable[np.ndarray],
+    images: ImagePartitionType,
     *,
     weights_file: Path,
     session_name: str,
@@ -324,27 +393,135 @@ def detect_flowers(
 
     """
     # Load the model.
-    model = YOLOv5(weights_file)
+    model = YOLO(weights_file)
 
     # Infer on batches.
     results = []
-    plot_num = 0
-    for batch in _batch_iter(images, batch_size=_PREDICTION_BATCH_SIZE):
-        batch_results = (
-            model.predict(batch, size=max(image_size)).pandas().xyxy
-        )
+    for batch_keys in _batch_iter(
+        images.keys(), batch_size=_PREDICTION_BATCH_SIZE
+    ):
+        logger.debug("Predicting on batch...")
+        batch = [images[key]().convert("RGB") for key in batch_keys]
+        batch_results = model.predict(batch, imgsz=max(image_size))
 
         # Add a new column indicating the source image.
-        for image_results in batch_results:
-            image_results[DetectionColumns.DETECTION_PLOT.value] = plot_num
-            plot_num += 1
+        for key, image_results in zip(batch_keys, batch_results):
+            results_df = pd.DataFrame(
+                data=image_results.boxes.xyxy.cpu().numpy(),
+                columns=[
+                    DetectionColumns.X1.value,
+                    DetectionColumns.Y1.value,
+                    DetectionColumns.X2.value,
+                    DetectionColumns.Y2.value,
+                ],
+            )
+            results_df[
+                DetectionColumns.CONFIDENCE.value
+            ] = image_results.boxes.conf.cpu().numpy()
+            results_df[DetectionColumns.BOX_NUM.value] = np.arange(
+                len(results_df)
+            )
 
-        results.extend(batch_results)
+            plot_num = int(_PLOT_RE.match(key).group(1))
+            results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
+
+            results.append(results_df)
 
     all_results = pd.concat(results, ignore_index=True)
     # Add a column for the session name.
     all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
+
+
+def load_sam_model(*, model_type: str, weights_file: str) -> SamPredictor:
+    """
+    Loads the SAM model to use for segmentation.
+
+    Args:
+        model_type: The model type to load.
+        weights_file: The checkpoint file to load weights from.
+
+    Returns:
+        The loaded `SamPredictor`.
+
+    """
+    logger.debug("Loading SAM weights from {}...", weights_file)
+    sam = sam_model_registry[model_type](
+        checkpoint=Path(weights_file).as_posix()
+    )
+    if torch.cuda.is_available():
+        sam = sam.cuda().eval()
+    else:
+        logger.warning(
+            "Not using CUDA for SAM, because torch couldn't find it."
+        )
+        sam = sam.eval()
+    return SamPredictor(sam)
+
+
+def segment_flowers(
+    images: ImagePartitionType,
+    *,
+    detections: pd.DataFrame,
+    segmentor: SamPredictor,
+    session_name: str,
+) -> Dict[str, Callable[[], Image.Image]]:
+    """
+    Segments the flowers in a series of input images.
+
+    Args:
+        images: The images to segment flowers in.
+        detections: The detection bounding boxes to use as segmentation prompts.
+        segmentor: The model to use for segmentation.
+        session_name: The name of this session.
+
+    Returns:
+        A large array with the segmentations for all the images, indexed by
+        detection plot number and box number.
+
+    """
+    # Filter to only this session.
+    detections = detections[
+        detections[DetectionColumns.SESSION.value] == session_name
+    ]
+    by_plot = detections.set_index(DetectionColumns.DETECTION_PLOT.value)
+
+    # Segments a particular bounding box.
+    def _segment_box(
+        image_: Callable[[], np.array], row_: pd.Series
+    ) -> Image.Image:
+        logger.debug("Segmenting plot...")
+        segmentor.set_image(np.array(image_().convert("RGB")))
+
+        box = row_[
+            [
+                DetectionColumns.X1.value,
+                DetectionColumns.Y1.value,
+                DetectionColumns.X2.value,
+                DetectionColumns.Y2.value,
+            ]
+        ]
+        mask, _, _ = segmentor.predict(
+            box=box.to_numpy(), multimask_output=False
+        )
+        # Combine all the masks into one.
+        return Image.fromarray(mask[0].astype(np.uint8) * 255, mode="L")
+
+    partitions = {}
+    for key, image in images.items():
+        plot_num = int(_PLOT_RE.match(key).group(1))
+        try:
+            boxes = by_plot.loc[[plot_num]]
+        except KeyError:
+            # No detections for this image.
+            continue
+
+        for row_i, (_, row) in enumerate(boxes.iterrows()):
+            session = row[DetectionColumns.SESSION.value]
+            partitions[f"{session}_plot{plot_num:04}_box{row_i:02}"] = partial(
+                _segment_box, image, row
+            )
+    return partitions
 
 
 def compute_heights(height_maps: Iterable[np.ndarray]) -> pd.DataFrame:
@@ -375,21 +552,21 @@ def compute_heights(height_maps: Iterable[np.ndarray]) -> pd.DataFrame:
     results = pd.DataFrame(
         data={
             HeightColumns.HEIGHT.value: plot_heights,
-            HeightColumns.PLOT.value: range(len(plot_heights)),
+            HeightColumns.DETECTION_PLOT.value: range(len(plot_heights)),
         },
     )
 
     return results
 
 
-def add_plot_index_for_heights(
-    plot_heights: pd.DataFrame, field_config: FieldConfig
+def add_plot_index(
+    plot_data: pd.DataFrame, field_config: FieldConfig
 ) -> pd.DataFrame:
     """
-    Adds the correct field plot index to the height data.
+    Adds the correct field plot index to data that have only detection plots.
 
     Args:
-        plot_heights: The raw plot height data, with a detection plot number
+        plot_data: The raw plot data, with a detection plot number
             column.
         field_config: The field configuration to use.
 
@@ -398,21 +575,22 @@ def add_plot_index_for_heights(
 
     """
     # Compute field plot numbers.
-    plot_heights[HeightColumns.PLOT.value] = plot_heights[
-        HeightColumns.PLOT.value
+    plot_data[CountingColumns.PLOT.value] = plot_data[
+        DetectionColumns.DETECTION_PLOT.value
     ].apply(_to_field_plot_num, field_config=field_config)
 
     # Remove NaN values, because these are for empty plots.
-    plot_heights = plot_heights[
-        ~plot_heights[HeightColumns.PLOT.value].isnull()
-    ]
+    plot_data.dropna(inplace=True)
+    plot_data[CountingColumns.PLOT.value] = plot_data[
+        CountingColumns.PLOT.value
+    ].astype("uint64")
 
     # Set the index.
-    plot_heights = plot_heights.set_index(HeightColumns.PLOT.value)
-    plot_heights.index.name = HeightColumns.PLOT.value
-    plot_heights.sort_index(inplace=True)
+    plot_data = plot_data.set_index(CountingColumns.PLOT.value)
+    plot_data.index.name = CountingColumns.PLOT.value
+    plot_data.sort_index(inplace=True)
 
-    return plot_heights
+    return plot_data
 
 
 def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
@@ -446,33 +624,30 @@ def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_low_confidence(
-    counting_results: pd.DataFrame, *, min_confidence: float
+    detection_results: pd.DataFrame, *, min_confidence: float
 ) -> pd.DataFrame:
     """
     Filters the counting results to remove any detections with low confidence.
 
     Args:
-        counting_results: The complete counting results.
+        detection_results: The complete detection results.
         min_confidence: The minimum confidence value to keep.
 
     Returns:
         The filtered results.
 
     """
-    return counting_results[
-        counting_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
+    return detection_results[
+        detection_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
     ]
 
 
-def compute_counts(
-    detection_results: pd.DataFrame, *, field_config: FieldConfig
-) -> pd.DataFrame:
+def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     """
     Computes the counts for each plot based on the detection results.
 
     Args:
         detection_results: The results from the detection stage.
-        field_config: Represents the configuration of the field.
 
     Returns:
         A DataFrame of the computed counts.
@@ -490,22 +665,6 @@ def compute_counts(
     counts_per_plot[
         CountingColumns.COUNT.value
     ] = counts_per_plot_series.values
-
-    # Convert the plot numbers used during detection to the plot numbers used
-    # in the field.
-    counts_per_plot[CountingColumns.PLOT.value] = counts_per_plot[
-        DetectionColumns.DETECTION_PLOT.value
-    ].apply(_to_field_plot_num, field_config=field_config)
-
-    # Remove null values.
-    counts_per_plot.dropna(inplace=True)
-    counts_per_plot[CountingColumns.PLOT.value] = counts_per_plot[
-        CountingColumns.PLOT.value
-    ].astype("uint64")
-    # Use plot number as an index.
-    counts_per_plot.set_index(CountingColumns.PLOT.value, inplace=True)
-    counts_per_plot.index.name = CountingColumns.PLOT.value
-    counts_per_plot.sort_index(inplace=True)
 
     return counts_per_plot
 
@@ -808,47 +967,32 @@ def clean_height_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
     return cleaned
 
 
-def find_empty_plots(
-    *, cumulative_counts: pd.DataFrame, num_empty_plots: int
-) -> List[int]:
-    """
-    Uses a very simple approach to find the plots that are probably empty.
-    Basically, it just assumes that the plots with the lowest number of total
-    flowers are empty.
-
-    Args:
-        cumulative_counts: The cumulative counting results.
-        num_empty_plots: The total number of empty plots in the field.
-
-    Returns:
-        List of the plots that are probably empty.
-
-    """
-    # Keep only the final counts for each plot.
-    only_counts = cumulative_counts[CountingColumns.COUNT.value]
-    plot_groups = only_counts.groupby([only_counts.index])
-    total_counts = plot_groups.agg("max")
-
-    # Find the smallest ones.
-    total_counts.sort_values(inplace=True)
-    return total_counts.index.tolist()[:num_empty_plots]
-
-
 def clean_empty_plots(
-    *, plot_df: pd.DataFrame, empty_plots: List[int]
+    *,
+    plot_df: pd.DataFrame,
+    empty_plots: pd.DataFrame,
+    field_config: FieldConfig,
 ) -> pd.DataFrame:
     """
     Removes rows from a dataframe that correspond to empty plots.
 
     Args:
         plot_df: The dataframe to clean, indexed by plot number.
-        empty_plots: The list of plots that are empty.
+        empty_plots: The list of (detection) plots that are empty.
+        field_config: The configuration for this field.
 
     Returns:
         The same dataframe, but without rows for empty plots.
 
     """
-    plot_df.drop(empty_plots, inplace=True)
+    empty_plots = empty_plots.to_numpy()[:, 0]
+    empty_plots = [
+        _to_field_plot_num(p, field_config=field_config) for p in empty_plots
+    ]
+    # Remove Nones that result from rows that are not planted.
+    empty_plots = [p for p in empty_plots if p is not None]
+
+    plot_df.drop(empty_plots, inplace=True, errors="ignore")
     return plot_df
 
 
@@ -1091,6 +1235,61 @@ def compute_flowering_ramps(
 
     plot_groups = cumulative_counts.groupby([cumulative_counts.index])
     return plot_groups.parallel_apply(_fit_line_for_plot)
+
+
+def compute_flower_sizes(
+    *,
+    flower_masks: ImagePartitionType,
+    detection_results: pd.DataFrame,
+    gsds: Dict[str, float],
+) -> pd.DataFrame:
+    """
+    Computes the average flower size for each plot.
+
+    Args:
+        flower_masks: The flower masks for each plot.
+        detection_results: The detection results. These will be used to
+            determine what plot masks we look at.
+        gsds: A mapping of session names to GSD values for that session,
+            in cm/px.
+
+    Returns:
+        A dataframe containing the average flower size for each plot.
+
+    """
+
+    def _compute_size(detection_row: pd.Series) -> float:
+        """
+        Computes the average flower size for a single detection.
+
+        Args:
+            detection_row: The row of the detection results for the plot.
+
+        Returns:
+            The average flower size for the plot.
+
+        """
+        session = detection_row[DetectionColumns.SESSION.value]
+        plot_num = detection_row[DetectionColumns.DETECTION_PLOT.value]
+        box_num = detection_row[DetectionColumns.BOX_NUM.value]
+
+        # Compute the size based on the mask.
+        try:
+            mask_image = np.array(
+                flower_masks[f"{session}_plot{plot_num:04}_box{box_num:02}"]()
+            )
+        except KeyError as error:
+            logger.warning(f"Could not find mask for detection: {error}")
+            return np.nan
+        size_px = np.count_nonzero(mask_image)
+        size_cm_2 = size_px * (gsds[session] * gsds[session])
+
+        return size_cm_2
+
+    detection_results[
+        FlowerSizeColumns.SIZE_CM.value
+    ] = detection_results.parallel_apply(_compute_size, axis=1)
+    return detection_results.dropna()
 
 
 def _merge_genotype_info(
@@ -1394,6 +1593,41 @@ def plot_flowering_end_comparison(
     )
 
 
+def plot_flower_size_comparison(
+    *, flower_sizes: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a comparison of the flowering sizes of different populations.
+
+    Args:
+        flower_sizes: Dataset containing flower sizes for each plot.
+        genotypes: The genotype data.
+
+    Returns:
+        The plot that it made.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flower_sizes, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot it.
+    axes = sns.barplot(
+        x=GenotypeColumns.POPULATION.value,
+        y=FlowerSizeColumns.SIZE_CM.value,
+        data=combined_data,
+        capsize=0.2,
+    )
+    axes.set_title("Flower Size")
+    axes.set(xlabel="Population", ylabel="Size (cm^2)")
+
+    figure = plot.gcf()
+    # Make it wider so the x labels don't overlap.
+    figure.set_size_inches(12, 6)
+    return figure
+
+
 def plot_flowering_duration_dist(
     *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
 ) -> plot.Figure:
@@ -1636,7 +1870,7 @@ def plot_ground_truth_vs_predicted(
 
 def plot_flowering_curves(
     *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
-) -> Iterable[plot.Figure]:
+) -> Dict[str, Callable[[], plot.Figure]]:
     """
     Creates a flowering curve for each individual plot.
 
@@ -1645,8 +1879,8 @@ def plot_flowering_curves(
             counts.
         genotypes: The cleaned genotype information.
 
-    Yields:
-        The curves for each plot, in order.
+    Returns:
+        Partitioned dataset containing the figure for each genotype.
 
     """
     # Get all the sessions to use as a common index.
@@ -1702,9 +1936,11 @@ def plot_flowering_curves(
     # Group by genotype, and plot all replicates on the same axes.
     genotype_groups = combined_data.groupby([GenotypeColumns.GENOTYPE.value])
 
-    for genotype, genotype_indices in genotype_groups.indices.items():
+    def _plot_genotype(
+        genotype_: str, genotype_indices_: List[int]
+    ) -> plot.Figure:
         # Get the rows pertaining to this genotype.
-        genotype_rows = combined_data.iloc[genotype_indices]
+        genotype_rows = combined_data.iloc[genotype_indices_]
 
         # Extract the index as columns, so we can plot it.
         genotype_rows.reset_index(inplace=True)
@@ -1717,12 +1953,19 @@ def plot_flowering_curves(
             palette="husl",
             linewidth=1.5,
         )
-        axes.set_title(f"Genotype {genotype}")
+        axes.set_title(f"Genotype {genotype_}")
         axes.set(
             xlabel="Days After Planting", ylabel="Cumulative # of Flowers"
         )
 
-        yield plot.gcf()
+        return plot.gcf()
+
+    partitions = {}
+    for genotype, genotype_indices in genotype_groups.indices.items():
+        partitions[f"genotype_{genotype}"] = partial(
+            _plot_genotype, genotype, genotype_indices
+        )
+    return partitions
 
 
 def plot_mean_flowering_curve(
@@ -1756,3 +1999,65 @@ def plot_mean_flowering_curve(
     axes.set(xlabel="Days After Planting", ylabel="Cumulative # of Flowers")
 
     return plot.gcf()
+
+
+def draw_qualitative_results(
+    *,
+    qualitative_examples: ImagePartitionType,
+    detection_results: pd.DataFrame,
+    flower_masks: ImagePartitionType,
+) -> Dict[str, Image.Image]:
+    """
+    Draws the detection results for qualitative example plot images.
+
+    Args:
+        qualitative_examples: The qualitative example plot images.
+        detection_results: The detection results.
+        flower_masks: The flower segmentation masks.
+
+    Returns:
+        The same qualitative example images, with the results drawn on top.
+
+    """
+    detection_results = detection_results.set_index(
+        DetectionColumns.DETECTION_PLOT.value
+    )
+
+    partitions = {}
+    for example_name, example_image in qualitative_examples.items():
+        # Extract the plot information.
+        match = _QUAL_EXAMPLE_PLOT_RE.match(example_name)
+        session = match.group(1)
+        plot_number = int(match.group(2))
+
+        # Get the example's detection results.
+        example_detection_results = detection_results.loc[plot_number]
+        example_detection_results = example_detection_results[
+            example_detection_results[DetectionColumns.SESSION.value]
+            == session
+        ]
+
+        # Get the masks for the detections.
+        masks = []
+        for _, detection in example_detection_results.iterrows():
+            # Get the mask for this detection.
+            box_num = detection[DetectionColumns.BOX_NUM.value]
+            mask_key = f"{session}_plot{plot_number:04}_box{box_num:02}"
+            masks.append(flower_masks[mask_key]())
+
+        # Do the drawing.
+        detections = example_detection_results[
+            [
+                DetectionColumns.X1.value,
+                DetectionColumns.Y1.value,
+                DetectionColumns.X2.value,
+                DetectionColumns.Y2.value,
+                DetectionColumns.CONFIDENCE.value,
+            ]
+        ]
+        overlaid_image = draw_detections(
+            example_image(), detections=detections.to_numpy(), masks=masks
+        )
+        partitions[example_name] = overlaid_image
+
+    return partitions

@@ -26,21 +26,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Application entry point."""
-from pathlib import Path
+"""Project settings."""
+from kedro.config import TemplatedConfigLoader
 
-from kedro.framework.project import configure_project
-from kedro.framework.session import KedroSession
+# Instantiate and list your project hooks here
+# HOOKS = (ProjectHooks(),)
 
+# List the installed plugins for which to disable auto-registry
+# DISABLE_HOOKS_FOR_PLUGINS = ("kedro-viz",)
 
-def run_package():
-    # Entry point for running a Kedro project packaged with `kedro package`
-    # using `python -m <project_package>.run` command.
-    package_name = Path(__file__).resolve().parent.name
-    configure_project(package_name)
-    with KedroSession.create(package_name) as session:
-        session.run()
+# Define where to store data from a KedroSession. Defaults to BaseSessionStore.
+# from kedro.framework.session.store import ShelveStore
+# SESSION_STORE_CLASS = ShelveStore
 
+# Define keyword arguments to be passed to `SESSION_STORE_CLASS` constructor
+# SESSION_STORE_ARGS = {
+#     "path": "./sessions"
+# }
 
-if __name__ == "__main__":
-    run_package()
+# Define custom context class. Defaults to `KedroContext`
+# CONTEXT_CLASS = KedroContext
+
+# Define the configuration folder. Defaults to `conf`
+# CONF_ROOT = "conf"
+
+CONFIG_LOADER_CLASS = TemplatedConfigLoader
+CONFIG_LOADER_ARGS = dict(globals_pattern="*globals.yml")

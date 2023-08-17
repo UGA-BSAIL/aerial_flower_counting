@@ -6,25 +6,27 @@
 # It expects that a valid virtualenv has already been created with
 # `poetry install`.
 
-#SBATCH --partition=patterli_p
-#SBATCH -J cotton_count_model_train
+#SBATCH --partition=gpu
+#SBATCH -J self_supervised_model_train
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --gres=gpu:1
-#SBATCH --time=8:00:00
-#SBATCH --mem=20gb
-#SBATCH --mail-user=daniel.petti@uga.edu
+#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:a100:1
+#SBATCH --time=48:00:00
+#SBATCH --mem=32gb
+#SBATCH --account=lift-phenomics
+#SBATCH --qos=lift-phenomics
+#SBATCH --mail-user=djpetti@gmail.com
 #SBATCH --mail-type=END,FAIL
-#SBATCH --output=cotton_count_model_train.%j.out    # Standard output log
-#SBATCH --error=cotton_count_model_train.%j.err     # Standard error log
+#SBATCH --output=yolo_model_train.%j.out    # Standard output log
+#SBATCH --error=yolo_model_train.%j.err     # Standard error log
 
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/scratch/$(whoami)"
+OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/work/cylilab/cotton_counter"
+LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.
@@ -34,8 +36,6 @@ function prepare_environment() {
 
   # Copy the code.
   cp -Rd "${SLURM_SUBMIT_DIR}/"* "${job_dir}/"
-  # Manually copy the config file too.
-  cp "${SLURM_SUBMIT_DIR}/.kedro.yml" "${job_dir}/"
 
   # Link to the input data directory and venv.
   rm -rf "${job_dir}/data"
@@ -44,22 +44,15 @@ function prepare_environment() {
 
   # Create output directories.
   mkdir "${job_dir}/output_data"
+  mkdir "${job_dir}/logs"
 
   # Set the working directory correctly for Kedro.
   cd "${job_dir}"
+  source .venv/bin/activate
 }
 
 # Prepare the environment.
 prepare_environment
 
-# Load needed modules.
-ml Python/3.8.2-GCCcore-8.3.0
-ml CUDA/11.2.1-GCC-8.3.0
-ml cuDNN/8.1.0.77-CUDA-11.2.1
-
-# Set this for deterministic runs. For more info, see
-# https://keras.io/getting_started/faq/#how-can-i-obtain-reproducible-results-using-keras-during-development
-export PYTHONHASHSEED=0
-
 # Run the training.
-poetry run kedro run -e categorical "$@"
+python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/ground_dataset.yaml $@

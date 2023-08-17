@@ -1,0 +1,10 @@
+# Total number of plots in the field.
+num_plots: 25
+# Initial row number.
+first_row_num: 28
+# Initial plot number.
+first_plot_num: 1
+# Numbering is not reversed.
+start_at_bottom: false
+# Set of empty rows.
+empty_rows: [41, 42]
