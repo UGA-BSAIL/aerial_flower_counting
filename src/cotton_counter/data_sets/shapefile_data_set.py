@@ -34,7 +34,7 @@ class ShapefileDataSet(AbstractVersionedDataSet):
         self.__schema = schema
         self.__epsg_crs = epsg_crs
 
-    def _load(self) -> List[Dict[str, Any]]:
+    def _load(self) -> List[fiona.model.Feature]:
         """
         Loads the shapefile data.
 

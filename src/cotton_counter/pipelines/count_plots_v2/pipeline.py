@@ -11,6 +11,7 @@ from .nodes import (
     CameraConfig,
     flowers_to_shapefile,
     find_image_extents,
+    prune_duplicate_detections,
 )
 from ..common import collect_session_results, filter_low_confidence
 
@@ -65,7 +66,7 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                         detections=f"detections_px_{session}",
                         camera_config=f"camera_config_{session}",
                     ),
-                    output_node,
+                    f"detections_unfiltered_{session}",
                 ),
                 # Save image extents.
                 node(
@@ -75,6 +76,15 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                         camera_config=f"camera_config_{session}",
                     ),
                     f"image_extents_{session}",
+                ),
+                # Remove duplicate detections.
+                node(
+                    prune_duplicate_detections,
+                    dict(
+                        detections=f"detections_unfiltered_{session}",
+                        image_extents=f"image_extents_{session}",
+                    ),
+                    output_node,
                 ),
             ]
         ),

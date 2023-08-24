@@ -20,7 +20,11 @@ from pandarallel import pandarallel
 from ...type_helpers import ArbitraryTypesConfig
 from shapely import Polygon
 from shapely.geometry import mapping
+from shapely import intersection
+from shapely import STRtree
 import enum
+from fiona.model import Feature
+from loguru import logger
 
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
@@ -384,6 +388,137 @@ def flowers_to_geographic(
     return detections
 
 
+def _load_polygons(features: List[Feature]) -> Iterable[Polygon]:
+    """
+    Loads polygon features from a shapefile.
+
+    Args:
+        features: The raw features from Fiona.
+
+    Returns:
+        The polygons.
+
+    """
+    for feature in features:
+        yield Polygon(feature.geometry.coordinates[0])
+
+
+def _detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
+    """
+    Converts detections from a dataframe to polygons.
+
+    Args:
+        detections: The detections.
+
+    Returns:
+        The polygons.
+
+    """
+    for _, row in detections.iterrows():
+        yield Polygon(
+            [
+                (
+                    row[DetectionColumns.X1.value],
+                    row[DetectionColumns.Y1.value],
+                ),
+                (
+                    row[DetectionColumns.X2.value],
+                    row[DetectionColumns.Y1.value],
+                ),
+                (
+                    row[DetectionColumns.X2.value],
+                    row[DetectionColumns.Y2.value],
+                ),
+                (
+                    row[DetectionColumns.X1.value],
+                    row[DetectionColumns.Y2.value],
+                ),
+                (
+                    row[DetectionColumns.X1.value],
+                    row[DetectionColumns.Y1.value],
+                ),
+            ]
+        )
+
+
+def prune_duplicate_detections(
+    *, detections: pd.DataFrame, image_extents: List[Feature]
+) -> pd.DataFrame:
+    """
+    Finds detections that are duplicates and removes them.
+
+    Args:
+        detections: The complete set of detections, in geographic coordinates.
+        image_extents: The extents of each of the input images in the dataset.
+
+    Returns:
+        The same detections, with duplicates removed.
+
+    """
+    # We initially need to find overlapping images so that we know which
+    # regions to focus on.
+    image_extent_polys = list(_load_polygons(image_extents))
+    detection_polys = list(_detections_to_polygons(detections))
+    extent_polys_to_id = {
+        p: f.properties["image_id"]
+        for p, f in zip(image_extent_polys, image_extents)
+    }
+    detection_polys_to_id = {
+        p: r[DetectionColumns.IMAGE_ID.value]
+        for p, (_, r) in zip(detection_polys, detections.iterrows())
+    }
+    detection_polys_to_row = {
+        p: i for p, i in zip(detection_polys, detections.index)
+    }
+    image_extent_tree = STRtree(image_extent_polys)
+    detections_tree = STRtree(list(_detections_to_polygons(detections)))
+
+    # Removes duplicate detections from the region where two input images
+    # overlap.
+    def _prune_from_intersection(
+        extent1: Polygon, extent2: Polygon
+    ) -> List[int]:
+        # Find the intersection between the images.
+        intersecting_region = intersection(extent1, extent2)
+        # Find all detections in that region.
+        detections_indices = detections_tree.query_nearest(intersecting_region)
+        detections_in_region = detections_tree.geometries[detections_indices]
+
+        extent1_id = extent_polys_to_id[extent1]
+        extent2_id = extent_polys_to_id[extent2]
+
+        # Filter to detections from either of the input images.
+        image1_indices = []
+        image2_indices = []
+        for detection in detections_in_region:
+            image_id = detection_polys_to_id[detection].split("_patch_")[0]
+            index = detection_polys_to_row[detection]
+            if image_id == extent1_id:
+                image1_indices.append(index)
+            elif image_id == extent2_id:
+                image2_indices.append(index)
+
+        # Our current, very naive algorithm is just to prune the detections
+        # from the image with fewer IDs.
+        if len(image1_indices) > len(image2_indices):
+            return image2_indices
+        else:
+            return image1_indices
+
+    prune_rows = []
+    for extent in image_extent_polys:
+        # Find all intersecting images.
+        intersecting_indices = image_extent_tree.query_nearest(extent)
+        intersecting = image_extent_tree.geometries[intersecting_indices]
+        for other_extent in intersecting:
+            # Remove duplicates in the intersecting region.
+            prune_rows.extend(_prune_from_intersection(extent, other_extent))
+
+    # Remove all the duplicates.
+    logger.info("Removing {} duplicate detections.", len(prune_rows))
+    return detections.drop(prune_rows)
+
+
 def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     Outputs the flower detections as a shapefile.
@@ -396,35 +531,12 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
 
     """
     features = []
-    for _, row in detections.iterrows():
+    for (_, row), polygon in zip(
+        detections.iterrows(), _detections_to_polygons(detections)
+    ):
         features.append(
             {
-                "geometry": mapping(
-                    Polygon(
-                        [
-                            (
-                                row[DetectionColumns.X1.value],
-                                row[DetectionColumns.Y1.value],
-                            ),
-                            (
-                                row[DetectionColumns.X2.value],
-                                row[DetectionColumns.Y1.value],
-                            ),
-                            (
-                                row[DetectionColumns.X2.value],
-                                row[DetectionColumns.Y2.value],
-                            ),
-                            (
-                                row[DetectionColumns.X1.value],
-                                row[DetectionColumns.Y2.value],
-                            ),
-                            (
-                                row[DetectionColumns.X1.value],
-                                row[DetectionColumns.Y1.value],
-                            ),
-                        ]
-                    )
-                ),
+                "geometry": mapping(polygon),
                 "properties": {
                     "confidence": row[DetectionColumns.CONFIDENCE.value],
                     "session": row[DetectionColumns.SESSION.value],
