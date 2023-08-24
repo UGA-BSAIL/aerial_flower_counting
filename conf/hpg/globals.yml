@@ -1,0 +1,5 @@
+# Base directory containing plot images.
+plot_image_dir: "/blue/lift-phenomics/daniel.petti/2021_flowering_analysis/plot_extraction/auto_extraction"
+
+# Base directory containing undistorted images for 2023.
+corrected_image_dir: "/blue/lift-phenomics/daniel.petti/metashape_projects/undistorted_images"

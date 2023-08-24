@@ -23,6 +23,7 @@ from pydantic.dataclasses import dataclass
 from segment_anything import SamPredictor, sam_model_registry
 from ultralytics import YOLO
 from .visualization import draw_detections
+from ..common import batch_iter, DetectionColumns
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -122,47 +123,6 @@ class HeightGtColumns(enum.Enum):
 
 
 @enum.unique
-class DetectionColumns(enum.Enum):
-    """
-    Names of the columns in the detection results dataframe.
-    """
-
-    SESSION = "session"
-    """
-    The name of the session that these detections are from.
-    """
-    DETECTION_PLOT = "plot"
-    """
-    The (detection) plot number that these detections are from.
-    """
-    BOX_NUM = "box_num"
-    """
-    The number of the box that these detections are from.
-    """
-    CONFIDENCE = "confidence"
-    """
-    The confidence score of the detection.
-    """
-
-    X1 = "x1"
-    """
-    The x-coordinate of the top left corner of the detection.
-    """
-    Y1 = "y1"
-    """
-    The y-coordinate of the top left corner of the detection.
-    """
-    X2 = "x2"
-    """
-    The x-coordinate of the bottom right corner of the detection.
-    """
-    Y2 = "y2"
-    """
-    The y-coordinate of the bottom right corner of the detection.
-    """
-
-
-@enum.unique
 class CountingColumns(enum.Enum):
     """
     Names of the columns in the counting results dataframe.
@@ -193,7 +153,7 @@ class HeightColumns(enum.Enum):
     Names of the columns in the plot height dataframe.
     """
 
-    DETECTION_PLOT = DetectionColumns.DETECTION_PLOT.value
+    DETECTION_PLOT = DetectionColumns.IMAGE_ID.value
     """
     The detection plot number that these heights are from.
     """
@@ -292,30 +252,6 @@ class FieldConfig:
         return cls(**parameters)
 
 
-def _batch_iter(iterable: Iterable, *, batch_size: int) -> Iterable[List]:
-    """
-    Condenses an iterable into batches.
-
-    Args:
-        iterable: The iterable.
-        batch_size: The batch size to use.
-
-    Yields:
-        The batches that it creates.
-
-    """
-    batch = []
-    for item in iterable:
-        batch.append(item)
-        if len(batch) >= batch_size:
-            yield batch
-            batch = []
-
-    # Produce a partial batch at the end if we have one.
-    if len(batch) > 0:
-        yield batch
-
-
 def _to_field_plot_num(
     plot_num: int, *, field_config: FieldConfig
 ) -> Optional[int]:
@@ -397,7 +333,7 @@ def detect_flowers(
 
     # Infer on batches.
     results = []
-    for batch_keys in _batch_iter(
+    for batch_keys in batch_iter(
         images.keys(), batch_size=_PREDICTION_BATCH_SIZE
     ):
         logger.debug("Predicting on batch...")
@@ -423,7 +359,7 @@ def detect_flowers(
             )
 
             plot_num = int(_PLOT_RE.match(key).group(1))
-            results_df[DetectionColumns.DETECTION_PLOT.value] = plot_num
+            results_df[DetectionColumns.IMAGE_ID.value] = plot_num
 
             results.append(results_df)
 
@@ -483,8 +419,8 @@ def segment_flowers(
     # Filter to only this session.
     detections = detections[
         detections[DetectionColumns.SESSION.value] == session_name
-    ]
-    by_plot = detections.set_index(DetectionColumns.DETECTION_PLOT.value)
+        ]
+    by_plot = detections.set_index(DetectionColumns.IMAGE_ID.value)
 
     # Segments a particular bounding box.
     def _segment_box(
@@ -576,7 +512,7 @@ def add_plot_index(
     """
     # Compute field plot numbers.
     plot_data[CountingColumns.PLOT.value] = plot_data[
-        DetectionColumns.DETECTION_PLOT.value
+        DetectionColumns.IMAGE_ID.value
     ].apply(_to_field_plot_num, field_config=field_config)
 
     # Remove NaN values, because these are for empty plots.
@@ -591,21 +527,6 @@ def add_plot_index(
     plot_data.sort_index(inplace=True)
 
     return plot_data
-
-
-def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
-    """
-    Collects the results from an entire set of sessions into a single Pandas
-    DataFrame.
-
-    Args:
-        session_results: The results from each session.
-
-    Returns:
-        A DataFrame containing all the results.
-
-    """
-    return pd.concat(session_results, ignore_index=True)
 
 
 def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
@@ -623,25 +544,6 @@ def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(plot_heights)
 
 
-def filter_low_confidence(
-    detection_results: pd.DataFrame, *, min_confidence: float
-) -> pd.DataFrame:
-    """
-    Filters the counting results to remove any detections with low confidence.
-
-    Args:
-        detection_results: The complete detection results.
-        min_confidence: The minimum confidence value to keep.
-
-    Returns:
-        The filtered results.
-
-    """
-    return detection_results[
-        detection_results[DetectionColumns.CONFIDENCE.value] >= min_confidence
-    ]
-
-
 def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     """
     Computes the counts for each plot based on the detection results.
@@ -657,7 +559,7 @@ def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     counts_per_plot_series = detection_results.value_counts(
         subset=[
             DetectionColumns.SESSION.value,
-            DetectionColumns.DETECTION_PLOT.value,
+            DetectionColumns.IMAGE_ID.value,
         ]
     )
     # Convert the series to a frame.
@@ -1270,7 +1172,7 @@ def compute_flower_sizes(
 
         """
         session = detection_row[DetectionColumns.SESSION.value]
-        plot_num = detection_row[DetectionColumns.DETECTION_PLOT.value]
+        plot_num = detection_row[DetectionColumns.IMAGE_ID.value]
         box_num = detection_row[DetectionColumns.BOX_NUM.value]
 
         # Compute the size based on the mask.
@@ -2020,7 +1922,7 @@ def draw_qualitative_results(
 
     """
     detection_results = detection_results.set_index(
-        DetectionColumns.DETECTION_PLOT.value
+        DetectionColumns.IMAGE_ID.value
     )
 
     partitions = {}

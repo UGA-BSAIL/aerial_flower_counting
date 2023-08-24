@@ -14,6 +14,8 @@
 #SBATCH --gres=gpu:a100:1
 #SBATCH --time=48:00:00
 #SBATCH --mem=32gb
+#SBATCH --account=lift-phenomics
+#SBATCH --qos=lift-phenomics
 #SBATCH --mail-user=djpetti@gmail.com
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=flower_analysis.%j.out    # Standard output log
@@ -22,9 +24,9 @@
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/blue/cli2/$(whoami)/job_scratch/"
+OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/blue/cli2/$(whoami)/aerial_flower/"
+LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.
@@ -53,5 +55,5 @@ function prepare_environment() {
 prepare_environment
 
 # Run the pipeline.
-source /blue/cli2/daniel.petti/aerial_flower/.venv/bin/activate
-kedro run --pipeline count_plots "$@"
+source ${LARGE_FILES_DIR}/.venv/bin/activate
+kedro run --pipeline count_plots_v2 -e hpg "$@"

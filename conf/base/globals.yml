@@ -4,6 +4,7 @@ output_data_dir: output_data
 log_dir: logs
 
 # Base directory containing plot images.
-#plot_image_dir: "/var/lab_data/share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"
 plot_image_dir: "/home/daniel/lab_share/scratch/2021_flowering_analysis/plot_extraction/auto_extraction"
-#plot_image_dir: "/blue/cli2/daniel.petti/2021_flowering_analysis/plot_extraction/auto_extraction"
+
+# Base directory containing undistorted images for 2023.
+corrected_image_dir: "/home/daniel/lab_share/scratch/2023_flowering_analysis/undistorted_images"

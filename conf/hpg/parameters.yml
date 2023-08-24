@@ -1,0 +1,2 @@
+# Batch size to use for inference.
+prediction_batch_size: 64

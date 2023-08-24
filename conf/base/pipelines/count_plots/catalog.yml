@@ -161,12 +161,6 @@ qualitative_examples:
   dataset:
     type: pillow.ImageDataSet
 
-# Dataset containing all the detection results.
-detection_results:
-  type: pandas.ParquetDataSet
-  filepath: data/03_primary/detection_results.parquet
-  versioned: True
-
 # Dataset containing estimated counts for each plot.
 counting_results:
   type: pandas.ParquetDataSet

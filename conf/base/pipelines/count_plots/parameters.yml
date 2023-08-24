@@ -1,5 +1,3 @@
-# Location where the detection model weights are saved.
-model_weights_file: "yolov8m_flower_active_4.pt"
 # SAM model parameters.
 sam_model_type: "vit_h"
 #sam_weights_file: "/blue/cli2/daniel.petti/aerial_flower/data/06_models/sam_vit_h_4b8939.pth"
@@ -24,7 +22,8 @@ flower_end_threshold: 0.95
 # GSDs to use for each session.
 session_gsds:
   # Phantom 4 sessions.
-  "2021-08-09": 0.27
+  "2021-08-09": 0.27:w
+
   "2021-08-13": 0.27
   "2021-08-16": 0.27
   "2021-08-20": 0.27

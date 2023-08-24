@@ -18,7 +18,6 @@ from .nodes import (
     clean_ground_truth,
     clean_height_ground_truth,
     collect_plot_heights,
-    collect_session_results,
     compute_counts,
     compute_cumulative_counts,
     compute_flowering_duration,
@@ -30,7 +29,6 @@ from .nodes import (
     create_metric_table,
     create_per_plot_table,
     detect_flowers,
-    filter_low_confidence,
     merge_ground_truth,
     merge_height_ground_truth,
     plot_flowering_curves,
@@ -57,6 +55,7 @@ from .nodes import (
     plot_flower_size_comparison,
     draw_qualitative_results,
 )
+from ..common import collect_session_results, filter_low_confidence
 
 SESSIONS = {
     "2021-08-09",

@@ -1,0 +1,33 @@
+# Datasets containing raw images to process.
+_image_params: &image_params
+  type: PartitionedDataSet
+  filename_suffix: ".JPG"
+  dataset:
+    type: pillow.ImageDataSet
+
+# Datasets containing the camera configuration.
+user_camera_config:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/camera_config.yml
+
+2023-08-14_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-14_cameras.xml
+
+# Datasets containing raw images.
+images_2023-08-14:
+  path: ${corrected_image_dir}/2023-08-14
+  << : *image_params
+
+# Shapefile containing the output bounding boxes.
+bounding_box_shapes:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/08_reporting/bounding_boxes/bounding_boxes.shp
+  schema:
+    geometry: Polygon
+    properties:
+      - [confidence, float]
+      - [session, str]
+      - [image_id, str]
+      - [box_num, int]
+  epsg_crs: 32617

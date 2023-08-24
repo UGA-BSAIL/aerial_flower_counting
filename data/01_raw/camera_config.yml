@@ -1,0 +1,9 @@
+# Camera parameters for the Phantom 4 camera.
+
+# Focal length.
+f_x: 907.7610020758964
+f_y: 907.7610020758964
+
+# Camera center.
+c_x: 2696.0  # frame width / 2 - 40
+c_y: 1794.0  # frame height / 2 - 30
