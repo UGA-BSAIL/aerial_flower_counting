@@ -10,6 +10,7 @@ from .nodes import (
     flowers_to_geographic,
     CameraConfig,
     flowers_to_shapefile,
+    find_image_extents,
 )
 from ..common import collect_session_results, filter_low_confidence
 
@@ -65,6 +66,15 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                         camera_config=f"camera_config_{session}",
                     ),
                     output_node,
+                ),
+                # Save image extents.
+                node(
+                    find_image_extents,
+                    dict(
+                        images=f"images_{session}",
+                        camera_config=f"camera_config_{session}",
+                    ),
+                    f"image_extents_{session}",
                 ),
             ]
         ),

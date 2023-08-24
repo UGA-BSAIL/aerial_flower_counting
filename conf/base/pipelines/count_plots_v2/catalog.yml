@@ -19,10 +19,22 @@ images_2023-08-14:
   path: ${corrected_image_dir}/2023-08-14
   << : *image_params
 
+# Shapefile containing the image extents.
+image_extents_2023-08-14:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/08_reporting/image_extents/image_extents.shp
+  versioned: True
+  schema:
+    geometry: Polygon
+    properties:
+      - [ image_id, str ]
+  epsg_crs: 32617
+
 # Shapefile containing the output bounding boxes.
 bounding_box_shapes:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/08_reporting/bounding_boxes/bounding_boxes.shp
+  versioned: True
   schema:
     geometry: Polygon
     properties:

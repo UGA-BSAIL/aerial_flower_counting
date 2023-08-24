@@ -4,6 +4,7 @@ Contains nodes for the updated plot counting pipeline.
 
 
 from typing import Tuple, Iterable, Dict, Callable, Any, List
+from functools import partial
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -19,6 +20,7 @@ from pandarallel import pandarallel
 from ...type_helpers import ArbitraryTypesConfig
 from shapely import Polygon
 from shapely.geometry import mapping
+import enum
 
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
@@ -28,6 +30,35 @@ Type alias for a dataset containing multiple images.
 
 
 pandarallel.initialize()
+
+
+@enum.unique
+class ImageExtents(enum.Enum):
+    """
+    Tracks the extents of the images in world coordinates.
+    """
+
+    IMAGE_ID = "image_id"
+    """
+    The unique ID of the image.
+    """
+
+    X1 = "x1"
+    """
+    The x-coordinate of the top left corner of the image.
+    """
+    Y1 = "y1"
+    """
+    The y-coordinate of the top left corner of the image.
+    """
+    X2 = "x2"
+    """
+    The x-coordinate of the bottom right corner of the image.
+    """
+    Y2 = "y2"
+    """
+    The y-coordinate of the bottom right corner of the image.
+    """
 
 
 @dataclass(config=ArbitraryTypesConfig)
@@ -221,6 +252,48 @@ def detect_flowers(
     # Add a column for the session name.
     all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
+
+
+def find_image_extents(
+    images: ImageDataSet, *, camera_config: CameraConfig
+) -> List[Dict[str, Any]]:
+    """
+    Finds the extents of each image in the dataset in real-world coordinates.
+
+    Args:
+        images: The images to find the shapes of. It assumes they all have
+            the same size.
+        camera_config: The camera configuration.
+
+    Returns:
+        Shapefile data for the image extents.
+
+    """
+    # Find the image size.
+    image = next(iter(images.values()))
+    width_px, height_px = image().size
+
+    shapes = []
+    for image_id in images:
+        # Project from the image corners into UTM.
+        px_to_utm = partial(
+            _pixel_to_utm, camera_config=camera_config, camera_id=image_id
+        )
+        top_left = px_to_utm(np.array([0.0, 0.0]))
+        top_right = px_to_utm(np.array([width_px, 0.0]))
+        bottom_right = px_to_utm(
+            np.array([width_px, height_px], dtype=np.float32)
+        )
+        bottom_left = px_to_utm(np.array([0.0, height_px]))
+
+        shapes.append(
+            Polygon([top_left, top_right, bottom_right, bottom_left, top_left])
+        )
+
+    return [
+        dict(geometry=mapping(s), properties=dict(image_id=i))
+        for i, s in zip(images, shapes)
+    ]
 
 
 def _pixel_to_utm(

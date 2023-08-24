@@ -3,29 +3,34 @@ Dataset for loading ESRI shapefiles.
 """
 
 
-from typing import List, Dict, Any, Iterable
-from kedro.io import AbstractDataSet
+from typing import List, Dict, Any
+from kedro.io import AbstractVersionedDataSet, Version
 import fiona
-from pathlib import Path
+from pathlib import PurePosixPath, Path
 from fiona import crs
 
 
-class ShapefileDataSet(AbstractDataSet):
+class ShapefileDataSet(AbstractVersionedDataSet):
     """
     Dataset for loading ESRI shapefiles.
     """
 
     def __init__(
-        self, filepath: str, schema: Dict[str, Any] = {}, epsg_crs: int = 4362
+        self,
+        filepath: str,
+        version: Version,
+        schema: Dict[str, Any] = {},
+        epsg_crs: int = 4362,
     ):
         """
         Args:
             filepath: The path to the shapefile.
+            version: The dataset version.
             schema: The schema of the shapefile.
             epsg_crs: The EPSG code of the CRS of the shapefile.
 
         """
-        self.__shape_path = Path(filepath)
+        super().__init__(filepath=PurePosixPath(filepath), version=version)
         self.__schema = schema
         self.__epsg_crs = epsg_crs
 
@@ -37,7 +42,8 @@ class ShapefileDataSet(AbstractDataSet):
             The shapefile contents, as read by `fiona`.
 
         """
-        with fiona.open(self.__shape_path) as shapefile:
+        shape_path = self._get_load_path()
+        with fiona.open(shape_path.as_posix()) as shapefile:
             return list(shapefile)
 
     def _save(self, data: List[Dict[str, Any]]) -> None:
@@ -48,11 +54,12 @@ class ShapefileDataSet(AbstractDataSet):
             data: The data to save, as a structure writable by `fiona`.
 
         """
+        shape_path = self._get_save_path()
         # Create missing directories.
-        self.__shape_path.parent.mkdir(parents=True, exist_ok=True)
+        Path(shape_path).parent.mkdir(parents=True, exist_ok=True)
 
         with fiona.open(
-            self.__shape_path,
+            shape_path.as_posix(),
             "w",
             driver="ESRI Shapefile",
             schema=self.__schema,
@@ -67,4 +74,8 @@ class ShapefileDataSet(AbstractDataSet):
             A human-readable description of the dataset.
 
         """
-        return dict(filepath=self.__shape_path.as_posix())
+        return dict(
+            version=self._version,
+            schema=self.__schema,
+            epsg_crs=self.__epsg_crs,
+        )
