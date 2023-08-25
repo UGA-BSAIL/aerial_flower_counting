@@ -441,6 +441,28 @@ def _detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
         )
 
 
+def _query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
+    """
+    Queries the tree for the indices of the polygons that intersect the given
+    polygon.
+
+    Args:
+        tree: The tree.
+        poly: The polygon.
+
+    Returns:
+        The indices of the polygons that intersect the given polygon.
+
+    """
+    indices = tree.query_nearest(poly)
+    nearby_polys = tree.geometries[indices]
+
+    # Remove any that are identical.
+    nearby_polys = [p for p in nearby_polys if not p.equals(poly)]
+    # Filter to only ones that actually intersect.
+    return [i for i, p in zip(indices, nearby_polys) if p.intersects(poly)]
+
+
 def prune_duplicate_detections(
     *, detections: pd.DataFrame, image_extents: List[Feature]
 ) -> pd.DataFrame:
@@ -481,7 +503,9 @@ def prune_duplicate_detections(
         # Find the intersection between the images.
         intersecting_region = intersection(extent1, extent2)
         # Find all detections in that region.
-        detections_indices = detections_tree.query_nearest(intersecting_region)
+        detections_indices = _query_intersecting(
+            detections_tree, intersecting_region
+        )
         detections_in_region = detections_tree.geometries[detections_indices]
 
         extent1_id = extent_polys_to_id[extent1]
@@ -508,7 +532,7 @@ def prune_duplicate_detections(
     prune_rows = []
     for extent in image_extent_polys:
         # Find all intersecting images.
-        intersecting_indices = image_extent_tree.query_nearest(extent)
+        intersecting_indices = _query_intersecting(image_extent_tree, extent)
         intersecting = image_extent_tree.geometries[intersecting_indices]
         for other_extent in intersecting:
             # Remove duplicates in the intersecting region.
