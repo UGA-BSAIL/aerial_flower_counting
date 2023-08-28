@@ -1,7 +1,7 @@
 """
 Version two of the pipeline for auto-counting.
 """
-
+import pandas as pd
 from kedro.pipeline import Pipeline, node
 from typing import Tuple
 from functools import partial
@@ -13,11 +13,18 @@ from .nodes import (
     find_image_extents,
     prune_duplicate_detections,
     add_plot_num,
+    load_ground_truth,
+    add_plot_index,
+    plot_ground_truth_vs_predicted,
 )
 from ..common import (
     collect_session_results,
     filter_low_confidence,
     compute_counts,
+    add_dap_ground_truth,
+    add_dap_counting,
+    merge_ground_truth,
+    plot_ground_truth_regression,
 )
 from .field_config import FieldConfig
 
@@ -98,8 +105,46 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
     )
 
 
+def _create_ground_truth_pipeline() -> Pipeline:
+    """
+    Returns:
+        A pipeline that loads all the ground-truth data.
+
+    """
+    nodes = []
+    session_node_names = []
+    for session in SESSIONS:
+        load_gt_session = partial(load_ground_truth, session_name=session)
+        nodes.append(
+            node(
+                load_gt_session,
+                dict(raw_gt_data=f"gt_{session}"),
+                f"gt_{session}_loaded",
+            )
+        )
+        session_node_names.append(f"gt_{session}_loaded")
+
+    nodes.extend(
+        [
+            # Merge them all together.
+            node(lambda *d: pd.concat(d), session_node_names, "gt_no_dap"),
+            # Add the DAP value.
+            node(
+                add_dap_ground_truth,
+                dict(
+                    ground_truth="gt_no_dap",
+                    field_planted_date="params:v2_field_planted_date",
+                ),
+                "gt_combined",
+            ),
+        ]
+    )
+
+    return Pipeline(nodes)
+
+
 def create_pipeline(**kwargs) -> Pipeline:
-    pipeline = Pipeline([])
+    pipeline = _create_ground_truth_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
@@ -182,7 +227,39 @@ def create_pipeline(**kwargs) -> Pipeline:
             node(
                 compute_counts,
                 "detection_results_plot_num",
+                "counting_results_no_dap_no_plot",
+            ),
+            node(
+                add_plot_index,
+                "counting_results_no_dap_no_plot",
+                "counting_results_no_dap",
+            ),
+            node(
+                add_dap_counting,
+                dict(
+                    counting_results="counting_results_no_dap",
+                    field_planted_date="params:v2_field_planted_date",
+                ),
                 "counting_results",
+            ),
+            # Plot the ground truth regression.
+            node(
+                merge_ground_truth,
+                dict(
+                    counting_results="counting_results",
+                    ground_truth="gt_combined",
+                ),
+                "counting_results_gt",
+            ),
+            node(
+                plot_ground_truth_regression,
+                "counting_results_gt",
+                "ground_truth_regression_plot",
+            ),
+            node(
+                plot_ground_truth_vs_predicted,
+                "counting_results_gt",
+                "ground_truth_vs_predicted",
             ),
         ]
     )

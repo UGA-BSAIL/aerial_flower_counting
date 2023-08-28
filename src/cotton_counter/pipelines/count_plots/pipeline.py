@@ -10,8 +10,6 @@ from kedro.pipeline import Pipeline, node
 
 from .nodes import (
     FieldConfig,
-    add_dap_counting,
-    add_dap_ground_truth,
     add_plot_index,
     clean_empty_plots,
     clean_genotypes,
@@ -28,7 +26,6 @@ from .nodes import (
     create_metric_table,
     create_per_plot_table,
     detect_flowers,
-    merge_ground_truth,
     merge_height_ground_truth,
     plot_flowering_curves,
     plot_flowering_duration_comparison,
@@ -39,8 +36,6 @@ from .nodes import (
     plot_flowering_slope_dist,
     plot_flowering_start_comparison,
     plot_flowering_start_dist,
-    plot_ground_truth_regression,
-    plot_ground_truth_vs_predicted,
     plot_height_comparison,
     plot_height_dist,
     plot_height_ground_truth_regression,
@@ -52,10 +47,11 @@ from .nodes import (
     merge_dicts,
     compute_flower_sizes,
     plot_flower_size_comparison,
-    draw_qualitative_results,
+    draw_qualitative_results, plot_ground_truth_vs_predicted,
 )
 from ..common import collect_session_results, filter_low_confidence, \
-    compute_counts
+    compute_counts, add_dap_counting, add_dap_ground_truth, merge_ground_truth, \
+    plot_ground_truth_regression
 
 SESSIONS = {
     "2021-08-09",

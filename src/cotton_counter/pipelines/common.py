@@ -2,9 +2,12 @@
 Common functionality between the two versions of the pipeline.
 """
 import enum
+from datetime import date
 from typing import Iterable, List
 
 import pandas as pd
+import seaborn as sns
+from matplotlib import pyplot as plot
 
 
 def batch_iter(iterable: Iterable, *, batch_size: int) -> Iterable[List]:
@@ -107,6 +110,12 @@ class GroundTruthColumns(enum.Enum):
     The initials of the person who took the GT measurement.
     """
 
+    USED_ALTERNATE_ROW = "alternate_row"
+    """
+    In field layouts that use two rows for each plot, this is a boolean 
+    variable that specifies whether the "non-default" row was counted.
+    """
+
 
 @enum.unique
 class CountingColumns(enum.Enum):
@@ -198,3 +207,128 @@ def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     ] = counts_per_plot_series.values
 
     return counts_per_plot
+
+
+def _add_dap(
+    flower_data: pd.DataFrame,
+    *,
+    field_planted_date: date,
+    session_column: enum.Enum,
+) -> pd.DataFrame:
+    """
+    Adds a "days after planting" column to a dataframe with a session column.
+
+    Args:
+        flower_data: The counting results dataframe.
+        field_planted_date: The date on which the field was planted.
+        session_column: The column containing the session data.
+
+    Returns:
+        The input, with an added DAP column.
+
+    """
+    # Compute DAP.
+    seconds_after_planting = flower_data[session_column.value].apply(
+        lambda x: (date.fromisoformat(x) - field_planted_date).total_seconds()
+    )
+    days_after_planting = seconds_after_planting / (60 * 60 * 24)
+    days_after_planting = days_after_planting.astype("uint64")
+    flower_data[CountingColumns.DAP.value] = days_after_planting
+
+    return flower_data
+
+
+def add_dap_counting(
+    counting_results: pd.DataFrame, *, field_planted_date: date
+) -> pd.DataFrame:
+    """
+    Adds a "days after planting" column to the counting results.
+
+    Args:
+        counting_results: The counting results dataframe.
+        field_planted_date: The date on which the field was planted.
+
+    Returns:
+        The counting results, with an added DAP column.
+
+    """
+    return _add_dap(
+        counting_results,
+        field_planted_date=field_planted_date,
+        session_column=CountingColumns.SESSION,
+    )
+
+
+def add_dap_ground_truth(
+    ground_truth: pd.DataFrame, *, field_planted_date: date
+) -> pd.DataFrame:
+    """
+    Adds a "days after planting" column to the ground-truth data.
+
+    Args:
+        ground_truth: The cleaned ground-truth data.
+        field_planted_date: The date on which the field was planted.
+
+    Returns:
+        The ground-truth data, with an added DAP column.
+
+    """
+    return _add_dap(
+        ground_truth,
+        field_planted_date=field_planted_date,
+        session_column=GroundTruthColumns.SESSION,
+    )
+
+
+def merge_ground_truth(
+    *, counting_results: pd.DataFrame, ground_truth: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Merges the ground-truth and counting results into a single `DataFrame`
+    for easy comparison.
+
+    Args:
+        counting_results: The complete counting results.
+        ground_truth: The cleaned ground-truth data.
+
+    Returns:
+        The merged data, indexed by both plot and DAP.
+
+    """
+    # Make sure the indices are named the same.
+    ground_truth.index.name = counting_results.index.name
+    # Merge the data for easy plotting.
+    counting_results.set_index(
+        CountingColumns.DAP.value, append=True, inplace=True
+    )
+    ground_truth.set_index(
+        GroundTruthColumns.DAP.value, append=True, inplace=True
+    )
+
+    return pd.merge(
+        counting_results, ground_truth, left_index=True, right_index=True
+    )
+
+
+def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:
+    """
+    Plots the regression between the counting results and the ground-truth
+    counts.
+
+    Args:
+        counts_with_gt: The merged counting results and ground-truth data.
+
+    Returns:
+        The plot that it created.
+
+    """
+    # Plot the regression.
+    axes = sns.residplot(
+        data=counts_with_gt,
+        x=GroundTruthColumns.TRUE_COUNT.value,
+        y=CountingColumns.COUNT.value,
+    )
+    axes.set_title("Counting Residuals")
+    axes.set(xlabel="Ground-Truth", ylabel="Automatic")
+
+    return plot.gcf()

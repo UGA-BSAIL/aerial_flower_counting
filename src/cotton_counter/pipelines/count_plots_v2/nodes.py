@@ -9,7 +9,12 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from ultralytics import YOLO
-from ..common import batch_iter, DetectionColumns
+from ..common import (
+    batch_iter,
+    DetectionColumns,
+    GroundTruthColumns,
+    CountingColumns,
+)
 from pydantic.dataclasses import dataclass
 import xml.etree.ElementTree as ET
 import cv2
@@ -23,11 +28,17 @@ import enum
 from fiona.model import Feature
 from loguru import logger
 from .field_config import FieldConfig
+import seaborn as sns
+from matplotlib import pyplot as plot
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
 Type alias for a dataset containing multiple images.
 """
+
+sns.set_theme(
+    context="paper", style="whitegrid", palette="husl", rc={"savefig.dpi": 600}
+)
 
 pandarallel.initialize()
 
@@ -660,3 +671,111 @@ def add_plot_num(
         ] = plot_num
 
     return detections
+
+
+def load_ground_truth(
+    *, raw_gt_data: pd.DataFrame, session_name: str
+) -> pd.DataFrame:
+    """
+    Loads the ground truth data from the spreadsheet, and formats it how we
+    expect.
+
+    Args:
+        raw_gt_data: The raw spreadsheet data.
+        session_name: The name of the session.
+
+    Returns:
+        The correctly-formatted ground-truth data.
+
+    """
+    # Rename the columns that directly carry over.
+    raw_gt_data.rename(
+        {
+            "Plot": GroundTruthColumns.PLOT.value,
+            "# of White Flowers": GroundTruthColumns.TRUE_COUNT.value,
+        },
+        axis="columns",
+        inplace=True,
+    )
+
+    # Determine which row is used based on the notes.
+    raw_gt_data[GroundTruthColumns.USED_ALTERNATE_ROW.value] = raw_gt_data[
+        "Notes"
+    ].str.contains("right row", case=False)
+
+    # Session is specified manually.
+    raw_gt_data[GroundTruthColumns.SESSION.value] = session_name
+    # The person collecting was always Dalton.
+    raw_gt_data[GroundTruthColumns.PERSON.value] = "DW"
+
+    # Index by plot number.
+    raw_gt_data.set_index(
+        GroundTruthColumns.PLOT.value,
+        inplace=True,
+    )
+    raw_gt_data.sort_index(inplace=True)
+
+    # Keep only the columns we care about.
+    return raw_gt_data[
+        [
+            GroundTruthColumns.TRUE_COUNT.value,
+            GroundTruthColumns.USED_ALTERNATE_ROW.value,
+            GroundTruthColumns.SESSION.value,
+            GroundTruthColumns.PERSON.value,
+        ]
+    ]
+
+
+def add_plot_index(
+    plot_data: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Adds the correct plot index to data with a plot number column.
+
+    Args:
+        plot_data: The raw plot data, with a plot number column.
+
+    Returns:
+        The same data, indexed by field plot number.
+
+    """
+    plot_data[CountingColumns.PLOT.value] = plot_data[
+        DetectionColumns.PLOT_NUM.value
+    ].astype("uint64")
+
+    # Set the index.
+    plot_data = plot_data.set_index(CountingColumns.PLOT.value)
+    plot_data.index.name = CountingColumns.PLOT.value
+    plot_data.sort_index(inplace=True)
+
+    return plot_data
+
+
+def plot_ground_truth_vs_predicted(
+    counts_with_gt: pd.DataFrame,
+) -> plot.Figure:
+    """
+    Creates a scatter plot showing the ground-truth vs. predicted counts.
+
+    Args:
+        counts_with_gt: The merged counting results and ground-truth data.
+
+    Returns:
+        The plot that it created.
+
+    """
+    counts_with_gt.reset_index(
+        level=GroundTruthColumns.DAP.value, inplace=True
+    )
+
+    # Plot the regression.
+    axes = sns.scatterplot(
+        data=counts_with_gt,
+        x=GroundTruthColumns.TRUE_COUNT.value,
+        y=CountingColumns.COUNT.value,
+        hue=CountingColumns.DAP.value,
+    )
+    axes.set_title("Predicted vs. Ground-Truth Counts")
+    axes.set(xlabel="Ground-Truth", ylabel="Automatic")
+
+    return plot.gcf()

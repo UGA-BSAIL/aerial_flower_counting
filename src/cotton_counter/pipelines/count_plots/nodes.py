@@ -3,7 +3,6 @@ Contains nodes for the `count_plots` pipeline.
 """
 
 import enum
-from datetime import date
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
@@ -44,26 +43,6 @@ pandarallel.initialize()
 
 
 @enum.unique
-class GenotypeColumns(enum.Enum):
-    """
-    Names of the columns in the genotype table.
-    """
-
-    GENOTYPE = "Genotype"
-    """
-    Genotype identifier.
-    """
-    PLOT = "2021 IDENTIFIER #"
-    """
-    Plot that this genotype is planted in.
-    """
-    POPULATION = "Population"
-    """
-    Genotype population.
-    """
-
-
-@enum.unique
 class HeightGtColumns(enum.Enum):
     """
     Names of the columns in the height ground-truth table.
@@ -88,6 +67,26 @@ class HeightGtColumns(enum.Enum):
     MAX_HEIGHT = "mean_height"
     """
     The max height of the plants.
+    """
+
+
+@enum.unique
+class GenotypeColumns(enum.Enum):
+    """
+    Names of the columns in the genotype table.
+    """
+
+    GENOTYPE = "Genotype"
+    """
+    Genotype identifier.
+    """
+    PLOT = "2021 IDENTIFIER #"
+    """
+    Plot that this genotype is planted in.
+    """
+    POPULATION = "Population"
+    """
+    Genotype population.
     """
 
 
@@ -488,77 +487,6 @@ def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(plot_heights)
 
 
-def _add_dap(
-    flower_data: pd.DataFrame,
-    *,
-    field_planted_date: date,
-    session_column: enum.Enum,
-) -> pd.DataFrame:
-    """
-    Adds a "days after planting" column to a dataframe with a session column.
-
-    Args:
-        flower_data: The counting results dataframe.
-        field_planted_date: The date on which the field was planted.
-        session_column: The column containing the session data.
-
-    Returns:
-        The input, with an added DAP column.
-
-    """
-    # Compute DAP.
-    seconds_after_planting = flower_data[session_column.value].apply(
-        lambda x: (date.fromisoformat(x) - field_planted_date).total_seconds()
-    )
-    days_after_planting = seconds_after_planting / (60 * 60 * 24)
-    days_after_planting = days_after_planting.astype("uint64")
-    flower_data[CountingColumns.DAP.value] = days_after_planting
-
-    return flower_data
-
-
-def add_dap_counting(
-    counting_results: pd.DataFrame, *, field_planted_date: date
-) -> pd.DataFrame:
-    """
-    Adds a "days after planting" column to the counting results.
-
-    Args:
-        counting_results: The counting results dataframe.
-        field_planted_date: The date on which the field was planted.
-
-    Returns:
-        The counting results, with an added DAP column.
-
-    """
-    return _add_dap(
-        counting_results,
-        field_planted_date=field_planted_date,
-        session_column=CountingColumns.SESSION,
-    )
-
-
-def add_dap_ground_truth(
-    ground_truth: pd.DataFrame, *, field_planted_date: date
-) -> pd.DataFrame:
-    """
-    Adds a "days after planting" column to the ground-truth data.
-
-    Args:
-        ground_truth: The cleaned ground-truth data.
-        field_planted_date: The date on which the field was planted.
-
-    Returns:
-        The ground-truth data, with an added DAP column.
-
-    """
-    return _add_dap(
-        ground_truth,
-        field_planted_date=field_planted_date,
-        session_column=GroundTruthColumns.SESSION,
-    )
-
-
 def create_per_plot_table(counting_results: pd.DataFrame) -> pd.DataFrame:
     """
     Converts the counting results to a table with per-plot counts.
@@ -813,36 +741,6 @@ def clean_empty_plots(
 
     plot_df.drop(empty_plots, inplace=True, errors="ignore")
     return plot_df
-
-
-def merge_ground_truth(
-    *, counting_results: pd.DataFrame, ground_truth: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Merges the ground-truth and counting results into a single `DataFrame`
-    for easy comparison.
-
-    Args:
-        counting_results: The complete counting results.
-        ground_truth: The cleaned ground-truth data.
-
-    Returns:
-        The merged data, indexed by both plot and DAP.
-
-    """
-    # Make sure the indices are named the same.
-    ground_truth.index.name = counting_results.index.name
-    # Merge the data for easy plotting.
-    counting_results.set_index(
-        CountingColumns.DAP.value, append=True, inplace=True
-    )
-    ground_truth.set_index(
-        GroundTruthColumns.DAP.value, append=True, inplace=True
-    )
-
-    return pd.merge(
-        counting_results, ground_truth, left_index=True, right_index=True
-    )
 
 
 def merge_height_ground_truth(
@@ -1583,30 +1481,6 @@ def plot_height_comparison(
     return figure
 
 
-def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:
-    """
-    Plots the regression between the counting results and the ground-truth
-    counts.
-
-    Args:
-        counts_with_gt: The merged counting results and ground-truth data.
-
-    Returns:
-        The plot that it created.
-
-    """
-    # Plot the regression.
-    axes = sns.residplot(
-        data=counts_with_gt,
-        x=GroundTruthColumns.TRUE_COUNT.value,
-        y=CountingColumns.COUNT.value,
-    )
-    axes.set_title("Counting Residuals")
-    axes.set(xlabel="Ground-Truth", ylabel="Automatic")
-
-    return plot.gcf()
-
-
 def plot_height_ground_truth_regression(
     heights_with_gt: pd.DataFrame,
 ) -> plot.Figure:
@@ -1647,42 +1521,6 @@ def plot_height_ground_truth_regression(
         )
 
     axes.map_dataframe(annotate)
-
-    return plot.gcf()
-
-
-def plot_ground_truth_vs_predicted(
-    *, counts_with_gt: pd.DataFrame, genotypes: pd.DataFrame
-) -> plot.Figure:
-    """
-    Creates a scatter plot showing the ground-truth vs. predicted counts.
-
-    Args:
-        counts_with_gt: The merged counting results and ground-truth data.
-        genotypes: The cleaned genotype information.
-
-    Returns:
-        The plot that it created.
-
-    """
-    # Merge flowering and genotype data together for easy plotting.
-    counts_with_gt.reset_index(
-        level=GroundTruthColumns.DAP.value, inplace=True
-    )
-    combined_data = pd.merge(
-        counts_with_gt, genotypes, left_index=True, right_index=True
-    )
-
-    # Plot the regression.
-    axes = sns.scatterplot(
-        data=combined_data,
-        x=GroundTruthColumns.TRUE_COUNT.value,
-        y=CountingColumns.COUNT.value,
-        hue=CountingColumns.DAP.value,
-        style=GenotypeColumns.POPULATION.value,
-    )
-    axes.set_title("Predicted vs. Ground-Truth Counts")
-    axes.set(xlabel="Ground-Truth", ylabel="Automatic")
 
     return plot.gcf()
 
@@ -1880,3 +1718,39 @@ def draw_qualitative_results(
         partitions[example_name] = overlaid_image
 
     return partitions
+
+
+def plot_ground_truth_vs_predicted(
+    *, counts_with_gt: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Creates a scatter plot showing the ground-truth vs. predicted counts.
+
+    Args:
+        counts_with_gt: The merged counting results and ground-truth data.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it created.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    counts_with_gt.reset_index(
+        level=GroundTruthColumns.DAP.value, inplace=True
+    )
+    combined_data = pd.merge(
+        counts_with_gt, genotypes, left_index=True, right_index=True
+    )
+
+    # Plot the regression.
+    axes = sns.scatterplot(
+        data=combined_data,
+        x=GroundTruthColumns.TRUE_COUNT.value,
+        y=CountingColumns.COUNT.value,
+        hue=CountingColumns.DAP.value,
+        style=GenotypeColumns.POPULATION.value,
+    )
+    axes.set_title("Predicted vs. Ground-Truth Counts")
+    axes.set(xlabel="Ground-Truth", ylabel="Automatic")
+
+    return plot.gcf()

@@ -11,7 +11,7 @@ bottom_field_config_raw:
   type: yaml.YAMLDataSet
   filepath: data/01_raw/field_config_tifton_bottom.yml
 
-  # Plot boundaries.
+# Plot boundaries.
 plot_borders_top:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_borders_top.shp
@@ -23,6 +23,22 @@ plot_borders_middle:
 plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
+
+# Datasets containing the ground-truth.
+_gt_params: &gt_params
+  type: pandas.ExcelDataSet
+  filepath: data/01_raw/2023_ground_truth_counts.xlsx
+
+_gt_load_args: &gt_load_args
+  engine: openpyxl
+  # Otherwise it reads empty boxes as NA...
+  na_filter: false
+
+gt_2023-08-14:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-14-23"
+    << : *gt_load_args
 
 # Datasets containing raw images to process.
 _image_params: &image_params

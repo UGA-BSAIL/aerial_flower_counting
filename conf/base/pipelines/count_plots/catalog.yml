@@ -295,22 +295,10 @@ mean_flowering_curve:
   filepath: data/08_reporting/mean_flowering_curve.png
   versioned: True
 
-# Plot of the regression with the ground-truth counts.
-ground_truth_regression_plot:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/ground_truth_regression.png
-  versioned: True
-
 # Plot of the regression with the ground-truth heights.
 height_ground_truth_regression_plot:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/height_ground_truth_regression.png
-  versioned: True
-
-# Plot of ground-truth vs. predicted data.
-ground_truth_vs_predicted:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/ground_truth_vs_predicted.png
   versioned: True
 
 # Dateset containing qualitative examples with detections overlayed.
