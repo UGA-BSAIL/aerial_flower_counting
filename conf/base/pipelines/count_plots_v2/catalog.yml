@@ -1,3 +1,29 @@
+# Field configuration.
+top_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_top.yml
+
+middle_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_middle.yml
+
+bottom_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_bottom.yml
+
+  # Plot boundaries.
+plot_borders_top:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_borders_top.shp
+
+plot_borders_middle:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2023-08-14_plot_borders_middle.shp
+
+plot_borders_bottom:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
+
 # Datasets containing raw images to process.
 _image_params: &image_params
   type: PartitionedDataSet
@@ -22,7 +48,7 @@ images_2023-08-14:
 # Shapefile containing the image extents.
 image_extents_2023-08-14:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/08_reporting/image_extents/image_extents.shp
+  filepath: data/08_reporting/image_extents.shp
   versioned: True
   schema:
     geometry: Polygon
@@ -33,7 +59,7 @@ image_extents_2023-08-14:
 # Shapefile containing the output bounding boxes.
 bounding_box_shapes:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/08_reporting/bounding_boxes/bounding_boxes.shp
+  filepath: data/08_reporting/bounding_boxes.shp
   versioned: True
   schema:
     geometry: Polygon

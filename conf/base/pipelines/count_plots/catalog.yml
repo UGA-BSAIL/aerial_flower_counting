@@ -161,12 +161,6 @@ qualitative_examples:
   dataset:
     type: pillow.ImageDataSet
 
-# Dataset containing estimated counts for each plot.
-counting_results:
-  type: pandas.ParquetDataSet
-  filepath: data/03_primary/counting_results.parquet
-  versioned: True
-
 # Segment Anything model to use.
 sam_model:
   type: MemoryDataSet

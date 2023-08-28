@@ -3,3 +3,9 @@ detection_results:
   type: pandas.ParquetDataSet
   filepath: data/03_primary/detection_results.parquet
   versioned: True
+
+# Dataset containing estimated counts for each plot.
+counting_results:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/counting_results.parquet
+  versioned: True

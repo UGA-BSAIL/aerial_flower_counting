@@ -23,7 +23,8 @@ from pydantic.dataclasses import dataclass
 from segment_anything import SamPredictor, sam_model_registry
 from ultralytics import YOLO
 from .visualization import draw_detections
-from ..common import batch_iter, DetectionColumns
+from ..common import batch_iter, DetectionColumns, CountingColumns, \
+    GroundTruthColumns
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -63,38 +64,6 @@ class GenotypeColumns(enum.Enum):
 
 
 @enum.unique
-class GroundTruthColumns(enum.Enum):
-    """
-    Names of the columns in the ground-truth table.
-    """
-
-    PLOT = "Plot Number"
-    """
-    The field plot number.
-    """
-    TRUE_COUNT = "GT Count"
-    """
-    The ground-truth count for that plot.
-    """
-    MANUAL_IMAGE_COUNT = "Drone Manual"
-    """
-    The number of flowers counted manually from the drone imagery.
-    """
-    SESSION = "Date"
-    """
-    The date for the session that the data was collected on.
-    """
-    DAP = "days_after_planting"
-    """
-    The number of days after planting that this count was taken at.
-    """
-    PERSON = "Person measured"
-    """
-    The initials of the person who took the GT measurement.
-    """
-
-
-@enum.unique
 class HeightGtColumns(enum.Enum):
     """
     Names of the columns in the height ground-truth table.
@@ -123,37 +92,12 @@ class HeightGtColumns(enum.Enum):
 
 
 @enum.unique
-class CountingColumns(enum.Enum):
-    """
-    Names of the columns in the counting results dataframe.
-    """
-
-    # This is carried over directly from the detection results.
-    SESSION = DetectionColumns.SESSION.value
-    """
-    The name of the session that this count is from.
-    """
-    PLOT = "field_plot"
-    """
-    The field plot number that this count is from.
-    """
-    COUNT = "count"
-    """
-    The number of flowers in this plot.
-    """
-    DAP = GroundTruthColumns.DAP.value
-    """
-    The number of days after planting that this count was taken at.
-    """
-
-
-@enum.unique
 class HeightColumns(enum.Enum):
     """
     Names of the columns in the plot height dataframe.
     """
 
-    DETECTION_PLOT = DetectionColumns.IMAGE_ID.value
+    DETECTION_PLOT = DetectionColumns.PLOT_NUM.value
     """
     The detection plot number that these heights are from.
     """
@@ -219,7 +163,7 @@ class FieldConfig:
     Represents the configuration of the actual field.
 
     Attributes:
-        num_rows: The total number of plots in each row.
+        num_plots: The total number of plots in each row.
 
         first_row_num: The number assigned to the first row.
         first_plot_num: The number assigned to the first plot in each row.
@@ -359,7 +303,7 @@ def detect_flowers(
             )
 
             plot_num = int(_PLOT_RE.match(key).group(1))
-            results_df[DetectionColumns.IMAGE_ID.value] = plot_num
+            results_df[DetectionColumns.PLOT_NUM.value] = plot_num
 
             results.append(results_df)
 
@@ -420,7 +364,7 @@ def segment_flowers(
     detections = detections[
         detections[DetectionColumns.SESSION.value] == session_name
         ]
-    by_plot = detections.set_index(DetectionColumns.IMAGE_ID.value)
+    by_plot = detections.set_index(DetectionColumns.PLOT_NUM.value)
 
     # Segments a particular bounding box.
     def _segment_box(
@@ -512,7 +456,7 @@ def add_plot_index(
     """
     # Compute field plot numbers.
     plot_data[CountingColumns.PLOT.value] = plot_data[
-        DetectionColumns.IMAGE_ID.value
+        DetectionColumns.PLOT_NUM.value
     ].apply(_to_field_plot_num, field_config=field_config)
 
     # Remove NaN values, because these are for empty plots.
@@ -542,33 +486,6 @@ def collect_plot_heights(*plot_heights: pd.DataFrame) -> pd.DataFrame:
 
     """
     return pd.concat(plot_heights)
-
-
-def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
-    """
-    Computes the counts for each plot based on the detection results.
-
-    Args:
-        detection_results: The results from the detection stage.
-
-    Returns:
-        A DataFrame of the computed counts.
-
-    """
-    # Figure out how many detections we have for each plot.
-    counts_per_plot_series = detection_results.value_counts(
-        subset=[
-            DetectionColumns.SESSION.value,
-            DetectionColumns.IMAGE_ID.value,
-        ]
-    )
-    # Convert the series to a frame.
-    counts_per_plot = counts_per_plot_series.index.to_frame(index=False)
-    counts_per_plot[
-        CountingColumns.COUNT.value
-    ] = counts_per_plot_series.values
-
-    return counts_per_plot
 
 
 def _add_dap(
@@ -662,7 +579,7 @@ def create_per_plot_table(counting_results: pd.DataFrame) -> pd.DataFrame:
         # Get the plot counts.
         session_counts = counting_results[
             counting_results[CountingColumns.SESSION.value] == session
-        ]
+            ]
         counts_by_session[session] = session_counts[
             CountingColumns.COUNT.value
         ]
@@ -1172,7 +1089,7 @@ def compute_flower_sizes(
 
         """
         session = detection_row[DetectionColumns.SESSION.value]
-        plot_num = detection_row[DetectionColumns.IMAGE_ID.value]
+        plot_num = detection_row[DetectionColumns.PLOT_NUM.value]
         box_num = detection_row[DetectionColumns.BOX_NUM.value]
 
         # Compute the size based on the mask.
@@ -1922,7 +1839,7 @@ def draw_qualitative_results(
 
     """
     detection_results = detection_results.set_index(
-        DetectionColumns.IMAGE_ID.value
+        DetectionColumns.PLOT_NUM.value
     )
 
     partitions = {}

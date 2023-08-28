@@ -1,0 +1,37 @@
+# List of the rows in the field.
+rows:
+  row1:
+    # Specifies a range of sequential numbers for the plots in the row.
+    - range:
+        # The number of the first plot.
+        start: 1393
+        # The number of the last plot.
+        end: 1442
+        # The number of times each plot number repeats.
+        repeats: 2
+  row2:
+    - range:
+        start: 1518
+        end: 1469
+        repeats: 2
+  row3:
+    # Plot numbers for this row are derived by adding a constant to the
+    # plot numbers of another row.
+    - shift:
+        # The row the plot numbers are derived from.
+        row: row1
+        # The amount to add to each plot number.
+        amount: 130
+  row4:
+    - shift:
+        row: row2
+        amount: 130
+  row5:
+    - shift:
+        row: row3
+        amount: 130
+  row6:
+    - shift:
+        row: row4
+        amount: 130
+

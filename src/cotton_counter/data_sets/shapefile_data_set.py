@@ -18,7 +18,7 @@ class ShapefileDataSet(AbstractVersionedDataSet):
     def __init__(
         self,
         filepath: str,
-        version: Version,
+        version: Version | None = None,
         schema: Dict[str, Any] = {},
         epsg_crs: int = 4362,
     ):

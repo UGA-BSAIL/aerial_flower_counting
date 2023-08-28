@@ -1,0 +1,62 @@
+# List of the rows in the field.
+rows:
+  row1:
+    # Specifies a range of sequential numbers for the plots in the row.
+    - range:
+        # The number of the first plot.
+        start: 1443
+        # The number of the last plot.
+        end: 1455
+        # The number of times each plot number repeats.
+        repeats: 2
+    # Specifies plot numbers directly for the remainder of the row.
+    - 2015007
+    - 2015018
+    - 2015046
+    - 399
+  row2:
+    - range:
+        start: 1468
+        end: 1456
+        repeats: 2
+    - 2015072
+    - 2016090
+    - 2016111
+    - 399
+  row3:
+    - range:
+        start: 1573
+        end: 1585
+        repeats: 2
+    - 2017002
+    - 2017005
+    - 2017020
+    - 399
+  row4:
+    - range:
+        start: 1598
+        end: 1586
+        repeats: 2
+    - 2017046
+    - 2017082
+    - 2017101
+    - 399
+  row5:
+    - range:
+        start: 1703
+        end: 1715
+        repeats: 2
+    - 1124
+    - 1117
+    - 1015
+    - 399
+  row6:
+    - range:
+        start: 1728
+        end: 1716
+        repeats: 2
+    - 1112
+    - 399
+    - 399
+    - 399
+

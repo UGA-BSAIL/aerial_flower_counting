@@ -2,9 +2,8 @@
 Contains nodes for the updated plot counting pipeline.
 """
 
-
 from typing import Tuple, Iterable, Dict, Callable, Any, List
-from functools import partial
+from functools import partial, reduce
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -18,20 +17,17 @@ from pygeodesy.ecef import EcefKarney
 from pygeodesy.utm import toUtm8
 from pandarallel import pandarallel
 from ...type_helpers import ArbitraryTypesConfig
-from shapely import Polygon
 from shapely.geometry import mapping
-from shapely import intersection
-from shapely import STRtree
+from shapely import intersection, STRtree, Polygon, minimum_rotated_rectangle
 import enum
 from fiona.model import Feature
 from loguru import logger
-
+from .field_config import FieldConfig
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
 Type alias for a dataset containing multiple images.
 """
-
 
 pandarallel.initialize()
 
@@ -570,3 +566,97 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
             }
         )
     return features
+
+
+def _label_plots(
+    *, plot_boundaries: Iterable[Polygon], field_config: FieldConfig
+) -> Iterable[Tuple[Polygon, int]]:
+    """
+    Computes the plot number for each plot in a shapefile.
+
+    Args:
+        plot_boundaries: The boundaries of the plots.
+        field_config: The configuration of the field.
+
+    Yields:
+        Each plot boundary polygon, along with the corresponding plot number.
+
+    """
+    # Sort plots north-to-south and then west-to-east.
+    plot_boundaries = list(plot_boundaries)
+    plot_centers = [p.centroid for p in plot_boundaries]
+    boundaries_with_centers = [
+        (b, c) for b, c in zip(plot_boundaries, plot_centers)
+    ]
+    # Sort by x coordinate.
+    boundaries_with_centers_sorted_x = sorted(
+        boundaries_with_centers, key=lambda p: p[1].x
+    )
+    # Group by row.
+    boundaries_with_centers_by_row = list(
+        batch_iter(
+            boundaries_with_centers_sorted_x,
+            batch_size=field_config.num_plots // field_config.num_rows,
+        )
+    )
+    # Sort by y coordinate within rows.
+    boundaries_with_centers_sorted = [
+        sorted(row, key=lambda p: p[1].y, reverse=True)
+        for row in boundaries_with_centers_by_row
+    ]
+    boundaries_with_centers_sorted = reduce(
+        lambda x, y: x + y, boundaries_with_centers_sorted, []
+    )
+    boundaries_sorted = [b for b, _ in boundaries_with_centers_sorted]
+
+    # Assign real plot numbers to them.
+    for i, boundary in enumerate(boundaries_sorted):
+        yield boundary, field_config.get_plot_num_row_major(i)
+
+
+def add_plot_num(
+    *,
+    detections: pd.DataFrame,
+    plot_boundaries: List[Feature],
+    field_config: FieldConfig,
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections.
+
+    Args:
+        detections: The detections.
+        plot_boundaries: The boundaries of the plots.
+        field_config: The configuration of the field.
+
+    Returns:
+        The detections with the plot number column.
+
+    """
+    # Detection RTree for fast intersection calculations.
+    detection_polys = list(_detections_to_polygons(detections))
+    detections_tree = STRtree(detection_polys)
+    detection_polys_to_row = {
+        p: i for p, i in zip(detection_polys, detections.index)
+    }
+
+    # Make sure it has a column for plot numbers.
+    if DetectionColumns.PLOT_NUM.value not in detections:
+        detections.insert(0, DetectionColumns.PLOT_NUM.value, np.nan)
+
+    for plot_boundary, plot_num in _label_plots(
+        plot_boundaries=_load_polygons(plot_boundaries),
+        field_config=field_config,
+    ):
+        # Figure out which detections intersect this plot.
+        plot_detection_indices = _query_intersecting(
+            detections_tree, plot_boundary
+        )
+        plot_detections = detections_tree.geometries[plot_detection_indices]
+
+        # Edit the corresponding rows in the dataframe.
+        detection_rows = [detection_polys_to_row[p] for p in plot_detections]
+        detections.loc[
+            detection_rows, DetectionColumns.PLOT_NUM.value
+        ] = plot_num
+
+    return detections
