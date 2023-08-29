@@ -305,9 +305,19 @@ def merge_ground_truth(
         GroundTruthColumns.DAP.value, append=True, inplace=True
     )
 
-    return pd.merge(
-        counting_results, ground_truth, left_index=True, right_index=True
+    merged = pd.merge(
+        counting_results,
+        ground_truth,
+        left_index=True,
+        right_index=True,
+        how="right",
     )
+    # NaN count values are actually zeros. They just don't show up in the
+    # original counts dataframe.
+    merged[CountingColumns.COUNT.value] = merged[
+        CountingColumns.COUNT.value
+    ].fillna(0)
+    return merged
 
 
 def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:

@@ -12,7 +12,8 @@ from .nodes import (
     flowers_to_shapefile,
     find_image_extents,
     prune_duplicate_detections,
-    add_plot_num,
+    find_detections_in_plots,
+    find_detections_in_gt_sampling_regions,
     load_ground_truth,
     add_plot_index,
     plot_ground_truth_vs_predicted,
@@ -197,7 +198,7 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "bottom_field_config",
             ),
             node(
-                add_plot_num,
+                find_detections_in_plots,
                 dict(
                     detections="filtered_detection_results",
                     plot_boundaries="plot_borders_top",
@@ -206,7 +207,7 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "detection_results_plot_num_top",
             ),
             node(
-                add_plot_num,
+                find_detections_in_plots,
                 dict(
                     detections="detection_results_plot_num_top",
                     plot_boundaries="plot_borders_middle",
@@ -215,13 +216,44 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "detection_results_plot_num_top_middle",
             ),
             node(
-                add_plot_num,
+                find_detections_in_plots,
                 dict(
                     detections="detection_results_plot_num_top_middle",
                     plot_boundaries="plot_borders_bottom",
                     field_config="bottom_field_config",
                 ),
                 "detection_results_plot_num",
+            ),
+            # Also extract the detections within the GT sampling regions.
+            node(
+                find_detections_in_gt_sampling_regions,
+                dict(
+                    detections="filtered_detection_results",
+                    gt_sampling_regions="plot_gt_sample_locations_top",
+                    field_config="top_field_config",
+                    ground_truth="gt_combined",
+                ),
+                "detection_results_gt_sample_top",
+            ),
+            node(
+                find_detections_in_gt_sampling_regions,
+                dict(
+                    detections="detection_results_gt_sample_top",
+                    gt_sampling_regions="plot_gt_sample_locations_middle",
+                    field_config="middle_field_config",
+                    ground_truth="gt_combined",
+                ),
+                "detection_results_gt_sample_top_middle",
+            ),
+            node(
+                find_detections_in_gt_sampling_regions,
+                dict(
+                    detections="detection_results_gt_sample_top_middle",
+                    gt_sampling_regions="plot_gt_sample_locations_bottom",
+                    field_config="bottom_field_config",
+                    ground_truth="gt_combined",
+                ),
+                "detection_results_gt_sample",
             ),
             # Compute the flower counts.
             node(
@@ -242,23 +274,42 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ),
                 "counting_results",
             ),
+            # Compute counts for the GT sample areas too.
+            node(
+                compute_counts,
+                "detection_results_gt_sample",
+                "counting_results_gt_sample_no_dap_no_plot",
+            ),
+            node(
+                add_plot_index,
+                "counting_results_gt_sample_no_dap_no_plot",
+                "counting_results_gt_sample_no_dap",
+            ),
+            node(
+                add_dap_counting,
+                dict(
+                    counting_results="counting_results_gt_sample_no_dap",
+                    field_planted_date="params:v2_field_planted_date",
+                ),
+                "counting_results_gt_sample",
+            ),
             # Plot the ground truth regression.
             node(
                 merge_ground_truth,
                 dict(
-                    counting_results="counting_results",
+                    counting_results="counting_results_gt_sample",
                     ground_truth="gt_combined",
                 ),
-                "counting_results_gt",
+                "counting_results_gt_merged",
             ),
             node(
                 plot_ground_truth_regression,
-                "counting_results_gt",
+                "counting_results_gt_merged",
                 "ground_truth_regression_plot",
             ),
             node(
                 plot_ground_truth_vs_predicted,
-                "counting_results_gt",
+                "counting_results_gt_merged",
                 "ground_truth_vs_predicted",
             ),
         ]

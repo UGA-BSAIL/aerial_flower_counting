@@ -625,19 +625,66 @@ def _label_plots(
         yield boundary, field_config.get_plot_num_row_major(i)
 
 
-def add_plot_num(
+def _label_plots_gt(
+    *,
+    sampling_regions: Iterable[Polygon],
+    field_config: FieldConfig,
+    ground_truth: pd.DataFrame,
+) -> Iterable[Tuple[Polygon, int]]:
+    """
+    Computes the plot number for each ground-truth sampling region in a
+    shapefile.
+
+    Args:
+        sampling_regions: The GT sampling regions.
+        field_config: The configuration of the field.
+        ground_truth: The ground truth data.
+
+    Yields:
+        Each sampling region polygon, along with the corresponding plot number.
+
+    """
+    for top_plot, bottom_plot in batch_iter(
+        _label_plots(
+            plot_boundaries=sampling_regions, field_config=field_config
+        ),
+        batch_size=2,
+    ):
+        _, top_plot_num = top_plot
+        _, bottom_plot_num = bottom_plot
+        if top_plot_num != bottom_plot_num:
+            # These are single row plots, so we should yield both.
+            yield top_plot
+            yield bottom_plot
+            continue
+
+        # Since we only sample either the top or bottom row, we have to fiter
+        # out extraneous ones.
+        try:
+            if ground_truth.loc[
+                top_plot_num, GroundTruthColumns.USED_ALTERNATE_ROW.value
+            ]:
+                yield bottom_plot
+            else:
+                yield top_plot
+        except KeyError:
+            # This plot wasn't measured in the ground-truth data, so we can
+            # completely ignore it.
+            pass
+
+
+def _find_detections_in_plots(
     *,
     detections: pd.DataFrame,
-    plot_boundaries: List[Feature],
-    field_config: FieldConfig,
+    labeled_plots: Iterable[Tuple[Polygon, int]],
 ) -> pd.DataFrame:
     """
-    Adds the plot number to the detections.
+    Finds detections within specific plots, and adds the appropriate plot
+    numbers to the detections dataframe.
 
     Args:
         detections: The detections.
-        plot_boundaries: The boundaries of the plots.
-        field_config: The configuration of the field.
+        labeled_plots: The plot polygons with associated plot numbers.
 
     Returns:
         The detections with the plot number column.
@@ -654,10 +701,7 @@ def add_plot_num(
     if DetectionColumns.PLOT_NUM.value not in detections:
         detections.insert(0, DetectionColumns.PLOT_NUM.value, np.nan)
 
-    for plot_boundary, plot_num in _label_plots(
-        plot_boundaries=_load_polygons(plot_boundaries),
-        field_config=field_config,
-    ):
+    for plot_boundary, plot_num in labeled_plots:
         # Figure out which detections intersect this plot.
         plot_detection_indices = _query_intersecting(
             detections_tree, plot_boundary
@@ -671,6 +715,64 @@ def add_plot_num(
         ] = plot_num
 
     return detections
+
+
+def find_detections_in_plots(
+    *,
+    detections: pd.DataFrame,
+    plot_boundaries: List[Feature],
+    field_config: FieldConfig,
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`.
+
+    Args:
+        detections: The original detections.
+        plot_boundaries: The plot boundary shapes.
+        field_config: The field configuration.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    return _find_detections_in_plots(
+        detections=detections,
+        labeled_plots=_label_plots(
+            plot_boundaries=_load_polygons(plot_boundaries),
+            field_config=field_config,
+        ),
+    )
+
+
+def find_detections_in_gt_sampling_regions(
+        *,
+        detections: pd.DataFrame,
+        gt_sampling_regions: List[Feature],
+        field_config: FieldConfig,
+        ground_truth: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`, based on which
+    detections fall within that plot's ground-truth sampling region.
+
+    Args:
+        detections: The original detections.
+        gt_sampling_regions: The GT sampling region shapes.
+        field_config: The field configuration.
+        ground_truth: The ground truth data.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    return _find_detections_in_plots(
+        detections=detections,
+        labeled_plots=_label_plots_gt(
+            sampling_regions=_load_polygons(gt_sampling_regions),
+            field_config=field_config,
+            ground_truth=ground_truth,
+        ),
+    )
 
 
 def load_ground_truth(

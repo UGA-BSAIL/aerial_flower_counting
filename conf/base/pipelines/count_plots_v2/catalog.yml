@@ -24,7 +24,20 @@ plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
 
-# Datasets containing the ground-truth.
+# Plot sampling locations for ground truth.
+plot_gt_sample_locations_top:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_sampling_locations_top.shp
+
+plot_gt_sample_locations_middle:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2023-08-14_plot_sampling_locations_middle.shp
+
+plot_gt_sample_locations_bottom:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_sampling_locations_bottom.shp
+
+  # Datasets containing the ground-truth.
 _gt_params: &gt_params
   type: pandas.ExcelDataSet
   filepath: data/01_raw/2023_ground_truth_counts.xlsx
