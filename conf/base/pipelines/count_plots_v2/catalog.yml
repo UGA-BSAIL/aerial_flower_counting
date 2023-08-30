@@ -47,10 +47,46 @@ _gt_load_args: &gt_load_args
   # Otherwise it reads empty boxes as NA...
   na_filter: false
 
+gt_2023-07-27:
+  << : *gt_params
+  load_args:
+    sheet_name: "7-27-23"
+    << : *gt_load_args
+
+gt_2023-08-01:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-01-23"
+    << : *gt_load_args
+
+gt_2023-08-03:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-03-23"
+    << : *gt_load_args
+
+gt_2023-08-07:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-07-23"
+    << : *gt_load_args
+
+gt_2023-08-10:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-10-23"
+    << : *gt_load_args
+
 gt_2023-08-14:
   << : *gt_params
   load_args:
     sheet_name: "8-14-23"
+    << : *gt_load_args
+
+gt_2023-08-18:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-18-23"
     << : *gt_load_args
 
 # Datasets containing raw images to process.
@@ -60,29 +96,77 @@ _image_params: &image_params
   dataset:
     type: pillow.ImageDataSet
 
+images_2023-07-27:
+  path: ${corrected_image_dir}/2023-07-27
+  << : *image_params
+
+images_2023-08-01:
+  path: ${corrected_image_dir}/2023-08-01
+  << : *image_params
+
+images_2023-08-03:
+  path: ${corrected_image_dir}/2023-08-03
+  << : *image_params
+
+images_2023-08-07:
+  path: ${corrected_image_dir}/2023-08-07
+  << : *image_params
+
+images_2023-08-10:
+  path: ${corrected_image_dir}/2023-08-10
+  << : *image_params
+
+images_2023-08-14:
+  path: ${corrected_image_dir}/2023-08-14
+  << : *image_params
+
+images_2023-08-18:
+  path: ${corrected_image_dir}/2023-08-18
+  << : *image_params
+
 # Datasets containing the camera configuration.
 user_camera_config:
   type: yaml.YAMLDataSet
   filepath: data/01_raw/camera_config.yml
 
+2023-07-27_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-07-27_cameras.xml
+
+2023-08-01_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-01_cameras.xml
+
+2023-08-03_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-03_cameras.xml
+
+2023-08-07_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-07_cameras.xml
+
+2023-08-10_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-10_cameras.xml
+
 2023-08-14_auto_camera_config:
   type: text.TextDataSet
   filepath: data/01_raw/metashape_cameras/2023-08-14_cameras.xml
 
-# Datasets containing raw images.
-images_2023-08-14:
-  path: ${corrected_image_dir}/2023-08-14
-  << : *image_params
+2023-08-18_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-18_cameras.xml
 
-# Shapefile containing the image extents.
-image_extents_2023-08-14:
+# Shapefiles containing the image extents.
+image_extents:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/08_reporting/image_extents.shp
+  filepath: data/08_reporting/image_extents/image_extents.shp
   versioned: True
   schema:
     geometry: Polygon
     properties:
       - [ image_id, str ]
+      - [ session, str ]
   epsg_crs: 32617
 
 # Shapefile containing the output bounding boxes.

@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from fiona.model import Feature
+from fiona.model import Feature, Geometry, Properties
 from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
@@ -268,8 +268,8 @@ def detect_flowers(
 
 
 def find_image_extents(
-    images: ImageDataSet, *, camera_config: CameraConfig
-) -> List[Dict[str, Any]]:
+    images: ImageDataSet, *, camera_config: CameraConfig, session_name: str
+) -> List[Feature]:
     """
     Finds the extents of each image in the dataset in real-world coordinates.
 
@@ -277,6 +277,7 @@ def find_image_extents(
         images: The images to find the shapes of. It assumes they all have
             the same size.
         camera_config: The camera configuration.
+        session_name: The name of the session we are finding extents for.
 
     Returns:
         Shapefile data for the image extents.
@@ -304,7 +305,10 @@ def find_image_extents(
         )
 
     return [
-        dict(geometry=mapping(s), properties=dict(image_id=i))
+        Feature(
+            geometry=Geometry.from_dict(mapping(s)),
+            properties=Properties(image_id=i, session=session_name),
+        )
         for i, s in zip(images, shapes)
     ]
 

@@ -8,6 +8,16 @@ from typing import Tuple
 
 from kedro.pipeline import Pipeline, node
 
+from ..common import (
+    add_dap_counting,
+    add_dap_ground_truth,
+    collect_session_results,
+    compute_counts,
+    filter_low_confidence,
+    merge_dicts,
+    merge_ground_truth,
+    plot_ground_truth_regression,
+)
 from .nodes import (
     FieldConfig,
     add_plot_index,
@@ -17,6 +27,7 @@ from .nodes import (
     clean_height_ground_truth,
     collect_plot_heights,
     compute_cumulative_counts,
+    compute_flower_sizes,
     compute_flowering_duration,
     compute_flowering_peak,
     compute_flowering_ramps,
@@ -26,7 +37,10 @@ from .nodes import (
     create_metric_table,
     create_per_plot_table,
     detect_flowers,
+    draw_qualitative_results,
+    load_sam_model,
     merge_height_ground_truth,
+    plot_flower_size_comparison,
     plot_flowering_curves,
     plot_flowering_duration_comparison,
     plot_flowering_duration_dist,
@@ -36,6 +50,7 @@ from .nodes import (
     plot_flowering_slope_dist,
     plot_flowering_start_comparison,
     plot_flowering_start_dist,
+    plot_ground_truth_vs_predicted,
     plot_height_comparison,
     plot_height_dist,
     plot_height_ground_truth_regression,
@@ -43,15 +58,7 @@ from .nodes import (
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
     segment_flowers,
-    load_sam_model,
-    merge_dicts,
-    compute_flower_sizes,
-    plot_flower_size_comparison,
-    draw_qualitative_results, plot_ground_truth_vs_predicted,
 )
-from ..common import collect_session_results, filter_low_confidence, \
-    compute_counts, add_dap_counting, add_dap_ground_truth, merge_ground_truth, \
-    plot_ground_truth_regression
 
 SESSIONS = {
     "2021-08-09",
@@ -140,7 +147,7 @@ def _create_session_segmentation_pipeline(
                     segment_flowers_session,
                     dict(
                         images=f"plots_{session}",
-                        detections=f"detection_results",
+                        detections="detection_results",
                         segmentor="sam_model",
                     ),
                     output_node,
@@ -205,7 +212,11 @@ def create_pipeline(**kwargs):
     pipeline += Pipeline(
         [
             # Merge segmentations.
-            node(merge_dicts, session_segmentation_nodes, "mask_results",),
+            node(
+                merge_dicts,
+                session_segmentation_nodes,
+                "mask_results",
+            ),
             # Compute counts.
             node(
                 FieldConfig.from_dict,

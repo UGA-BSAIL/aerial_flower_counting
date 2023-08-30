@@ -3,7 +3,7 @@ Common functionality between the two versions of the pipeline.
 """
 import enum
 from datetime import date
-from typing import Iterable, List
+from typing import Dict, Iterable, List
 
 import pandas as pd
 import seaborn as sns
@@ -112,7 +112,7 @@ class GroundTruthColumns(enum.Enum):
 
     USED_ALTERNATE_ROW = "alternate_row"
     """
-    In field layouts that use two rows for each plot, this is a boolean 
+    In field layouts that use two rows for each plot, this is a boolean
     variable that specifies whether the "non-default" row was counted.
     """
 
@@ -342,3 +342,20 @@ def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:
     axes.set(xlabel="Ground-Truth", ylabel="Automatic")
 
     return plot.gcf()
+
+
+def merge_dicts(*args: Dict) -> Dict:
+    """
+    Small helper node to merge dictionaries.
+
+    Args:
+        *args: The dictionaries to merge.
+
+    Returns:
+        The merged dictionary.
+
+    """
+    merged = {}
+    for arg in args:
+        merged.update(arg)
+    return merged

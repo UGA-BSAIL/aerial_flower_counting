@@ -1,7 +1,8 @@
 """
 Version two of the pipeline for auto-counting.
 """
-from functools import partial
+from functools import partial, reduce
+from operator import add
 from typing import Tuple
 
 import pandas as pd
@@ -31,7 +32,15 @@ from .nodes import (
     prune_duplicate_detections,
 )
 
-SESSIONS = {"2023-08-14"}
+SESSIONS = {
+    "2023-07-27",
+    "2023-08-01",
+    "2023-08-03",
+    "2023-08-07",
+    "2023-08-10",
+    "2023-08-14",
+    "2023-08-18",
+}
 """
 The set of all the sessions that we want to process.
 """
@@ -82,15 +91,6 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                         camera_config=f"camera_config_{session}",
                     ),
                     f"detections_unfiltered_{session}",
-                ),
-                # Save image extents.
-                node(
-                    find_image_extents,
-                    dict(
-                        images=f"images_{session}",
-                        camera_config=f"camera_config_{session}",
-                    ),
-                    f"image_extents_{session}",
                 ),
                 # Remove duplicate detections.
                 node(
@@ -145,8 +145,48 @@ def _create_ground_truth_pipeline() -> Pipeline:
     return Pipeline(nodes)
 
 
+def _create_image_extents_pipeline() -> Pipeline:
+    """
+    Returns:
+        A pipeline that outputs all the image extents data.
+
+    """
+    nodes = []
+    session_node_names = []
+    for session in SESSIONS:
+        image_extents_session = partial(
+            find_image_extents, session_name=session
+        )
+        output_node = f"image_extents_{session}"
+        nodes.append(
+            node(
+                image_extents_session,
+                dict(
+                    images=f"images_{session}",
+                    camera_config=f"camera_config_{session}",
+                ),
+                output_node,
+            ),
+        )
+        session_node_names.append(output_node)
+
+    nodes.extend(
+        [
+            # Merge them all together.
+            node(
+                lambda *f: reduce(add, f, []),
+                session_node_names,
+                "image_extents",
+            ),
+        ]
+    )
+
+    return Pipeline(nodes)
+
+
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
+    pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []

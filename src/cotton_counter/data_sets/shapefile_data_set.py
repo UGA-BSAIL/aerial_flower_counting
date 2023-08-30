@@ -3,11 +3,13 @@ Dataset for loading ESRI shapefiles.
 """
 
 
-from typing import List, Dict, Any
-from kedro.io import AbstractVersionedDataSet, Version
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, List
+
 import fiona
-from pathlib import PurePosixPath, Path
 from fiona import crs
+from fiona.model import Feature
+from kedro.io import AbstractVersionedDataSet, Version
 
 
 class ShapefileDataSet(AbstractVersionedDataSet):
@@ -34,7 +36,7 @@ class ShapefileDataSet(AbstractVersionedDataSet):
         self.__schema = schema
         self.__epsg_crs = epsg_crs
 
-    def _load(self) -> List[fiona.model.Feature]:
+    def _load(self) -> List[Feature]:
         """
         Loads the shapefile data.
 
@@ -46,7 +48,7 @@ class ShapefileDataSet(AbstractVersionedDataSet):
         with fiona.open(shape_path.as_posix()) as shapefile:
             return list(shapefile)
 
-    def _save(self, data: List[Dict[str, Any]]) -> None:
+    def _save(self, data: List[Dict[str, Any] | Feature]) -> None:
         """
         Saves the shapefile data.
 

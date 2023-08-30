@@ -3,10 +3,10 @@ Contains nodes for the `count_plots` pipeline.
 """
 
 import enum
+import re
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
-import re
 
 import numpy as np
 import pandas as pd
@@ -21,9 +21,14 @@ from PIL import Image
 from pydantic.dataclasses import dataclass
 from segment_anything import SamPredictor, sam_model_registry
 from ultralytics import YOLO
+
+from ..common import (
+    CountingColumns,
+    DetectionColumns,
+    GroundTruthColumns,
+    batch_iter,
+)
 from .visualization import draw_detections
-from ..common import batch_iter, DetectionColumns, CountingColumns, \
-    GroundTruthColumns
 
 _PREDICTION_BATCH_SIZE = 50
 """
@@ -234,23 +239,6 @@ def _to_field_plot_num(
     return int(f"{row_num:02}{column_num:02}")
 
 
-def merge_dicts(*args: Dict) -> Dict:
-    """
-    Small helper node to merge dictionaries.
-
-    Args:
-        *args: The dictionaries to merge.
-
-    Returns:
-        The merged dictionary.
-
-    """
-    merged = {}
-    for arg in args:
-        merged.update(arg)
-    return merged
-
-
 def detect_flowers(
     images: ImagePartitionType,
     *,
@@ -362,7 +350,7 @@ def segment_flowers(
     # Filter to only this session.
     detections = detections[
         detections[DetectionColumns.SESSION.value] == session_name
-        ]
+    ]
     by_plot = detections.set_index(DetectionColumns.PLOT_NUM.value)
 
     # Segments a particular bounding box.
@@ -507,7 +495,7 @@ def create_per_plot_table(counting_results: pd.DataFrame) -> pd.DataFrame:
         # Get the plot counts.
         session_counts = counting_results[
             counting_results[CountingColumns.SESSION.value] == session
-            ]
+        ]
         counts_by_session[session] = session_counts[
             CountingColumns.COUNT.value
         ]
@@ -668,7 +656,8 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
 
     # Index by plot number.
     cleaned.set_index(
-        GroundTruthColumns.PLOT.value, inplace=True,
+        GroundTruthColumns.PLOT.value,
+        inplace=True,
     )
     cleaned.sort_index(inplace=True)
 
@@ -1043,7 +1032,10 @@ def _merge_genotype_info(
     if CountingColumns.DAP.value in combined_data.columns:
         # Group by DAP too if the data are temporal.
         group_columns.append(CountingColumns.DAP.value)
-    return combined_data.groupby(group_columns, as_index=False,).agg("mean")
+    return combined_data.groupby(
+        group_columns,
+        as_index=False,
+    ).agg("mean")
 
 
 def _plot_flowering_time_histogram(
