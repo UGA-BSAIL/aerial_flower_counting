@@ -24,6 +24,8 @@ logs/**
 !data/01_raw/*.xlsx
 !data/01_raw/*.csv
 !data/01_raw/qualitative_examples/*
+!data/01_raw/plot_boundaries/*/*
+!data/01_raw/metashape_cameras/*
 
 
 ##########################

@@ -2,34 +2,36 @@
 Contains nodes for the updated plot counting pipeline.
 """
 
-from typing import Tuple, Iterable, Dict, Callable, Any, List
-from functools import partial, reduce
-import pandas as pd
-import numpy as np
-from PIL import Image
-from pathlib import Path
-from ultralytics import YOLO
-from ..common import (
-    batch_iter,
-    DetectionColumns,
-    GroundTruthColumns,
-    CountingColumns,
-)
-from pydantic.dataclasses import dataclass
-import xml.etree.ElementTree as ET
-import cv2
-from pygeodesy.ecef import EcefKarney
-from pygeodesy.utm import toUtm8
-from pandarallel import pandarallel
-from ...type_helpers import ArbitraryTypesConfig
-from shapely.geometry import mapping
-from shapely import intersection, STRtree, Polygon, minimum_rotated_rectangle
 import enum
+import xml.etree.ElementTree as ET
+from functools import partial, reduce
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
+
+import cv2
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from fiona.model import Feature
 from loguru import logger
-from .field_config import FieldConfig
-import seaborn as sns
 from matplotlib import pyplot as plot
+from pandarallel import pandarallel
+from PIL import Image
+from pydantic.dataclasses import dataclass
+from pygeodesy.ecef import EcefKarney
+from pygeodesy.utm import toUtm8
+from shapely import Polygon, STRtree, intersection, minimum_rotated_rectangle
+from shapely.geometry import mapping
+from ultralytics import YOLO
+
+from ...type_helpers import ArbitraryTypesConfig
+from ..common import (
+    CountingColumns,
+    DetectionColumns,
+    GroundTruthColumns,
+    batch_iter,
+)
+from .field_config import FieldConfig
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
@@ -464,10 +466,12 @@ def _query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
     indices = tree.query_nearest(poly)
     nearby_polys = tree.geometries[indices]
 
-    # Remove any that are identical.
-    nearby_polys = [p for p in nearby_polys if not p.equals(poly)]
-    # Filter to only ones that actually intersect.
-    return [i for i, p in zip(indices, nearby_polys) if p.intersects(poly)]
+    # Filter to only ones that actually intersect and are not identical.
+    return [
+        i
+        for i, p in zip(indices, nearby_polys)
+        if not p.equals(poly) and p.intersects(poly)
+    ]
 
 
 def prune_duplicate_detections(
@@ -502,11 +506,13 @@ def prune_duplicate_detections(
     image_extent_tree = STRtree(image_extent_polys)
     detections_tree = STRtree(list(_detections_to_polygons(detections)))
 
+    prune_rows = set()
+
     # Removes duplicate detections from the region where two input images
     # overlap.
     def _prune_from_intersection(
         extent1: Polygon, extent2: Polygon
-    ) -> List[int]:
+    ) -> Set[int]:
         # Find the intersection between the images.
         intersecting_region = intersection(extent1, extent2)
         # Find all detections in that region.
@@ -519,15 +525,19 @@ def prune_duplicate_detections(
         extent2_id = extent_polys_to_id[extent2]
 
         # Filter to detections from either of the input images.
-        image1_indices = []
-        image2_indices = []
+        image1_indices = set()
+        image2_indices = set()
         for detection in detections_in_region:
             image_id = detection_polys_to_id[detection].split("_patch_")[0]
             index = detection_polys_to_row[detection]
             if image_id == extent1_id:
-                image1_indices.append(index)
+                image1_indices.add(index)
             elif image_id == extent2_id:
-                image2_indices.append(index)
+                image2_indices.add(index)
+
+        # Filter detections that are already slated for removal.
+        image1_indices = image1_indices - prune_rows
+        image2_indices = image2_indices - prune_rows
 
         # Our current, very naive algorithm is just to prune the detections
         # from the image with fewer IDs.
@@ -536,18 +546,17 @@ def prune_duplicate_detections(
         else:
             return image1_indices
 
-    prune_rows = []
     for extent in image_extent_polys:
         # Find all intersecting images.
         intersecting_indices = _query_intersecting(image_extent_tree, extent)
         intersecting = image_extent_tree.geometries[intersecting_indices]
         for other_extent in intersecting:
             # Remove duplicates in the intersecting region.
-            prune_rows.extend(_prune_from_intersection(extent, other_extent))
+            prune_rows.update(_prune_from_intersection(extent, other_extent))
 
     # Remove all the duplicates.
     logger.info("Removing {} duplicate detections.", len(prune_rows))
-    return detections.drop(prune_rows)
+    return detections.drop(iter(prune_rows))
 
 
 def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
@@ -745,11 +754,11 @@ def find_detections_in_plots(
 
 
 def find_detections_in_gt_sampling_regions(
-        *,
-        detections: pd.DataFrame,
-        gt_sampling_regions: List[Feature],
-        field_config: FieldConfig,
-        ground_truth: pd.DataFrame,
+    *,
+    detections: pd.DataFrame,
+    gt_sampling_regions: List[Feature],
+    field_config: FieldConfig,
+    ground_truth: pd.DataFrame,
 ) -> pd.DataFrame:
     """
     Adds the plot number to the detections `DataFrame`, based on which

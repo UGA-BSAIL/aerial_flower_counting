@@ -1,34 +1,35 @@
 """
 Version two of the pipeline for auto-counting.
 """
+from functools import partial
+from typing import Tuple
+
 import pandas as pd
 from kedro.pipeline import Pipeline, node
-from typing import Tuple
-from functools import partial
-from .nodes import (
-    detect_flowers,
-    flowers_to_geographic,
-    CameraConfig,
-    flowers_to_shapefile,
-    find_image_extents,
-    prune_duplicate_detections,
-    find_detections_in_plots,
-    find_detections_in_gt_sampling_regions,
-    load_ground_truth,
-    add_plot_index,
-    plot_ground_truth_vs_predicted,
-)
+
 from ..common import (
-    collect_session_results,
-    filter_low_confidence,
-    compute_counts,
-    add_dap_ground_truth,
     add_dap_counting,
+    add_dap_ground_truth,
+    collect_session_results,
+    compute_counts,
+    filter_low_confidence,
     merge_ground_truth,
     plot_ground_truth_regression,
 )
 from .field_config import FieldConfig
-
+from .nodes import (
+    CameraConfig,
+    add_plot_index,
+    detect_flowers,
+    find_detections_in_gt_sampling_regions,
+    find_detections_in_plots,
+    find_image_extents,
+    flowers_to_geographic,
+    flowers_to_shapefile,
+    load_ground_truth,
+    plot_ground_truth_vs_predicted,
+    prune_duplicate_detections,
+)
 
 SESSIONS = {"2023-08-14"}
 """
@@ -149,22 +150,22 @@ def create_pipeline(**kwargs) -> Pipeline:
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    # for session in SESSIONS:
-    #     (
-    #         session_detection_pipeline,
-    #         output_node,
-    #     ) = _create_session_detection_pipeline(session)
-    #     pipeline += session_detection_pipeline
-    #     session_detection_nodes.append(output_node)
+    for session in SESSIONS:
+        (
+            session_detection_pipeline,
+            output_node,
+        ) = _create_session_detection_pipeline(session)
+        pipeline += session_detection_pipeline
+        session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
             # Combine the session detections into a single table.
-            # node(
-            #     collect_session_results,
-            #     session_detection_nodes,
-            #     "detection_results",
-            # ),
+            node(
+                collect_session_results,
+                session_detection_nodes,
+                "detection_results",
+            ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,
