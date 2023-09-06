@@ -56,19 +56,21 @@ gt_2023-07-27:
 gt_2023-08-01:
   << : *gt_params
   load_args:
-    sheet_name: "8-01-23"
+    sheet_name: "8-2-23"
+    # This one has some extraneous text, so limit the number of rows.
+    skiprows: [37]
     << : *gt_load_args
 
 gt_2023-08-03:
   << : *gt_params
   load_args:
-    sheet_name: "8-03-23"
+    sheet_name: "8-3-23"
     << : *gt_load_args
 
 gt_2023-08-07:
   << : *gt_params
   load_args:
-    sheet_name: "8-07-23"
+    sheet_name: "8-7-23"
     << : *gt_load_args
 
 gt_2023-08-10:
@@ -87,6 +89,24 @@ gt_2023-08-18:
   << : *gt_params
   load_args:
     sheet_name: "8-18-23"
+    << : *gt_load_args
+
+gt_2023-08-21:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-21-23"
+    << : *gt_load_args
+
+gt_2023-08-24:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-24-23"
+    << : *gt_load_args
+
+gt_2023-08-28:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-28-23"
     << : *gt_load_args
 
 # Datasets containing raw images to process.
@@ -124,11 +144,63 @@ images_2023-08-18:
   path: ${corrected_image_dir}/2023-08-18
   << : *image_params
 
-# Datasets containing the camera configuration.
-user_camera_config:
-  type: yaml.YAMLDataSet
-  filepath: data/01_raw/camera_config.yml
+images_2023-08-21:
+  path: ${corrected_image_dir}/2023-08-21
+  << : *image_params
 
+images_2023-08-24:
+  path: ${corrected_image_dir}/2023-08-24
+  << : *image_params
+
+images_2023-08-28:
+  path: ${corrected_image_dir}/2023-08-28
+  << : *image_params
+
+# Datasets containing the DEMs.
+_dem_params: &dem_params
+  type: cotton_counter.data_sets.RasterDataSet
+
+dem_2023-07-27:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-07-27/2023-07-27_dem.tif
+
+dem_2023-08-01:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-01/2023-08-01_dem.tif
+
+dem_2023-08-03:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-03/2023-08-03_dem.tif
+
+dem_2023-08-07:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-07/2023-08-07_dem.tif
+
+dem_2023-08-10:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-10/2023-08-10_dem.tif
+
+dem_2023-08-14:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-14/tifton_cotton/2023-08-14_dem.tif
+
+dem_2023-08-18:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-18/2023-08-18_dem.tif
+
+dem_2023-08-21:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-21/2023-08-21_dem.tif
+
+dem_2023-08-24:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-24/2023-08-24_dem.tif
+
+dem_2023-08-28:
+  << : *dem_params
+  filepath: ${dem_dir}/2023-08-28/2023-08-28_dem.tif
+
+# Datasets containing the camera configuration.
 2023-07-27_auto_camera_config:
   type: text.TextDataSet
   filepath: data/01_raw/metashape_cameras/2023-07-27_cameras.xml
@@ -156,6 +228,18 @@ user_camera_config:
 2023-08-18_auto_camera_config:
   type: text.TextDataSet
   filepath: data/01_raw/metashape_cameras/2023-08-18_cameras.xml
+
+2023-08-21_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-21_cameras.xml
+
+2023-08-24_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-24_cameras.xml
+
+2023-08-28_auto_camera_config:
+  type: text.TextDataSet
+  filepath: data/01_raw/metashape_cameras/2023-08-28_cameras.xml
 
 # Shapefiles containing the image extents.
 image_extents:

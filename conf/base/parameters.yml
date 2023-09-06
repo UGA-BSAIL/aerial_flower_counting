@@ -3,3 +3,6 @@ model_weights_file: "yolov8m_flower_active_4.pt"
 
 # Batch size to use for inference.
 prediction_batch_size: 16
+
+# Minimum confidence we allow for flower detections.
+min_confidence: 0.25

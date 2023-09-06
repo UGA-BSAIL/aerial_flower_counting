@@ -19,7 +19,6 @@ from ..common import (
 )
 from .field_config import FieldConfig
 from .nodes import (
-    CameraConfig,
     add_plot_index,
     detect_flowers,
     find_detections_in_gt_sampling_regions,
@@ -31,15 +30,18 @@ from .nodes import (
     plot_ground_truth_vs_predicted,
     prune_duplicate_detections,
 )
+from .camera_utils import CameraConfig
 
 SESSIONS = {
-    "2023-07-27",
-    "2023-08-01",
-    "2023-08-03",
-    "2023-08-07",
-    "2023-08-10",
-    "2023-08-14",
-    "2023-08-18",
+    # "2023-07-27",
+    # "2023-08-01",
+    # "2023-08-03",
+    # "2023-08-07",
+    # "2023-08-10",
+    # "2023-08-14",
+    # "2023-08-18",
+    "2023-08-21",
+    # "2023-08-24",
 }
 """
 The set of all the sessions that we want to process.
@@ -79,7 +81,6 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                     CameraConfig.load,
                     dict(
                         camera_xml=f"{session}_auto_camera_config",
-                        parameters="user_camera_config",
                     ),
                     f"camera_config_{session}",
                 ),
@@ -89,6 +90,7 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                     dict(
                         detections=f"detections_px_{session}",
                         camera_config=f"camera_config_{session}",
+                        dem_dataset=f"dem_{session}",
                     ),
                     f"detections_unfiltered_{session}",
                 ),
@@ -164,6 +166,7 @@ def _create_image_extents_pipeline() -> Pipeline:
                 dict(
                     images=f"images_{session}",
                     camera_config=f"camera_config_{session}",
+                    dem_dataset=f"dem_{session}",
                 ),
                 output_node,
             ),

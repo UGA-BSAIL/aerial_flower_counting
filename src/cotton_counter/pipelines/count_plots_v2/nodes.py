@@ -3,12 +3,10 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-import xml.etree.ElementTree as ET
 from functools import partial, reduce
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
-import cv2
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,14 +15,11 @@ from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
 from PIL import Image
-from pydantic.dataclasses import dataclass
-from pygeodesy.ecef import EcefKarney
-from pygeodesy.utm import toUtm8
-from shapely import Polygon, STRtree, intersection, minimum_rotated_rectangle
+from shapely import Polygon, STRtree, intersection
 from shapely.geometry import mapping
 from ultralytics import YOLO
 
-from ...type_helpers import ArbitraryTypesConfig
+from .camera_utils import CameraConfig, CameraTransformer
 from ..common import (
     CountingColumns,
     DetectionColumns,
@@ -32,6 +27,7 @@ from ..common import (
     batch_iter,
 )
 from .field_config import FieldConfig
+from rasterio import DatasetReader
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
@@ -72,100 +68,6 @@ class ImageExtents(enum.Enum):
     """
     The y-coordinate of the bottom right corner of the image.
     """
-
-
-@dataclass(config=ArbitraryTypesConfig)
-class CameraConfig:
-    """
-    Represents the configuration for the Metashape cameras.
-
-    Attributes:
-        chunk_transform: 3D transformation matrix from chunk coordinates to
-            ECEF.
-        camera_intrinsics: The camera intrinsics matrix.
-        camera_transforms: Maps camera IDs to 4D transformation matrices from
-            camera coordinates to chunk coordinates.
-    """
-
-    chunk_transform: np.ndarray
-    camera_intrinsics: np.ndarray
-    camera_transforms: Dict[str, np.ndarray]
-
-    @classmethod
-    def _load_camera_transforms(
-        cls, cameras: ET.Element
-    ) -> Dict[str, np.ndarray]:
-        """
-        Loads the camera transforms from an XML tree.
-
-        Args:
-            cameras: The `<cameras>` element from the camera.xml file.
-
-        Returns:
-            A mapping of the camera labels to the camera transform matrices.
-
-        """
-        return {
-            camera.attrib["label"]: np.reshape(
-                np.fromstring(camera.find("transform").text, sep=" "), (4, 4)
-            )
-            for camera in cameras
-            if camera.attrib.get("enabled", "true") != "false"
-        }
-
-    @classmethod
-    def load(
-        cls, camera_xml: str, parameters: Dict[str, Any]
-    ) -> "CameraConfig":
-        """
-        Initializes from a camera.xml file (from Metashape), and an
-        additional dictionary of parameters loaded by Kedro.
-
-        Args:
-            camera_xml: The camera XML data.
-            parameters: Additional parameter values.
-
-        Returns:
-            The initialized dataclass.
-
-        """
-        # Load camera intrinsics.
-        f_x = parameters["f_x"]
-        f_y = parameters["f_y"]
-        c_x = parameters["c_x"]
-        c_y = parameters["c_y"]
-        camera_intrinsics = np.array([[f_x, 0, c_x], [0, f_y, c_y], [0, 0, 1]])
-
-        # Load the XML.
-        root = ET.fromstring(camera_xml)
-        # Load the chunk transform.
-        chunk_node = root.find("chunk")
-        chunk_transform_node = chunk_node.find("components")[0].find(
-            "transform"
-        )
-        chunk_rotation = np.fromstring(
-            chunk_transform_node.find("rotation").text, sep=" "
-        )
-        chunk_translation = np.fromstring(
-            chunk_transform_node.find("translation").text, sep=" "
-        )
-        chunk_scale = float(chunk_transform_node.find("scale").text)
-
-        chunk_transform = np.eye(4, dtype=np.float32)
-        chunk_transform[:3, :3] = (
-            np.reshape(chunk_rotation, (3, 3)) * chunk_scale
-        )
-        chunk_transform[:3, 3] = chunk_translation
-
-        # Load the camera transforms.
-        cameras_node = chunk_node.find("cameras")
-        camera_transforms = cls._load_camera_transforms(cameras_node)
-
-        return cls(
-            chunk_transform=chunk_transform,
-            camera_intrinsics=camera_intrinsics,
-            camera_transforms=camera_transforms,
-        )
 
 
 def _split_image_grid(
@@ -268,7 +170,11 @@ def detect_flowers(
 
 
 def find_image_extents(
-    images: ImageDataSet, *, camera_config: CameraConfig, session_name: str
+    images: ImageDataSet,
+    *,
+    camera_config: CameraConfig,
+    session_name: str,
+    dem_dataset: DatasetReader,
 ) -> List[Feature]:
     """
     Finds the extents of each image in the dataset in real-world coordinates.
@@ -278,6 +184,7 @@ def find_image_extents(
             the same size.
         camera_config: The camera configuration.
         session_name: The name of the session we are finding extents for.
+        dem_dataset: The corresponding DEM for this session.
 
     Returns:
         Shapefile data for the image extents.
@@ -288,10 +195,13 @@ def find_image_extents(
     width_px, height_px = image().size
 
     shapes = []
+    transformer = CameraTransformer(dem_dataset)
     for image_id in images:
         # Project from the image corners into UTM.
         px_to_utm = partial(
-            _pixel_to_utm, camera_config=camera_config, camera_id=image_id
+            transformer.pixel_to_utm,
+            camera_config=camera_config,
+            camera_id=image_id,
         )
         top_left = px_to_utm(np.array([0.0, 0.0]))
         top_right = px_to_utm(np.array([width_px, 0.0]))
@@ -313,41 +223,11 @@ def find_image_extents(
     ]
 
 
-def _pixel_to_utm(
-    pixel: np.array, *, camera_config: CameraConfig, camera_id: str
-) -> Tuple[float, float, float]:
-    """
-    Converts pixels in image-space to UTM.
-
-    Args:
-        pixel: The pixel to convert, as a 2-element array of `[x, y]`.
-        camera_config: The camera configuration.
-        camera_id: The ID of the camera we are transforming from.
-
-    Returns:
-        The easting, northing, and height of the pixel in UTM.
-
-    """
-    camera_transform = camera_config.camera_transforms[camera_id]
-    chunk_transform = camera_config.chunk_transform
-    intrinsics = camera_config.camera_intrinsics
-
-    # Convert pixels to camera coordinates.
-    cam_coords = cv2.undistortPoints(
-        np.expand_dims(pixel, 0), intrinsics, None
-    ).squeeze()
-    camera_ecef = (
-        chunk_transform @ camera_transform @ np.append(cam_coords, [0.0, 1.0])
-    )
-
-    ecef = EcefKarney()
-    camera_latlon = ecef.reverse(*camera_ecef)
-    camera_utm = toUtm8(camera_latlon.lat, camera_latlon.lon)
-    return camera_utm.easting, camera_utm.northing, camera_latlon.height
-
-
 def flowers_to_geographic(
-    detections: pd.DataFrame, *, camera_config: CameraConfig
+    detections: pd.DataFrame,
+    *,
+    camera_config: CameraConfig,
+    dem_dataset: DatasetReader,
 ) -> pd.DataFrame:
     """
     Converts the detected flowers to geographic coordinates.
@@ -355,6 +235,7 @@ def flowers_to_geographic(
     Args:
         detections: The detected flowers.
         camera_config: The camera configuration.
+        dem_dataset: The corresponding DEM for this session.
 
     Returns:
         The flowers in geographic coordinates.
@@ -366,6 +247,7 @@ def flowers_to_geographic(
         DetectionColumns.X2.value,
         DetectionColumns.Y2.value,
     ]
+    transformer = CameraTransformer(dem_dataset)
 
     # Convert the coordinates to geographic.
     def _convert(row: pd.Series) -> pd.Series:
@@ -379,10 +261,10 @@ def flowers_to_geographic(
             [DetectionColumns.X2.value, DetectionColumns.Y2.value]
         ].to_numpy(dtype=np.float32)
 
-        top_x, top_y, _ = _pixel_to_utm(
+        top_x, top_y, _ = transformer.pixel_to_utm(
             box_top_left, camera_config=camera_config, camera_id=camera_id
         )
-        bottom_x, bottom_y, _ = _pixel_to_utm(
+        bottom_x, bottom_y, _ = transformer.pixel_to_utm(
             box_bottom_right, camera_config=camera_config, camera_id=camera_id
         )
 
@@ -394,7 +276,7 @@ def flowers_to_geographic(
     detection_coords = detections[
         [DetectionColumns.IMAGE_ID.value] + coord_columns
     ]
-    geo_detection_coords = detection_coords.parallel_apply(
+    geo_detection_coords = detection_coords.apply(
         _convert, axis="columns"
     )
     detections[coord_columns] = geo_detection_coords
@@ -593,14 +475,18 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
 
 
 def _label_plots(
-    *, plot_boundaries: Iterable[Polygon], field_config: FieldConfig
-) -> Iterable[Tuple[Polygon, int]]:
+    *,
+    plot_boundaries: Iterable[Polygon],
+    field_config: FieldConfig,
+    sessions: List[str],
+) -> Iterable[Tuple[Polygon, int, List[str]]]:
     """
     Computes the plot number for each plot in a shapefile.
 
     Args:
         plot_boundaries: The boundaries of the plots.
         field_config: The configuration of the field.
+        sessions: The sessions that these boundaries are valid for.
 
     Yields:
         Each plot boundary polygon, along with the corresponding plot number.
@@ -635,7 +521,7 @@ def _label_plots(
 
     # Assign real plot numbers to them.
     for i, boundary in enumerate(boundaries_sorted):
-        yield boundary, field_config.get_plot_num_row_major(i)
+        yield boundary, field_config.get_plot_num_row_major(i), sessions
 
 
 def _label_plots_gt(
@@ -643,7 +529,7 @@ def _label_plots_gt(
     sampling_regions: Iterable[Polygon],
     field_config: FieldConfig,
     ground_truth: pd.DataFrame,
-) -> Iterable[Tuple[Polygon, int]]:
+) -> Iterable[Tuple[Polygon, int, List[str]]]:
     """
     Computes the plot number for each ground-truth sampling region in a
     shapefile.
@@ -654,42 +540,60 @@ def _label_plots_gt(
         ground_truth: The ground truth data.
 
     Yields:
-        Each sampling region polygon, along with the corresponding plot number.
+        Each sampling region polygon, along with the corresponding plot
+        number and the sessions that this is valid for.
 
     """
+    all_sessions = (
+        ground_truth[GroundTruthColumns.SESSION.value].unique().tolist()
+    )
+
     for top_plot, bottom_plot in batch_iter(
         _label_plots(
-            plot_boundaries=sampling_regions, field_config=field_config
+            plot_boundaries=sampling_regions,
+            field_config=field_config,
+            sessions=[],
         ),
         batch_size=2,
     ):
+        top_plot = top_plot[:2]
+        bottom_plot = bottom_plot[:2]
         _, top_plot_num = top_plot
         _, bottom_plot_num = bottom_plot
         if top_plot_num != bottom_plot_num:
             # These are single row plots, so we should yield both.
-            yield top_plot
-            yield bottom_plot
+            yield top_plot + (all_sessions,)
+            yield bottom_plot + (all_sessions,)
             continue
 
         # Since we only sample either the top or bottom row, we have to fiter
         # out extraneous ones.
         try:
-            if ground_truth.loc[
-                top_plot_num, GroundTruthColumns.USED_ALTERNATE_ROW.value
-            ]:
-                yield bottom_plot
-            else:
-                yield top_plot
+            plot_rows = ground_truth.loc[[top_plot_num]]
         except KeyError:
             # This plot wasn't measured in the ground-truth data, so we can
             # completely ignore it.
-            pass
+            continue
+
+        alternate_row = plot_rows[GroundTruthColumns.USED_ALTERNATE_ROW.value]
+        if alternate_row.any():
+            yield bottom_plot + (
+                plot_rows.loc[alternate_row, GroundTruthColumns.SESSION.value]
+                .unique()
+                .tolist(),
+            )
+        if not alternate_row.all():
+            yield top_plot + (
+                plot_rows.loc[~alternate_row, GroundTruthColumns.SESSION.value]
+                .unique()
+                .tolist(),
+            )
 
 
 def _find_detections_in_plots(
     *,
     detections: pd.DataFrame,
-    labeled_plots: Iterable[Tuple[Polygon, int]],
+    labeled_plots: Iterable[Tuple[Polygon, int, List[str]]],
 ) -> pd.DataFrame:
     """
     Finds detections within specific plots, and adds the appropriate plot
@@ -697,7 +601,8 @@ def _find_detections_in_plots(
 
     Args:
         detections: The detections.
-        labeled_plots: The plot polygons with associated plot numbers.
+        labeled_plots: The plot polygons with associated plot numbers and
+            valid sessions.
 
     Returns:
         The detections with the plot number column.
@@ -714,7 +619,12 @@ def _find_detections_in_plots(
     if DetectionColumns.PLOT_NUM.value not in detections:
         detections.insert(0, DetectionColumns.PLOT_NUM.value, np.nan)
 
-    for plot_boundary, plot_num in labeled_plots:
+    # Index by sessions as well.
+    detections.set_index(
+        DetectionColumns.SESSION.value, append=True, drop=False, inplace=True
+    )
+
+    for plot_boundary, plot_num, plot_sessions in labeled_plots:
         # Figure out which detections intersect this plot.
         plot_detection_indices = _query_intersecting(
             detections_tree, plot_boundary
@@ -723,11 +633,18 @@ def _find_detections_in_plots(
 
         # Edit the corresponding rows in the dataframe.
         detection_rows = [detection_polys_to_row[p] for p in plot_detections]
-        detections.loc[
-            detection_rows, DetectionColumns.PLOT_NUM.value
-        ] = plot_num
+        try:
+            detections.loc[
+                (detection_rows, plot_sessions),
+                DetectionColumns.PLOT_NUM.value,
+            ] = plot_num
+        except KeyError:
+            # In this case, none of the rows met the session criteria. No
+            # changes to the detections frame are necessary.
+            pass
 
-    return detections
+    # Remove the temporary index we added.
+    return detections.droplevel(DetectionColumns.SESSION.value)
 
 
 def find_detections_in_plots(
@@ -753,6 +670,10 @@ def find_detections_in_plots(
         labeled_plots=_label_plots(
             plot_boundaries=_load_polygons(plot_boundaries),
             field_config=field_config,
+            # Plots are the same for all sessions.
+            sessions=detections[DetectionColumns.SESSION.value]
+            .unique()
+            .tolist(),
         ),
     )
 

@@ -3,8 +3,6 @@ sam_model_type: "vit_h"
 #sam_weights_file: "/blue/cli2/daniel.petti/aerial_flower/data/06_models/sam_vit_h_4b8939.pth"
 sam_weights_file: "data/06_models/sam_vit_h_4b8939.pth"
 
-# Minimum confidence we allow for flower detections.
-min_confidence: 0.5
 # Image size to use for inference. (h, w)
 inference_size: [1377, 484]
 
