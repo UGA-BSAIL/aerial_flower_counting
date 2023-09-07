@@ -186,7 +186,7 @@ dem_2023-08-14:
 
 dem_2023-08-18:
   << : *dem_params
-  filepath: ${dem_dir}/2023-08-18/2023-08-18_dem.tif
+  filepath: ${dem_dir}/2023-08-18/tifton_cotton/2023-08-18_dem.tif
 
 dem_2023-08-21:
   << : *dem_params

@@ -4,13 +4,13 @@ Utilities for converting between camera and geographic coordinates.
 from typing import Dict, Tuple
 from xml.etree import ElementTree as ET
 
-import cv2
 import numpy as np
 from pydantic.dataclasses import dataclass
 from pygeodesy import EcefKarney, toUtm8
 
 from src.cotton_counter.type_helpers import ArbitraryTypesConfig
 from rasterio import DatasetReader
+from loguru import logger
 
 
 @dataclass(config=ArbitraryTypesConfig)
@@ -121,6 +121,69 @@ class CameraConfig:
         )
 
 
+class DemHeightEstimator:
+    """
+    Helper class for estimating DEM heights in a robust way.
+    """
+
+    def __init__(self, dem_dataset: DatasetReader):
+        """
+        Args:
+            dem_dataset: The DEM to read height data from.
+
+        """
+        self.__dem_dataset = dem_dataset
+
+        # Keeps track of the previous height measurement.
+        self.__previous_height = self.__dem_dataset.statistics(1).min
+
+    def __get_dem_height(self, point_xy: np.array) -> float:
+        """
+        Computes the height at a particular point on the DEM.
+
+        Args:
+            point_xy: The point to compute the height at, in the form
+                [x, y].
+
+        Returns:
+            The height at the point.
+
+        Raises:
+            IndexError: If the point is out of bounds.
+
+        """
+        height = next(
+            self.__dem_dataset.sample([point_xy.tolist()], indexes=1)
+        )[0]
+        if height in self.__dem_dataset.nodatavals:
+            logger.warning("Pont {} is out of bounds.".format(point_xy))
+            raise IndexError(f"Point {point_xy} is out of bounds.")
+        return height
+
+    def dist_to_dem(self, point: np.array) -> float:
+        """
+        Finds the height of the surface at this location. If the location is
+        out of bounds, it will use the height of the previous location,
+        which is assumed to be close.
+
+        Args:
+            point: The point to compute the height at, in the form
+                [x, y, z].
+
+        Returns:
+            The height at the point.
+
+        """
+        try:
+            surface_height = self.__get_dem_height(point[:2])
+            self.__previous_height = surface_height
+        except IndexError:
+            # It's out of bounds. We'll just use the previous height.
+            surface_height = self.__previous_height
+
+        return point[-1] - surface_height
+
+
 class CameraTransformer:
     """
     Transforms points from camera to geographic coordinates.
@@ -133,42 +196,42 @@ class CameraTransformer:
 
         """
         self.__dem_dataset = dem_dataset
-        self.__dem_stats = self.__dem_dataset.statistics(1)
-
-    def __get_dem_height(self, point_xy: np.array) -> float:
-        height = next(
-            self.__dem_dataset.sample([point_xy.tolist()], indexes=1)
-        )[0]
-        if height in self.__dem_dataset.nodatavals:
-            raise IndexError(f"Point {point_xy} is out of range.")
-        return height
-
-    def __get_dist_to_dem(self, point: np.array) -> float:
-        # Find the height of the surface at this location.
-        try:
-            surface_height = self.__get_dem_height(point[:2])
-        except IndexError:
-            # It's out of bounds. We'll just extend the surface outwards at
-            # its minimum height.
-            surface_height = self.__dem_stats.min
-
-        return point[-1] - surface_height
 
     def __find_dem_intersection(
-        self, point1: np.array, point2: np.array, max_iters=30
+        self,
+        point1: np.array,
+        point2: np.array,
+        max_iters: int = 30,
+        eps: float = 0.01,
     ) -> np.array:
-        # Find the closest point on the DEM to a line, defined by two points.
+        """
+        Finds the approximate point at which a line crosses the DEM.
+
+        Args:
+            point1: The first point defining the line.
+            point2: The second point defining the line.
+            max_iters: The maximum number of refinement iterations to
+                perform. This sets an upper bound on computation in cases
+                where the DEM is somewhat sparse.
+            eps: If the distance between the DEM and a point is below this
+                value, it will return this point.
+
+        Returns:
+            The closest point on the DEM to the line, in the form
+            [x, y, z].
+
+        """
         step = 1.0
         point = point1
         slope = point2 - point1
-        eps = 0.01
         crossed_once = False
         num_iters = 0
-        dist_to_dem = self.__get_dist_to_dem(point)
+        estimator = DemHeightEstimator(self.__dem_dataset)
+        dist_to_dem = estimator.dist_to_dem(point)
 
         while np.abs(dist_to_dem) > eps and num_iters < max_iters:
             point += slope * step
-            new_dist_to_dem = self.__get_dist_to_dem(point)
+            new_dist_to_dem = estimator.dist_to_dem(point)
 
             if new_dist_to_dem * dist_to_dem < 0:
                 # We crossed the surface. Start going the other way in smaller
