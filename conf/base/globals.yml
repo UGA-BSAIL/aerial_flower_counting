@@ -9,4 +9,4 @@ plot_image_dir: "/home/daniel/lab_share/scratch/2021_flowering_analysis/plot_ext
 # Base directory containing undistorted images for 2023.
 corrected_image_dir: "/home/daniel/lab_share/scratch/2023_flowering_analysis/undistorted_images"
 # Base directory containing DEMs for 2023.
-dem_dir: "/home/daniel/lab_share/raw_data/2023/images/uav"
+dem_dir: "/home/daniel/lab_share/scratch/2023_flowering_analysis/dems"

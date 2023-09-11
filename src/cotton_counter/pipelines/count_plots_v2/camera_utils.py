@@ -1,16 +1,23 @@
 """
 Utilities for converting between camera and geographic coordinates.
 """
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Callable
 from xml.etree import ElementTree as ET
 
 import numpy as np
 from pydantic.dataclasses import dataclass
 from pygeodesy import EcefKarney, toUtm8
 
-from src.cotton_counter.type_helpers import ArbitraryTypesConfig
 from rasterio import DatasetReader
 from loguru import logger
+
+from ...type_helpers import ArbitraryTypesConfig
+
+
+class MissingImageError(Exception):
+    """
+    Raised when an image is missing from the configuration.
+    """
 
 
 @dataclass(config=ArbitraryTypesConfig)
@@ -120,6 +127,22 @@ class CameraConfig:
             camera_transforms=camera_transforms,
         )
 
+    @classmethod
+    def load_partitioned(
+        cls, camera_xml: Dict[str, Callable[[], str]]
+    ) -> Dict[str, "CameraConfig"]:
+        """
+        Loads camera configuration from a partitioned dataset.
+
+        Args:
+            camera_xml: The partitioned dataset containing raw XML data.
+
+        Returns:
+            Corresponding partitioned dataset containing loaded configuration.
+
+        """
+        return {p: cls.load(v()) for p, v in camera_xml.items()}
+
 
 class DemHeightEstimator:
     """
@@ -156,7 +179,7 @@ class DemHeightEstimator:
             self.__dem_dataset.sample([point_xy.tolist()], indexes=1)
         )[0]
         if height in self.__dem_dataset.nodatavals:
-            logger.warning("Pont {} is out of bounds.".format(point_xy))
+            logger.warning("Point {} is out of bounds.".format(point_xy))
             raise IndexError(f"Point {point_xy} is out of bounds.")
         return height
 
@@ -269,7 +292,15 @@ class CameraTransformer:
             The easting, northing, and height of the pixel in UTM.
 
         """
-        camera_transform = camera_config.camera_transforms[camera_id]
+        try:
+            camera_transform = camera_config.camera_transforms[camera_id]
+        except KeyError:
+            logger.warning(
+                "Could not find transform data for camera {}.", camera_id
+            )
+            raise MissingImageError(
+                f"Could not find transform data for camera {camera_id}."
+            )
         chunk_transform = camera_config.chunk_transform
 
         camera_ecef = (

@@ -42,6 +42,9 @@ SESSIONS = {
     "2023-08-18",
     "2023-08-21",
     "2023-08-24",
+    "2023-08-28",
+    "2023-09-01",
+    "2023-09-05",
 }
 """
 The set of all the sessions that we want to process.
@@ -73,24 +76,17 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                         images=f"images_{session}",
                         weights_file="params:model_weights_file",
                         batch_size="params:prediction_batch_size",
+                        dry_run="params:dry_run",
                     ),
                     f"detections_px_{session}",
                 ),
-                # Load associated camera configuration.
-                node(
-                    CameraConfig.load,
-                    dict(
-                        camera_xml=f"{session}_auto_camera_config",
-                    ),
-                    f"camera_config_{session}",
-                ),
                 # Convert to geographic coordinates.
                 node(
-                    flowers_to_geographic,
+                    partial(flowers_to_geographic, session_name=session),
                     dict(
                         detections=f"detections_px_{session}",
-                        camera_config=f"camera_config_{session}",
-                        dem_dataset=f"dem_{session}",
+                        camera_config=f"camera_config",
+                        dem_dataset="dems",
                     ),
                     f"detections_unfiltered_{session}",
                 ),
@@ -165,8 +161,8 @@ def _create_image_extents_pipeline() -> Pipeline:
                 image_extents_session,
                 dict(
                     images=f"images_{session}",
-                    camera_config=f"camera_config_{session}",
-                    dem_dataset=f"dem_{session}",
+                    camera_config=f"camera_config",
+                    dem_dataset=f"dems",
                 ),
                 output_node,
             ),
@@ -203,6 +199,14 @@ def create_pipeline(**kwargs) -> Pipeline:
 
     pipeline += Pipeline(
         [
+            # Load camera configuration.
+            node(
+                CameraConfig.load_partitioned,
+                dict(
+                    camera_xml=f"auto_camera_config",
+                ),
+                f"camera_config",
+            ),
             # Combine the session detections into a single table.
             node(
                 collect_session_results,

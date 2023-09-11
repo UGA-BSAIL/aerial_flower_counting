@@ -33,6 +33,10 @@ ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
 Type alias for a dataset containing multiple images.
 """
+RasterDataSet = Dict[str, Callable[[], DatasetReader]]
+"""
+Type alias for a dataset containing multiple rasters.
+"""
 
 sns.set_theme(
     context="paper", style="whitegrid", palette="husl", rc={"savefig.dpi": 600}
@@ -99,6 +103,7 @@ def detect_flowers(
     weights_file: Path,
     session_name: str,
     batch_size: int,
+    dry_run: bool = False,
 ) -> pd.DataFrame:
     """
     Performs flower detection for the images in a session.
@@ -108,6 +113,8 @@ def detect_flowers(
         weights_file: The location of the file to load the model weights from.
         session_name: The name of the session.
         batch_size: The batch size to use for inference.
+        dry_run: If true, just return an empty dataframe without actually
+            doing detection.
 
     Returns:
         A dataframe containing the detected flowers.
@@ -123,7 +130,26 @@ def detect_flowers(
                 yield f"{image_id_}_patch_{i}", patch, offsets_
 
     # Predict on batches.
-    results = []
+    detection_columns = [
+        DetectionColumns.X1.value,
+        DetectionColumns.Y1.value,
+        DetectionColumns.X2.value,
+        DetectionColumns.Y2.value,
+    ]
+    results = [
+        pd.DataFrame(
+            data={},
+            columns=detection_columns
+            + [
+                DetectionColumns.IMAGE_ID.value,
+                DetectionColumns.CONFIDENCE.value,
+                DetectionColumns.SESSION.value,
+            ],
+        )
+    ]
+    if dry_run:
+        return results[0]
+
     for batch in batch_iter(_iter_patches(), batch_size=batch_size):
         # "unzip" the batch.
         image_ids, image_batch, offsets = zip(*batch)
@@ -139,12 +165,7 @@ def detect_flowers(
         ):
             results_df = pd.DataFrame(
                 data=image_results.boxes.xyxyn.cpu().numpy(),
-                columns=[
-                    DetectionColumns.X1.value,
-                    DetectionColumns.Y1.value,
-                    DetectionColumns.X2.value,
-                    DetectionColumns.Y2.value,
-                ],
+                columns=detection_columns,
             )
             # Convert to pixels.
             results_df *= np.tile(np.array(image_batch[0].size), (2,))
@@ -172,9 +193,9 @@ def detect_flowers(
 def find_image_extents(
     images: ImageDataSet,
     *,
-    camera_config: CameraConfig,
+    camera_config: Dict[str, CameraConfig],
     session_name: str,
-    dem_dataset: DatasetReader,
+    dem_dataset: RasterDataSet,
 ) -> List[Feature]:
     """
     Finds the extents of each image in the dataset in real-world coordinates.
@@ -190,6 +211,9 @@ def find_image_extents(
         Shapefile data for the image extents.
 
     """
+    camera_config = camera_config[f"{session_name}_cameras"]
+    dem_dataset = dem_dataset[f"{session_name}_dem"]()
+
     # Find the image size.
     image = next(iter(images.values()))
     width_px, height_px = image().size
@@ -226,8 +250,9 @@ def find_image_extents(
 def flowers_to_geographic(
     detections: pd.DataFrame,
     *,
-    camera_config: CameraConfig,
-    dem_dataset: DatasetReader,
+    camera_config: Dict[str, CameraConfig],
+    dem_dataset: RasterDataSet,
+    session_name: str,
 ) -> pd.DataFrame:
     """
     Converts the detected flowers to geographic coordinates.
@@ -236,23 +261,27 @@ def flowers_to_geographic(
         detections: The detected flowers.
         camera_config: The camera configuration.
         dem_dataset: The corresponding DEM for this session.
+        session_name: The name of the session we are loading data from.
 
     Returns:
         The flowers in geographic coordinates.
 
     """
     coord_columns = [
+        DetectionColumns.IMAGE_ID.value,
         DetectionColumns.X1.value,
         DetectionColumns.Y1.value,
         DetectionColumns.X2.value,
         DetectionColumns.Y2.value,
     ]
+    dem_dataset = dem_dataset[f"{session_name}_dem"]()
     transformer = CameraTransformer(dem_dataset)
+    camera_config = camera_config[f"{session_name}_cameras"]
 
     # Convert the coordinates to geographic.
     def _convert(row: pd.Series) -> pd.Series:
-        camera_id = row[DetectionColumns.IMAGE_ID.value]
-        camera_id = camera_id.split("_patch_")[0]
+        image_id = row[DetectionColumns.IMAGE_ID.value]
+        camera_id = image_id.split("_patch_")[0]
         # Get the points to transform.
         box_top_left = row[
             [DetectionColumns.X1.value, DetectionColumns.Y1.value]
@@ -270,15 +299,11 @@ def flowers_to_geographic(
 
         return pd.Series(
             index=coord_columns,
-            data=[top_x, top_y, bottom_x, bottom_y],
+            data=[image_id, top_x, top_y, bottom_x, bottom_y],
         )
 
-    detection_coords = detections[
-        [DetectionColumns.IMAGE_ID.value] + coord_columns
-    ]
-    geo_detection_coords = detection_coords.apply(
-        _convert, axis="columns"
-    )
+    detection_coords = detections[coord_columns]
+    geo_detection_coords = detection_coords.apply(_convert, axis="columns")
     detections[coord_columns] = geo_detection_coords
     return detections
 

@@ -6,3 +6,6 @@ prediction_batch_size: 16
 
 # Minimum confidence we allow for flower detections.
 min_confidence: 0.25
+
+# Whether to do a try run without running the detector.
+dry_run: false

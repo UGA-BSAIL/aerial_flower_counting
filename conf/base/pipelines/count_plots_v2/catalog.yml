@@ -109,6 +109,18 @@ gt_2023-08-28:
     sheet_name: "8-28-23"
     << : *gt_load_args
 
+gt_2023-09-01:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-1-23"
+    << : *gt_load_args
+
+gt_2023-09-05:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-5-23"
+    << : *gt_load_args
+
 # Datasets containing raw images to process.
 _image_params: &image_params
   type: PartitionedDataSet
@@ -156,90 +168,29 @@ images_2023-08-28:
   path: ${corrected_image_dir}/2023-08-28
   << : *image_params
 
-# Datasets containing the DEMs.
-_dem_params: &dem_params
-  type: cotton_counter.data_sets.RasterDataSet
+images_2023-09-01:
+  path: ${corrected_image_dir}/2023-09-01
+  << : *image_params
 
-dem_2023-07-27:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-07-27/2023-07-27_dem.tif
+images_2023-09-05:
+  path: ${corrected_image_dir}/2023-09-05
+  << : *image_params
 
-dem_2023-08-01:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-01/2023-08-01_dem.tif
+# Dataset containing the DEMs.
+dems:
+  type: PartitionedDataSet
+  filename_suffix: ".tif"
+  path: ${dem_dir}
+  dataset:
+    type: cotton_counter.data_sets.RasterDataSet
 
-dem_2023-08-03:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-03/2023-08-03_dem.tif
-
-dem_2023-08-07:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-07/2023-08-07_dem.tif
-
-dem_2023-08-10:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-10/2023-08-10_dem.tif
-
-dem_2023-08-14:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-14/tifton_cotton/2023-08-14_dem.tif
-
-dem_2023-08-18:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-18/tifton_cotton/2023-08-18_dem.tif
-
-dem_2023-08-21:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-21/2023-08-21_dem.tif
-
-dem_2023-08-24:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-24/2023-08-24_dem.tif
-
-dem_2023-08-28:
-  << : *dem_params
-  filepath: ${dem_dir}/2023-08-28/2023-08-28_dem.tif
-
-# Datasets containing the camera configuration.
-2023-07-27_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-07-27_cameras.xml
-
-2023-08-01_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-01_cameras.xml
-
-2023-08-03_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-03_cameras.xml
-
-2023-08-07_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-07_cameras.xml
-
-2023-08-10_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-10_cameras.xml
-
-2023-08-14_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-14_cameras.xml
-
-2023-08-18_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-18_cameras.xml
-
-2023-08-21_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-21_cameras.xml
-
-2023-08-24_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-24_cameras.xml
-
-2023-08-28_auto_camera_config:
-  type: text.TextDataSet
-  filepath: data/01_raw/metashape_cameras/2023-08-28_cameras.xml
+# The camera configuration from metashape.
+auto_camera_config:
+  type: PartitionedDataSet
+  filename_suffix: ".xml"
+  path: data/01_raw/metashape_cameras
+  dataset:
+    type: text.TextDataSet
 
 # Shapefiles containing the image extents.
 image_extents:
