@@ -10,6 +10,13 @@ counting_results:
   filepath: data/03_primary/counting_results.parquet
   versioned: True
 
+# Dataset containing estimated counts for each plot within the GT sampling
+# region.
+counting_results_gt_sample:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/counting_results_gt_sample.parquet
+  versioned: True
+
 # Plot of ground-truth vs. predicted data.
 ground_truth_vs_predicted:
   type: matplotlib.MatplotlibWriter

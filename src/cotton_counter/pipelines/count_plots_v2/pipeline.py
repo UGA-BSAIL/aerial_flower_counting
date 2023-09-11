@@ -183,6 +183,37 @@ def _create_image_extents_pipeline() -> Pipeline:
     return Pipeline(nodes)
 
 
+def _create_analysis_pipeline() -> Pipeline:
+    """
+    Returns:
+        A pipeline that analyzes computed flower counts.
+
+    """
+    return Pipeline(
+        [
+            # Plot the ground truth regression.
+            node(
+                merge_ground_truth,
+                dict(
+                    counting_results="counting_results_gt_sample",
+                    ground_truth="gt_combined",
+                ),
+                "counting_results_gt_merged",
+            ),
+            node(
+                plot_ground_truth_regression,
+                "counting_results_gt_merged",
+                "ground_truth_regression_plot",
+            ),
+            node(
+                plot_ground_truth_vs_predicted,
+                "counting_results_gt_merged",
+                "ground_truth_vs_predicted",
+            ),
+        ]
+    )
+
+
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
     pipeline += _create_image_extents_pipeline()
@@ -208,11 +239,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 f"camera_config",
             ),
             # Combine the session detections into a single table.
-            node(
-                collect_session_results,
-                session_detection_nodes,
-                "detection_results",
-            ),
+            # node(
+            #     collect_session_results,
+            #     session_detection_nodes,
+            #     "detection_results",
+            # ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,
@@ -340,25 +371,6 @@ def create_pipeline(**kwargs) -> Pipeline:
                     field_planted_date="params:v2_field_planted_date",
                 ),
                 "counting_results_gt_sample",
-            ),
-            # Plot the ground truth regression.
-            node(
-                merge_ground_truth,
-                dict(
-                    counting_results="counting_results_gt_sample",
-                    ground_truth="gt_combined",
-                ),
-                "counting_results_gt_merged",
-            ),
-            node(
-                plot_ground_truth_regression,
-                "counting_results_gt_merged",
-                "ground_truth_regression_plot",
-            ),
-            node(
-                plot_ground_truth_vs_predicted,
-                "counting_results_gt_merged",
-                "ground_truth_vs_predicted",
             ),
         ]
     )

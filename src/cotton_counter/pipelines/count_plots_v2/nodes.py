@@ -830,13 +830,13 @@ def plot_ground_truth_vs_predicted(
     )
 
     # Plot the regression.
-    axes = sns.scatterplot(
+    axes = sns.catplot(
         data=counts_with_gt,
         x=GroundTruthColumns.TRUE_COUNT.value,
         y=CountingColumns.COUNT.value,
         hue=CountingColumns.DAP.value,
     )
-    axes.set_title("Predicted vs. Ground-Truth Counts")
+    axes.set_titles("Predicted vs. Ground-Truth Counts")
     axes.set(xlabel="Ground-Truth", ylabel="Automatic")
 
     return plot.gcf()
