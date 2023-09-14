@@ -18,7 +18,7 @@ def _choose_session(base_path: Path) -> Path:
         The session path.
 
     """
-    sessions = list(base_path.iterdir())
+    sessions = [i for i in base_path.iterdir() if i.is_dir()]
     return random.choice(sessions)
 
 

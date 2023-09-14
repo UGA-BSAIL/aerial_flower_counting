@@ -493,6 +493,7 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
                     "session": row[DetectionColumns.SESSION.value],
                     "image_id": row[DetectionColumns.IMAGE_ID.value],
                     "box_num": row[DetectionColumns.BOX_NUM.value],
+                    "plot_num": row[DetectionColumns.PLOT_NUM.value],
                 },
             }
         )

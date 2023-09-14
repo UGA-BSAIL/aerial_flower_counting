@@ -163,3 +163,4 @@ venv.bak/
 
 # This is created by running jobs.
 output_data/
+/to_annotate/

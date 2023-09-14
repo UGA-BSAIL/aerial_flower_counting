@@ -216,17 +216,17 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    pipeline += _create_image_extents_pipeline()
+    # pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    for session in SESSIONS:
-        (
-            session_detection_pipeline,
-            output_node,
-        ) = _create_session_detection_pipeline(session)
-        pipeline += session_detection_pipeline
-        session_detection_nodes.append(output_node)
+    # for session in SESSIONS:
+    #     (
+    #         session_detection_pipeline,
+    #         output_node,
+    #     ) = _create_session_detection_pipeline(session)
+    #     pipeline += session_detection_pipeline
+    #     session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
@@ -253,12 +253,6 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ),
                 "filtered_detection_results",
                 name="filter_results",
-            ),
-            # Convert to shapefile.
-            node(
-                flowers_to_shapefile,
-                "filtered_detection_results",
-                "bounding_box_shapes",
             ),
             # Add plot numbers.
             node(
@@ -334,6 +328,12 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ),
                 "detection_results_gt_sample",
             ),
+            # Convert detections to shapefile.
+            node(
+                flowers_to_shapefile,
+                "detection_results_plot_num",
+                "bounding_box_shapes",
+            ),
             # Compute the flower counts.
             node(
                 compute_counts,
@@ -375,4 +375,4 @@ def create_pipeline(**kwargs) -> Pipeline:
         ]
     )
 
-    return pipeline
+    return pipeline + _create_analysis_pipeline()

@@ -216,4 +216,5 @@ bounding_box_shapes:
       - [session, str]
       - [image_id, str]
       - [box_num, int]
+      - [plot_num, int]
   epsg_crs: 32617
