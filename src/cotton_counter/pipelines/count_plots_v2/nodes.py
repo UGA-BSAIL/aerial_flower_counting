@@ -502,7 +502,7 @@ def _label_plots(
     plot_boundaries: Iterable[Polygon],
     field_config: FieldConfig,
     sessions: List[str],
-) -> Iterable[Tuple[Polygon, int, List[str]]]:
+) -> Iterable[Tuple[Polygon, int, Set[str]]]:
     """
     Computes the plot number for each plot in a shapefile.
 
@@ -512,7 +512,8 @@ def _label_plots(
         sessions: The sessions that these boundaries are valid for.
 
     Yields:
-        Each plot boundary polygon, along with the corresponding plot number.
+        Each plot boundary polygon, along with the corresponding plot number
+        and the sessions that this is valid for.
 
     """
     # Sort plots north-to-south and then west-to-east.
@@ -543,6 +544,7 @@ def _label_plots(
     boundaries_sorted = [b for b, _ in boundaries_with_centers_sorted]
 
     # Assign real plot numbers to them.
+    sessions = set(sessions)
     for i, boundary in enumerate(boundaries_sorted):
         yield boundary, field_config.get_plot_num_row_major(i), sessions
 
@@ -552,7 +554,8 @@ def _label_plots_gt(
     sampling_regions: Iterable[Polygon],
     field_config: FieldConfig,
     ground_truth: pd.DataFrame,
-) -> Iterable[Tuple[Polygon, int, List[str]]]:
+    sessions: List[str],
+) -> Iterable[Tuple[Polygon, int, Set[str]]]:
     """
     Computes the plot number for each ground-truth sampling region in a
     shapefile.
@@ -561,15 +564,14 @@ def _label_plots_gt(
         sampling_regions: The GT sampling regions.
         field_config: The configuration of the field.
         ground_truth: The ground truth data.
+        sessions: The sessions that these boundaries are valid for.
 
     Yields:
         Each sampling region polygon, along with the corresponding plot
         number and the sessions that this is valid for.
 
     """
-    all_sessions = (
-        ground_truth[GroundTruthColumns.SESSION.value].unique().tolist()
-    )
+    sessions = set(sessions)
 
     for top_plot, bottom_plot in batch_iter(
         _label_plots(
@@ -585,8 +587,8 @@ def _label_plots_gt(
         _, bottom_plot_num = bottom_plot
         if top_plot_num != bottom_plot_num:
             # These are single row plots, so we should yield both.
-            yield top_plot + (all_sessions,)
-            yield bottom_plot + (all_sessions,)
+            yield top_plot + (sessions,)
+            yield bottom_plot + (sessions,)
             continue
 
         # Since we only sample either the top or bottom row, we have to fiter
@@ -601,15 +603,25 @@ def _label_plots_gt(
         alternate_row = plot_rows[GroundTruthColumns.USED_ALTERNATE_ROW.value]
         if alternate_row.any():
             yield bottom_plot + (
-                plot_rows.loc[alternate_row, GroundTruthColumns.SESSION.value]
-                .unique()
-                .tolist(),
+                set(
+                    plot_rows.loc[
+                        alternate_row, GroundTruthColumns.SESSION.value
+                    ]
+                    .unique()
+                    .tolist()
+                )
+                & sessions,
             )
         if not alternate_row.all():
             yield top_plot + (
-                plot_rows.loc[~alternate_row, GroundTruthColumns.SESSION.value]
-                .unique()
-                .tolist(),
+                set(
+                    plot_rows.loc[
+                        ~alternate_row, GroundTruthColumns.SESSION.value
+                    ]
+                    .unique()
+                    .tolist()
+                )
+                & sessions,
             )
 
 
@@ -639,10 +651,10 @@ def _shift_plot(plot_boundary: Polygon, shift_amount: float) -> Polygon:
 
 
 def _label_plots_gt_monte_carlo(
-    labeled_plots: Iterable[Tuple[Polygon, int, List[str]]],
+    labeled_plots: Iterable[Tuple[Polygon, int, Set[str]]],
     *,
     max_shift_amount: float,
-) -> Iterable[Tuple[Polygon, int, List[str]]]:
+) -> Iterable[Tuple[Polygon, int, Set[str]]]:
     """
     Applies random shifts to the  plots in order to simulate the fact that
     Dalton might not always sample the exact center of the plot.
@@ -650,7 +662,6 @@ def _label_plots_gt_monte_carlo(
     Args:
         labeled_plots: The previously-labeled GT sampling locations.
         max_shift_amount: The maximum amount to shift in the x direction.
-        num_samples: The number of randomly-shifted replicates to add.
 
     Returns:
         The augmented labeled plots.
@@ -664,10 +675,10 @@ def _label_plots_gt_monte_carlo(
         yield shifted_plot, plot_num, sessions
 
 
-def _find_detections_in_plots(
+def _find_detections_in_regions(
     *,
     detections: pd.DataFrame,
-    labeled_plots: Iterable[Tuple[Polygon, int, List[str]]],
+    labeled_plots: Iterable[Tuple[Polygon, int, Set[str]]],
 ) -> pd.DataFrame:
     """
     Finds detections within specific plots, and adds the appropriate plot
@@ -711,7 +722,7 @@ def _find_detections_in_plots(
         detection_rows = [detection_polys_to_row[p] for p in plot_detections]
         try:
             detections.loc[
-                (detection_rows, plot_sessions),
+                (detection_rows, list(plot_sessions)),
                 (DetectionColumns.PLOT_NUM.value, "in_plot"),
             ] = [plot_num, True]
         except KeyError:
@@ -726,14 +737,45 @@ def _find_detections_in_plots(
     return detections.droplevel(DetectionColumns.SESSION.value)
 
 
-def find_detections_in_plots(
+def _find_detections_in_plots(
+    *,
+    detections: pd.DataFrame,
+    plot_boundaries: List[Feature],
+    field_config: FieldConfig,
+    sessions: List[str],
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`.
+
+    Args:
+        detections: The original detections.
+        plot_boundaries: The plot boundary shapes.
+        field_config: The field configuration.
+        sessions: List of sessions that these plot boundaries are valid for.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    return _find_detections_in_regions(
+        detections=detections,
+        labeled_plots=_label_plots(
+            plot_boundaries=_load_polygons(plot_boundaries),
+            field_config=field_config,
+            sessions=sessions,
+        ),
+    )
+
+
+def find_detections_in_plots_pre_september(
     *,
     detections: pd.DataFrame,
     plot_boundaries: List[Feature],
     field_config: FieldConfig,
 ) -> pd.DataFrame:
     """
-    Adds the plot number to the detections `DataFrame`.
+    Adds the plot number to the detections `DataFrame`, for data from before
+    September 1.
 
     Args:
         detections: The original detections.
@@ -744,20 +786,99 @@ def find_detections_in_plots(
         The same detections, with a plot number column.
 
     """
-    return _find_detections_in_plots(
+    # Find the sessions from before September.
+    all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
+    valid_sessions = [s for s in all_sessions if s < "2023-09-01"]
+
+    return _find_detections_in_regions(
         detections=detections,
         labeled_plots=_label_plots(
             plot_boundaries=_load_polygons(plot_boundaries),
             field_config=field_config,
-            # Plots are the same for all sessions.
-            sessions=detections[DetectionColumns.SESSION.value]
-            .unique()
-            .tolist(),
+            sessions=valid_sessions,
         ),
     )
 
 
-def find_detections_in_gt_sampling_regions(
+def find_detections_in_plots_post_september(
+    *,
+    detections: pd.DataFrame,
+    plot_boundaries: List[Feature],
+    field_config: FieldConfig,
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`, for data from after
+    September 1.
+
+    Args:
+        detections: The original detections.
+        plot_boundaries: The plot boundary shapes.
+        field_config: The field configuration.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    # Find the sessions from before September.
+    all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
+    valid_sessions = [s for s in all_sessions if s >= "2023-09-01"]
+
+    return _find_detections_in_regions(
+        detections=detections,
+        labeled_plots=_label_plots(
+            plot_boundaries=_load_polygons(plot_boundaries),
+            field_config=field_config,
+            sessions=valid_sessions,
+        ),
+    )
+
+
+def _find_detections_in_gt_sampling_regions(
+    *,
+    detections: pd.DataFrame,
+    gt_sampling_regions: List[Feature],
+    field_config: FieldConfig,
+    ground_truth: pd.DataFrame,
+    sessions: List[str],
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`, based on which
+    detections fall within that plot's ground-truth sampling region.
+
+    Args:
+        detections: The original detections.
+        gt_sampling_regions: The GT sampling region shapes.
+        field_config: The field configuration.
+        ground_truth: The ground truth data.
+        sessions: List of sessions that these plot boundaries are valid for.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    all_detections = []
+
+    for sample_num in range(40):
+        sample_detections = _find_detections_in_regions(
+            detections=detections.copy(),
+            labeled_plots=_label_plots_gt_monte_carlo(
+                _label_plots_gt(
+                    sampling_regions=_load_polygons(gt_sampling_regions),
+                    field_config=field_config,
+                    ground_truth=ground_truth,
+                    sessions=sessions,
+                ),
+                max_shift_amount=2.0,
+            ),
+        )
+
+        sample_detections[DetectionColumns.SAMPLE.value] = sample_num
+        all_detections.append(sample_detections)
+
+    return pd.concat(all_detections)
+
+
+def find_detections_in_gt_sampling_regions_pre_september(
     *,
     detections: pd.DataFrame,
     gt_sampling_regions: List[Feature],
@@ -766,7 +887,8 @@ def find_detections_in_gt_sampling_regions(
 ) -> pd.DataFrame:
     """
     Adds the plot number to the detections `DataFrame`, based on which
-    detections fall within that plot's ground-truth sampling region.
+    detections fall within that plot's ground-truth sampling region, for data
+    from before September 1.
 
     Args:
         detections: The original detections.
@@ -778,25 +900,52 @@ def find_detections_in_gt_sampling_regions(
         The same detections, with a plot number column.
 
     """
-    all_detections = []
+    # Find the sessions from before September.
+    all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
+    valid_sessions = [s for s in all_sessions if s < "2023-09-01"]
 
-    for sample_num in range(40):
-        sample_detections = _find_detections_in_plots(
-            detections=detections.copy(),
-            labeled_plots=_label_plots_gt_monte_carlo(
-                _label_plots_gt(
-                    sampling_regions=_load_polygons(gt_sampling_regions),
-                    field_config=field_config,
-                    ground_truth=ground_truth,
-                ),
-                max_shift_amount=2.0,
-            ),
-        )
+    return _find_detections_in_gt_sampling_regions(
+        detections=detections,
+        gt_sampling_regions=gt_sampling_regions,
+        field_config=field_config,
+        ground_truth=ground_truth,
+        sessions=valid_sessions,
+    )
 
-        sample_detections[DetectionColumns.SAMPLE.value] = sample_num
-        all_detections.append(sample_detections)
 
-    return pd.concat(all_detections)
+def find_detections_in_gt_sampling_regions_post_september(
+    *,
+    detections: pd.DataFrame,
+    gt_sampling_regions: List[Feature],
+    field_config: FieldConfig,
+    ground_truth: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Adds the plot number to the detections `DataFrame`, based on which
+    detections fall within that plot's ground-truth sampling region, for data
+    from after September 1.
+
+    Args:
+        detections: The original detections.
+        gt_sampling_regions: The GT sampling region shapes.
+        field_config: The field configuration.
+        ground_truth: The ground truth data.
+
+    Returns:
+        The same detections, with a plot number column.
+
+    """
+    # Find the sessions from before September.
+    all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
+    valid_sessions = [s for s in all_sessions if s >= "2023-09-01"]
+
+    return _find_detections_in_gt_sampling_regions(
+        detections=detections,
+        gt_sampling_regions=gt_sampling_regions,
+        field_config=field_config,
+        ground_truth=ground_truth,
+        sessions=valid_sessions,
+    )
 
 
 def load_ground_truth(
