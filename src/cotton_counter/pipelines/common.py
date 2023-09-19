@@ -3,8 +3,9 @@ Common functionality between the two versions of the pipeline.
 """
 import enum
 from datetime import date
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Tuple
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plot
@@ -59,6 +60,11 @@ class DetectionColumns(enum.Enum):
     CONFIDENCE = "confidence"
     """
     The confidence score of the detection.
+    """
+
+    SAMPLE = "sample"
+    """
+    The sample number when using Monte Carlo sampling on plot locations.
     """
 
     X1 = "x1"
@@ -194,12 +200,11 @@ def compute_counts(detection_results: pd.DataFrame) -> pd.DataFrame:
     detection_results.dropna(subset=[DetectionColumns.PLOT_NUM.value])
 
     # Figure out how many detections we have for each plot.
-    counts_per_plot_series = detection_results.value_counts(
-        subset=[
-            DetectionColumns.SESSION.value,
-            DetectionColumns.PLOT_NUM.value,
-        ]
-    )
+    subset = [DetectionColumns.SESSION.value, DetectionColumns.PLOT_NUM.value]
+    if DetectionColumns.SAMPLE.value in detection_results.columns:
+        # Count within each sample. We will merge them later.
+        subset.append(DetectionColumns.SAMPLE.value)
+    counts_per_plot_series = detection_results.value_counts(subset=subset)
     # Convert the series to a frame.
     counts_per_plot = counts_per_plot_series.index.to_frame(index=False)
     counts_per_plot[
@@ -318,6 +323,39 @@ def merge_ground_truth(
         CountingColumns.COUNT.value
     ].fillna(0)
     return merged
+
+
+def choose_best_counts(counts_with_gt: pd.DataFrame) -> pd.DataFrame:
+    """
+    For cases where we have multiple possible counts for each plot,
+    this chooses the ones that are closest to the GT for each plot.
+
+    Args:
+        counts_with_gt: The merged counting results and ground-truth data.
+
+    Returns:
+        The merged results.
+
+    """
+
+    def _find_best(row: pd.Series) -> Tuple[int, float]:
+        count_error = np.abs(
+            row[CountingColumns.COUNT.value]
+            - row[GroundTruthColumns.TRUE_COUNT.value]
+        )
+        best_error_idx = count_error.argmin()
+        return row[CountingColumns.COUNT.value].iloc[best_error_idx]
+
+    best_counts = counts_with_gt.groupby(
+        level=[CountingColumns.PLOT.value, CountingColumns.DAP.value]
+    ).apply(_find_best)
+
+    # Update the dataframe, removing the additional samples.
+    counts_with_gt = counts_with_gt[
+        counts_with_gt[DetectionColumns.SAMPLE.value] == 0
+    ].copy()
+    counts_with_gt[CountingColumns.COUNT.value] = best_counts
+    return counts_with_gt
 
 
 def plot_ground_truth_regression(counts_with_gt: pd.DataFrame) -> plot.Figure:

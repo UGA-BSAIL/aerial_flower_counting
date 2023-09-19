@@ -3,7 +3,7 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import partial, reduce
+from functools import partial, reduce, cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
@@ -17,6 +17,7 @@ from pandarallel import pandarallel
 from PIL import Image
 from shapely import Polygon, STRtree, intersection
 from shapely.geometry import mapping
+from shapely import affinity, from_ragged_array, GeometryType
 from ultralytics import YOLO
 
 from .camera_utils import CameraConfig, CameraTransformer
@@ -334,31 +335,27 @@ def _detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
         The polygons.
 
     """
-    for _, row in detections.iterrows():
-        yield Polygon(
-            [
-                (
-                    row[DetectionColumns.X1.value],
-                    row[DetectionColumns.Y1.value],
-                ),
-                (
-                    row[DetectionColumns.X2.value],
-                    row[DetectionColumns.Y1.value],
-                ),
-                (
-                    row[DetectionColumns.X2.value],
-                    row[DetectionColumns.Y2.value],
-                ),
-                (
-                    row[DetectionColumns.X1.value],
-                    row[DetectionColumns.Y2.value],
-                ),
-                (
-                    row[DetectionColumns.X1.value],
-                    row[DetectionColumns.Y1.value],
-                ),
-            ]
-        )
+    # Extract raw coordinates as an array of points.
+    x1, y1, x2, y2 = [
+        c.value
+        for c in [
+            DetectionColumns.X1,
+            DetectionColumns.Y1,
+            DetectionColumns.X2,
+            DetectionColumns.Y2,
+        ]
+    ]
+    coords = detections[[x1, y1, x2, y1, x2, y2, x1, y2, x1, y1]]
+    coords = coords.to_numpy().reshape(-1, 2)
+
+    # Five points for every detection box.
+    offsets = np.arange(0, len(coords) + 1, 5)
+    # One ring for every box.
+    num_rings = np.arange(0, len(coords) // 5 + 1)
+
+    return from_ragged_array(
+        GeometryType.POLYGON, coords, (offsets, num_rings)
+    )
 
 
 def _query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
@@ -616,6 +613,57 @@ def _label_plots_gt(
             )
 
 
+def _shift_plot(plot_boundary: Polygon, shift_amount: float) -> Polygon:
+    """
+    Shifts the plot boundary by a certain amount, along the longer axis of
+    the plot.
+
+    Args:
+        plot_boundary: The plot boundary.
+        shift_amount: The amount to shift the plot by in the x direction.
+
+    Returns:
+        The shifted plot boundary.
+
+    """
+    # Find the slope of the sides.
+    point1, point2, point3 = plot_boundary.exterior.coords[:3]
+    slope1 = (point2[1] - point1[1]) / (point2[0] - point1[0])
+    slope2 = (point3[1] - point2[1]) / (point3[0] - point2[0])
+    nearest_horizontal_slope = min(slope1, slope2)
+
+    # Compute the amount of shift in each direction.
+    shift_y = shift_amount * nearest_horizontal_slope
+
+    return affinity.translate(plot_boundary, xoff=shift_amount, yoff=shift_y)
+
+
+def _label_plots_gt_monte_carlo(
+    labeled_plots: Iterable[Tuple[Polygon, int, List[str]]],
+    *,
+    max_shift_amount: float,
+) -> Iterable[Tuple[Polygon, int, List[str]]]:
+    """
+    Applies random shifts to the  plots in order to simulate the fact that
+    Dalton might not always sample the exact center of the plot.
+
+    Args:
+        labeled_plots: The previously-labeled GT sampling locations.
+        max_shift_amount: The maximum amount to shift in the x direction.
+        num_samples: The number of randomly-shifted replicates to add.
+
+    Returns:
+        The augmented labeled plots.
+
+    """
+    for boundary, plot_num, sessions in labeled_plots:
+        shifted_plot = _shift_plot(
+            boundary,
+            np.random.uniform(-max_shift_amount, max_shift_amount),
+        )
+        yield shifted_plot, plot_num, sessions
+
+
 def _find_detections_in_plots(
     *,
     detections: pd.DataFrame,
@@ -644,6 +692,8 @@ def _find_detections_in_plots(
     # Make sure it has a column for plot numbers.
     if DetectionColumns.PLOT_NUM.value not in detections:
         detections.insert(0, DetectionColumns.PLOT_NUM.value, np.nan)
+    # We also use a column to keep track of whether this detection is in a plot.
+    detections.insert(0, "in_plot", False)
 
     # Index by sessions as well.
     detections.set_index(
@@ -662,13 +712,16 @@ def _find_detections_in_plots(
         try:
             detections.loc[
                 (detection_rows, plot_sessions),
-                DetectionColumns.PLOT_NUM.value,
-            ] = plot_num
+                (DetectionColumns.PLOT_NUM.value, "in_plot"),
+            ] = [plot_num, True]
         except KeyError:
             # In this case, none of the rows met the session criteria. No
             # changes to the detections frame are necessary.
             pass
 
+    # Keep only the detections that are in a plot.
+    detections = detections[detections["in_plot"]].copy()
+    detections.drop(columns=["in_plot"], inplace=True)
     # Remove the temporary index we added.
     return detections.droplevel(DetectionColumns.SESSION.value)
 
@@ -725,14 +778,25 @@ def find_detections_in_gt_sampling_regions(
         The same detections, with a plot number column.
 
     """
-    return _find_detections_in_plots(
-        detections=detections,
-        labeled_plots=_label_plots_gt(
-            sampling_regions=_load_polygons(gt_sampling_regions),
-            field_config=field_config,
-            ground_truth=ground_truth,
-        ),
-    )
+    all_detections = []
+
+    for sample_num in range(40):
+        sample_detections = _find_detections_in_plots(
+            detections=detections.copy(),
+            labeled_plots=_label_plots_gt_monte_carlo(
+                _label_plots_gt(
+                    sampling_regions=_load_polygons(gt_sampling_regions),
+                    field_config=field_config,
+                    ground_truth=ground_truth,
+                ),
+                max_shift_amount=2.0,
+            ),
+        )
+
+        sample_detections[DetectionColumns.SAMPLE.value] = sample_num
+        all_detections.append(sample_detections)
+
+    return pd.concat(all_detections)
 
 
 def load_ground_truth(

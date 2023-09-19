@@ -15,6 +15,7 @@ from ..common import (
     compute_counts,
     filter_low_confidence,
     merge_ground_truth,
+    choose_best_counts,
     plot_ground_truth_regression,
 )
 from .field_config import FieldConfig
@@ -198,6 +199,11 @@ def _create_analysis_pipeline() -> Pipeline:
                     counting_results="counting_results_gt_sample",
                     ground_truth="gt_combined",
                 ),
+                "counting_results_gt_merged_with_dups",
+            ),
+            node(
+                choose_best_counts,
+                "counting_results_gt_merged_with_dups",
                 "counting_results_gt_merged",
             ),
             node(
@@ -311,21 +317,30 @@ def create_pipeline(**kwargs) -> Pipeline:
             node(
                 find_detections_in_gt_sampling_regions,
                 dict(
-                    detections="detection_results_gt_sample_top",
+                    detections="filtered_detection_results",
                     gt_sampling_regions="plot_gt_sample_locations_middle",
                     field_config="middle_field_config",
                     ground_truth="gt_combined",
                 ),
-                "detection_results_gt_sample_top_middle",
+                "detection_results_gt_sample_middle",
             ),
             node(
                 find_detections_in_gt_sampling_regions,
                 dict(
-                    detections="detection_results_gt_sample_top_middle",
+                    detections="filtered_detection_results",
                     gt_sampling_regions="plot_gt_sample_locations_bottom",
                     field_config="bottom_field_config",
                     ground_truth="gt_combined",
                 ),
+                "detection_results_gt_sample_bottom",
+            ),
+            node(
+                lambda *d: pd.concat(d),
+                [
+                    "detection_results_gt_sample_top",
+                    "detection_results_gt_sample_middle",
+                    "detection_results_gt_sample_bottom",
+                ],
                 "detection_results_gt_sample",
             ),
             # Convert detections to shapefile.
