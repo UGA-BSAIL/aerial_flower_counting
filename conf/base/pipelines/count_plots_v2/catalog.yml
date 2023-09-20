@@ -147,6 +147,24 @@ gt_2023-09-05:
     sheet_name: "9-5-23"
     << : *gt_load_args
 
+gt_2023-09-07:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-7-23"
+    << : *gt_load_args
+
+gt_2023-09-12:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-11-23"
+    << : *gt_load_args
+
+gt_2023-09-14:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-14-23"
+    << : *gt_load_args
+
 # Datasets containing raw images to process.
 _image_params: &image_params
   type: PartitionedDataSet
@@ -202,7 +220,19 @@ images_2023-09-05:
   path: ${corrected_image_dir}/2023-09-05
   << : *image_params
 
-# Dataset containing the DEMs.
+images_2023-09-07:
+  path: ${corrected_image_dir}/2023-09-07
+  << : *image_params
+
+images_2023-09-12:
+  path: ${corrected_image_dir}/2023-09-12
+  << : *image_params
+
+images_2023-09-14:
+  path: ${corrected_image_dir}/2023-09-14
+  << : *image_params
+
+  # Dataset containing the DEMs.
 dems:
   type: PartitionedDataSet
   filename_suffix: ".tif"

@@ -20,7 +20,7 @@ from shapely.geometry import mapping
 from shapely import affinity, from_ragged_array, GeometryType
 from ultralytics import YOLO
 
-from .camera_utils import CameraConfig, CameraTransformer
+from .camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
     CountingColumns,
     DetectionColumns,
@@ -228,16 +228,24 @@ def find_image_extents(
             camera_config=camera_config,
             camera_id=image_id,
         )
-        top_left = px_to_utm(np.array([0.0, 0.0]))
-        top_right = px_to_utm(np.array([width_px, 0.0]))
-        bottom_right = px_to_utm(
-            np.array([width_px, height_px], dtype=np.float32)
-        )
-        bottom_left = px_to_utm(np.array([0.0, height_px]))
+        try:
+            top_left = px_to_utm(np.array([0.0, 0.0]))
+            top_right = px_to_utm(np.array([width_px, 0.0]))
+            bottom_right = px_to_utm(
+                np.array([width_px, height_px], dtype=np.float32)
+            )
+            bottom_left = px_to_utm(np.array([0.0, height_px]))
+        except MissingImageError:
+            logger.warning("No transform data for {}, skipping.", image_id)
+            continue
 
-        shapes.append(
-            Polygon([top_left, top_right, bottom_right, bottom_left, top_left])
+        extent = Polygon(
+            [top_left, top_right, bottom_right, bottom_left, top_left]
         )
+        if not extent.is_valid:
+            logger.warning("Extent for {} is invalid, skipping.", image_id)
+            continue
+        shapes.append(extent)
 
     return [
         Feature(
@@ -291,12 +299,21 @@ def flowers_to_geographic(
             [DetectionColumns.X2.value, DetectionColumns.Y2.value]
         ].to_numpy(dtype=np.float32)
 
-        top_x, top_y, _ = transformer.pixel_to_utm(
-            box_top_left, camera_config=camera_config, camera_id=camera_id
-        )
-        bottom_x, bottom_y, _ = transformer.pixel_to_utm(
-            box_bottom_right, camera_config=camera_config, camera_id=camera_id
-        )
+        try:
+            top_x, top_y, _ = transformer.pixel_to_utm(
+                box_top_left, camera_config=camera_config, camera_id=camera_id
+            )
+            bottom_x, bottom_y, _ = transformer.pixel_to_utm(
+                box_bottom_right,
+                camera_config=camera_config,
+                camera_id=camera_id,
+            )
+        except MissingImageError:
+            logger.warning(
+                "No transformation for image {}, ignoring detections.",
+                image_id,
+            )
+            return pd.Series(index=coord_columns)
 
         return pd.Series(
             index=coord_columns,
@@ -306,6 +323,8 @@ def flowers_to_geographic(
     detection_coords = detections[coord_columns]
     geo_detection_coords = detection_coords.apply(_convert, axis="columns")
     detections[coord_columns] = geo_detection_coords
+    # Remove data for images with no transformation.
+    detections.dropna(subset=coord_columns, inplace=True)
     return detections
 
 

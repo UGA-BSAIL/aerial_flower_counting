@@ -56,7 +56,7 @@ class CameraConfig:
                 np.fromstring(camera.find("transform").text, sep=" "), (4, 4)
             )
             for camera in cameras
-            if camera.attrib.get("enabled", "true") != "false"
+            if camera.find("transform") is not None
         }
 
     @classmethod

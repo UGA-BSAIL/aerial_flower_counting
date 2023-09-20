@@ -1,5 +1,5 @@
 # Location where the detection model weights are saved.
-model_weights_file: "yolov8m_flower_active_4.pt"
+model_weights_file: "yolov8m_flower_active_7.pt"
 
 # Batch size to use for inference.
 prediction_batch_size: 16
