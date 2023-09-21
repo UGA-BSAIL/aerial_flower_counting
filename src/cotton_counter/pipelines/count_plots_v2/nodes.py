@@ -644,14 +644,19 @@ def _label_plots_gt(
             )
 
 
-def _shift_plot(plot_boundary: Polygon, shift_amount: float) -> Polygon:
+def _shift_plot(
+    plot_boundary: Polygon, shift_h: float = 0, shift_v: float = 0
+) -> Polygon:
     """
     Shifts the plot boundary by a certain amount, along the longer axis of
     the plot.
 
     Args:
         plot_boundary: The plot boundary.
-        shift_amount: The amount to shift the plot by in the x direction.
+        shift_h: The amount to shift the box horizontally, in the plot
+            coordinate frame.
+        shift_v: The amount to shift the box vertically, in the plot
+            coordinate frame.
 
     Returns:
         The shifted plot boundary.
@@ -661,18 +666,29 @@ def _shift_plot(plot_boundary: Polygon, shift_amount: float) -> Polygon:
     point1, point2, point3 = plot_boundary.exterior.coords[:3]
     slope1 = (point2[1] - point1[1]) / (point2[0] - point1[0])
     slope2 = (point3[1] - point2[1]) / (point3[0] - point2[0])
-    nearest_horizontal_slope = min(slope1, slope2)
 
-    # Compute the amount of shift in each direction.
-    shift_y = shift_amount * nearest_horizontal_slope
+    nearest_horizontal_slope = slope1
+    if np.abs(slope2) < np.abs(slope1):
+        nearest_horizontal_slope = slope2
+    rotation_angle = np.arctan(nearest_horizontal_slope)
 
-    return affinity.translate(plot_boundary, xoff=shift_amount, yoff=shift_y)
+    # Go from plot to world coordinates.
+    rotation_matrix = np.array(
+        [
+            [np.cos(rotation_angle), np.sin(rotation_angle)],
+            [-np.sin(rotation_angle), np.cos(rotation_angle)],
+        ]
+    )
+    shift_amount = np.array([shift_h, shift_v])
+    shift_x, shift_y = rotation_matrix @ shift_amount
+
+    return affinity.translate(plot_boundary, xoff=shift_x, yoff=shift_y)
 
 
 def _label_plots_gt_monte_carlo(
     labeled_plots: Iterable[Tuple[Polygon, int, Set[str]]],
-    *,
-    max_shift_amount: float,
+    max_shift_amount_h: float = 0,
+    max_shift_amount_v: float = 0,
 ) -> Iterable[Tuple[Polygon, int, Set[str]]]:
     """
     Applies random shifts to the  plots in order to simulate the fact that
@@ -680,7 +696,10 @@ def _label_plots_gt_monte_carlo(
 
     Args:
         labeled_plots: The previously-labeled GT sampling locations.
-        max_shift_amount: The maximum amount to shift in the x direction.
+        max_shift_amount_h: The maximum amount to shift along the length of
+            the plot.
+        max_shift_amount_v: The maximum amount to shift perpendicular to the
+            plot.
 
     Returns:
         The augmented labeled plots.
@@ -689,7 +708,8 @@ def _label_plots_gt_monte_carlo(
     for boundary, plot_num, sessions in labeled_plots:
         shifted_plot = _shift_plot(
             boundary,
-            np.random.uniform(-max_shift_amount, max_shift_amount),
+            shift_h=np.random.uniform(-max_shift_amount_h, max_shift_amount_h),
+            shift_v=np.random.uniform(-max_shift_amount_v, max_shift_amount_v),
         )
         yield shifted_plot, plot_num, sessions
 
@@ -887,7 +907,8 @@ def _find_detections_in_gt_sampling_regions(
                     ground_truth=ground_truth,
                     sessions=sessions,
                 ),
-                max_shift_amount=2.0,
+                max_shift_amount_h=2.0,
+                max_shift_amount_v=0.5,
             ),
         )
 
