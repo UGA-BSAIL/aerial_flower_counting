@@ -697,6 +697,7 @@ def _label_plots_gt_monte_carlo(
 def _find_detections_in_regions(
     *,
     detections: pd.DataFrame,
+    detection_polys: Iterable[Polygon],
     labeled_plots: Iterable[Tuple[Polygon, int, Set[str]]],
 ) -> pd.DataFrame:
     """
@@ -705,6 +706,7 @@ def _find_detections_in_regions(
 
     Args:
         detections: The detections.
+        detection_polys: The equivalent detection polygons.
         labeled_plots: The plot polygons with associated plot numbers and
             valid sessions.
 
@@ -713,7 +715,6 @@ def _find_detections_in_regions(
 
     """
     # Detection RTree for fast intersection calculations.
-    detection_polys = list(_detections_to_polygons(detections))
     detections_tree = STRtree(detection_polys)
     detection_polys_to_row = {
         p: i for p, i in zip(detection_polys, detections.index)
@@ -778,6 +779,7 @@ def _find_detections_in_plots(
     """
     return _find_detections_in_regions(
         detections=detections,
+        detection_polys=_detections_to_polygons(detections),
         labeled_plots=_label_plots(
             plot_boundaries=_load_polygons(plot_boundaries),
             field_config=field_config,
@@ -809,13 +811,11 @@ def find_detections_in_plots_pre_september(
     all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
     valid_sessions = [s for s in all_sessions if s < "2023-09-01"]
 
-    return _find_detections_in_regions(
+    return _find_detections_in_plots(
         detections=detections,
-        labeled_plots=_label_plots(
-            plot_boundaries=_load_polygons(plot_boundaries),
-            field_config=field_config,
-            sessions=valid_sessions,
-        ),
+        plot_boundaries=plot_boundaries,
+        field_config=field_config,
+        sessions=valid_sessions,
     )
 
 
@@ -842,13 +842,11 @@ def find_detections_in_plots_post_september(
     all_sessions = detections[DetectionColumns.SESSION.value].unique().tolist()
     valid_sessions = [s for s in all_sessions if s >= "2023-09-01"]
 
-    return _find_detections_in_regions(
+    return _find_detections_in_plots(
         detections=detections,
-        labeled_plots=_label_plots(
-            plot_boundaries=_load_polygons(plot_boundaries),
-            field_config=field_config,
-            sessions=valid_sessions,
-        ),
+        plot_boundaries=plot_boundaries,
+        field_config=field_config,
+        sessions=valid_sessions,
     )
 
 
@@ -877,9 +875,11 @@ def _find_detections_in_gt_sampling_regions(
     """
     all_detections = []
 
+    detection_polys = _detections_to_polygons(detections)
     for sample_num in range(40):
         sample_detections = _find_detections_in_regions(
             detections=detections.copy(),
+            detection_polys=detection_polys,
             labeled_plots=_label_plots_gt_monte_carlo(
                 _label_plots_gt(
                     sampling_regions=_load_polygons(gt_sampling_regions),

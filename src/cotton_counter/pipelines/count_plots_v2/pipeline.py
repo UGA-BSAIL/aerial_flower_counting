@@ -32,6 +32,7 @@ from .nodes import (
     load_ground_truth,
     plot_ground_truth_vs_predicted,
     prune_duplicate_detections,
+    _detections_to_polygons,
 )
 from .camera_utils import CameraConfig
 
@@ -227,17 +228,17 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    pipeline += _create_image_extents_pipeline()
+    # pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    for session in SESSIONS:
-        (
-            session_detection_pipeline,
-            output_node,
-        ) = _create_session_detection_pipeline(session)
-        pipeline += session_detection_pipeline
-        session_detection_nodes.append(output_node)
+    # for session in SESSIONS:
+    #     (
+    #         session_detection_pipeline,
+    #         output_node,
+    #     ) = _create_session_detection_pipeline(session)
+    #     pipeline += session_detection_pipeline
+    #     session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
@@ -250,11 +251,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 f"camera_config",
             ),
             # Combine the session detections into a single table.
-            node(
-                collect_session_results,
-                session_detection_nodes,
-                "detection_results",
-            ),
+            # node(
+            #     collect_session_results,
+            #     session_detection_nodes,
+            #     "detection_results",
+            # ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,
