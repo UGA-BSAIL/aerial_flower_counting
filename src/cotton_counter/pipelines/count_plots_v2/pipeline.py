@@ -37,21 +37,21 @@ from .nodes import (
 from .camera_utils import CameraConfig
 
 SESSIONS = {
-    "2023-07-27",
-    "2023-08-01",
-    "2023-08-03",
-    "2023-08-07",
-    "2023-08-10",
-    "2023-08-14",
+    # "2023-07-27",
+    # "2023-08-01",
+    # "2023-08-03",
+    # "2023-08-07",
+    # "2023-08-10",
+    # "2023-08-14",
     "2023-08-18",
-    "2023-08-21",
-    "2023-08-24",
-    "2023-08-28",
-    "2023-09-01",
-    "2023-09-05",
-    "2023-09-07",
-    "2023-09-12",
-    "2023-09-14",
+    # "2023-08-21",
+    # "2023-08-24",
+    # "2023-08-28",
+    # "2023-09-01",
+    # "2023-09-05",
+    # "2023-09-07",
+    # "2023-09-12",
+    # "2023-09-14",
 }
 """
 The set of all the sessions that we want to process.
@@ -228,17 +228,17 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    # pipeline += _create_image_extents_pipeline()
+    pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    # for session in SESSIONS:
-    #     (
-    #         session_detection_pipeline,
-    #         output_node,
-    #     ) = _create_session_detection_pipeline(session)
-    #     pipeline += session_detection_pipeline
-    #     session_detection_nodes.append(output_node)
+    for session in SESSIONS:
+        (
+            session_detection_pipeline,
+            output_node,
+        ) = _create_session_detection_pipeline(session)
+        pipeline += session_detection_pipeline
+        session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
@@ -251,11 +251,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 f"camera_config",
             ),
             # Combine the session detections into a single table.
-            # node(
-            #     collect_session_results,
-            #     session_detection_nodes,
-            #     "detection_results",
-            # ),
+            node(
+                collect_session_results,
+                session_detection_nodes,
+                "detection_results",
+            ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,

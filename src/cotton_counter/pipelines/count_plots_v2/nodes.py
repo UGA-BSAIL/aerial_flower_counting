@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy import optimize
 import seaborn as sns
 from fiona.model import Feature, Geometry, Properties
 from loguru import logger
@@ -401,6 +402,81 @@ def _query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
     ]
 
 
+def _prune_by_size(
+    *, indices1: List[int], indices2: List[int], prune_rows: Set[int]
+) -> Set[int]:
+    """
+    A very simple pruning algorithm that removes the detections from
+    whichever image has fewer detections.
+
+    Args:
+        indices1: The indices of the detections in image 1.
+        indices2: The indices of the detections in image 2.
+        prune_rows: The indices of the detections that are already being
+            removed.
+
+    Returns:
+        The indices of the detections that should be removed.
+
+    """
+    # Filter detections that are already slated for removal.
+    indices1 = set(indices1) - prune_rows
+    indices2 = set(indices2) - prune_rows
+
+    if len(indices1) < len(indices2):
+        return indices1
+    else:
+        return indices2
+
+
+def _prune_with_hungarian(
+    *,
+    indices1: List[int],
+    indices2: List[int],
+    centroids1: List[List[int]],
+    centroids2: List[List[int]],
+    prune_rows: Set[int],
+) -> Set[int]:
+    """
+    Prunes duplicate bounding boxes using Hungarian matching.
+
+    Args:
+        indices1: The indices of the detections in image 1.
+        indices2: The indices of the detections in image 2.
+        centroids1: The centroids of the detections in image 1.
+        centroids2: The centroids of the detections in image 2.
+        prune_rows: The indices of the detections that are already being
+            removed.
+
+    Returns:
+        The indices of the detections that should be removed.
+
+    """
+    # Construct the cost matrix based on the centroid distances.
+    centroids1 = np.array([centroids1]).transpose(1, 0, 2)
+    centroids2 = np.array([centroids2])
+    cost = np.linalg.norm(centroids1 - centroids2, axis=2)
+
+    # Solve the assignment problem.
+    image1_i, image2_i = optimize.linear_sum_assignment(cost)
+
+    # We want to put an upper limit on the cost of a match. The Hungarian
+    # algorithm will always try to match as many things as possible, but if
+    # the cost is too high, that probably just means that the detections are
+    # two different flowers.
+    match_costs = cost[image1_i, image2_i]
+    valid_matches = match_costs < 0.5
+    image1_i = image1_i[valid_matches]
+    image2_i = image2_i[valid_matches]
+
+    # Matched indices are duplicates, so we should remove one set.
+    indices1 = set(np.array(indices1)[image1_i]) - prune_rows
+    indices2 = set(np.array(indices2)[image2_i]) - prune_rows
+    if len(indices1) < len(indices2):
+        return indices1
+    return indices2
+
+
 def prune_duplicate_detections(
     *, detections: pd.DataFrame, image_extents: List[Feature]
 ) -> pd.DataFrame:
@@ -446,32 +522,36 @@ def prune_duplicate_detections(
         detections_indices = _query_intersecting(
             detections_tree, intersecting_region
         )
-        detections_in_region = detections_tree.geometries[detections_indices]
+        detections_in_region: List[Polygon] = detections_tree.geometries[
+            detections_indices
+        ]
 
         extent1_id = extent_polys_to_id[extent1]
         extent2_id = extent_polys_to_id[extent2]
 
         # Filter to detections from either of the input images.
-        image1_indices = set()
-        image2_indices = set()
+        image1_indices = []
+        image2_indices = []
+        image1_centroids = []
+        image2_centroids = []
         for detection in detections_in_region:
             image_id = detection_polys_to_id[detection].split("_patch_")[0]
             index = detection_polys_to_row[detection]
+            centroid = [detection.centroid.x, detection.centroid.y]
             if image_id == extent1_id:
-                image1_indices.add(index)
+                image1_indices.append(index)
+                image1_centroids.append(centroid)
             elif image_id == extent2_id:
-                image2_indices.add(index)
+                image2_indices.append(index)
+                image2_centroids.append(centroid)
 
-        # Filter detections that are already slated for removal.
-        image1_indices = image1_indices - prune_rows
-        image2_indices = image2_indices - prune_rows
-
-        # Our current, very naive algorithm is just to prune the detections
-        # from the image with fewer IDs.
-        if len(image1_indices) > len(image2_indices):
-            return image2_indices
-        else:
-            return image1_indices
+        return _prune_with_hungarian(
+            indices1=image1_indices,
+            indices2=image2_indices,
+            centroids1=image1_centroids,
+            centroids2=image2_centroids,
+            prune_rows=prune_rows,
+        )
 
     for extent in image_extent_polys:
         # Find all intersecting images.
