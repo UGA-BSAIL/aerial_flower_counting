@@ -28,7 +28,7 @@ from ..common import (
     GroundTruthColumns,
     batch_iter,
     FloweringTimeColumns,
-    FloweringSlopeColumns
+    FloweringSlopeColumns,
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -91,6 +91,47 @@ class GenotypeColumns(enum.Enum):
     PLOT = "PLOT"
     """
     Plot that this genotype is planted in.
+    """
+
+
+@enum.unique
+class Outlier(enum.IntEnum):
+    """
+    Represents different types of outliers.
+    """
+
+    INLIER = 0
+    """
+    Not an outlier.
+    """
+    MILD = 1
+    """
+    A mild outlier.
+    """
+    EXTREME = 2
+    """
+    An extreme outlier.
+    """
+
+
+@enum.unique
+class OutlierColumns(enum.Enum):
+    """
+    Names of columns for the outlier info DF.
+    """
+
+    TYPE = "outlier_type"
+    """
+    The type of outlier See the `Outlier` enum for the possible values.
+    """
+
+    START = "start_outlier"
+    END = "end_outlier"
+    DURATION = "duration_outlier"
+    PEAK = "peak_outlier"
+    SLOPE = "slope_outlier"
+    """
+    Outlier types for specific metrics.
     """
 
 
@@ -1188,6 +1229,111 @@ def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
     return cleaned
 
 
+def _find_outlier_genotypes(
+    dataset: pd.DataFrame, *, metric_column: str
+) -> pd.Series:
+    """
+    Finds genotypes that are clear outliers in some particular metric.
+
+    Args:
+        dataset: The data for the metric to check.
+        metric_column: The name of the column containing the metric to analyze.
+
+    Returns:
+        A `Series` containing outlier information.
+
+    """
+    # Find the IQR.
+    metric = dataset[metric_column]
+    lower_quartile = metric.quantile(0.25)
+    upper_quartile = metric.quantile(0.75)
+    iqr = upper_quartile - lower_quartile
+
+    lower_inner_fence = lower_quartile - 1.5 * iqr
+    upper_inner_fence = upper_quartile + 1.5 * iqr
+    lower_outer_fence = lower_quartile - 3 * iqr
+    upper_outer_fence = upper_quartile + 3 * iqr
+
+    # Find outliers.
+    is_outlier = np.array([Outlier.INLIER.value for _ in range(len(metric))])
+    is_outlier[
+        np.logical_or(metric < lower_inner_fence, metric > upper_inner_fence)
+    ] = Outlier.MILD.value
+    is_outlier[
+        np.logical_or(metric < lower_outer_fence, metric > upper_outer_fence)
+    ] = Outlier.EXTREME.value
+
+    # Build the dataframe.
+    return pd.Series(index=metric.index, data=is_outlier)
+
+
+def find_all_outliers(
+    *,
+    start: pd.DataFrame,
+    end: pd.DataFrame,
+    duration: pd.DataFrame,
+    peak: pd.DataFrame,
+    slope: pd.DataFrame,
+    genotypes: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Finds the outliers for all computed metrics.
+
+    Args:
+        start: The flowering start dates.
+        end: The flowering end dates.
+        duration: The flowering durations.
+        peak: The flowering peaks.
+        slope: The flowering slopes.
+        genotypes: The associated genotype information.
+
+    Returns:
+        A single DataFrame containing outlier information for all metrics.
+
+    """
+    # Merge genotype info.
+    start = _merge_genotype_info(flower_data=start, genotypes=genotypes)
+    end = _merge_genotype_info(flower_data=end, genotypes=genotypes)
+    duration = _merge_genotype_info(flower_data=duration, genotypes=genotypes)
+    peak = _merge_genotype_info(flower_data=peak, genotypes=genotypes)
+    slope = _merge_genotype_info(flower_data=slope, genotypes=genotypes)
+
+    start_outliers = _find_outlier_genotypes(
+        start, metric_column=CountingColumns.DAP.value
+    )
+    end_outliers = _find_outlier_genotypes(
+        end, metric_column=CountingColumns.DAP.value
+    )
+    duration_outliers = _find_outlier_genotypes(
+        duration, metric_column=FloweringTimeColumns.DURATION.value
+    )
+    peak_outliers = _find_outlier_genotypes(
+        peak, metric_column=CountingColumns.DAP.value
+    )
+    slope_outliers = _find_outlier_genotypes(
+        slope, metric_column=FloweringSlopeColumns.SLOPE.value
+    )
+
+    # Create the output DataFrame.
+    return pd.concat(
+        [
+            start_outliers,
+            end_outliers,
+            duration_outliers,
+            peak_outliers,
+            slope_outliers,
+        ],
+        axis=1,
+        keys=[
+            OutlierColumns.START.value,
+            OutlierColumns.END.value,
+            OutlierColumns.DURATION.value,
+            OutlierColumns.PEAK.value,
+            OutlierColumns.SLOPE.value,
+        ],
+    )
+
+
 def plot_ground_truth_vs_predicted(
     counts_with_gt: pd.DataFrame,
 ) -> plot.Figure:
@@ -1345,7 +1491,7 @@ def plot_flowering_end_dist(
 
 
 def plot_flowering_duration_dist(
-        *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the flowering start times.
@@ -1375,7 +1521,7 @@ def plot_flowering_duration_dist(
 
 
 def plot_flowering_slope_dist(
-        *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the slopes of the initial flowering ramp-up for each
@@ -1405,7 +1551,7 @@ def plot_flowering_slope_dist(
 
 
 def plot_mean_flowering_curve(
-        *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
 ) -> plot.Figure:
     """
     Creates mean flowering curves for each population.
