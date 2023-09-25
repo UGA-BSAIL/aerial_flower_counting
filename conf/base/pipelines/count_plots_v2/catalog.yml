@@ -63,7 +63,16 @@ plot_gt_sample_locations_bottom_sep:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/01_raw/plot_boundaries/bottom/2023-09-01_plot_sampling_locations_bottom.shp
 
-  # Datasets containing the ground-truth.
+# Dataset containing the genotype information.
+genotype_spreadsheet_2023:
+  type: pandas.ExcelDataSet
+  filepath: "data/01_raw/2023 PT Field.xlsx"
+  versioned: False
+  load_args:
+    engine: openpyxl
+    sheet_name: "Listing"
+
+# Datasets containing the ground-truth.
 _gt_params: &gt_params
   type: pandas.ExcelDataSet
   filepath: data/01_raw/2023_ground_truth_counts.xlsx

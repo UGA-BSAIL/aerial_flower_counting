@@ -203,36 +203,6 @@ human_readable_heights:
   filepath: data/08_reporting/plot_heights.xlsx
   versioned: True
 
-# Histogram of the peak flowering times.
-peak_flowering_histogram:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/peak_flowering_histogram.png
-  versioned: True
-
-# Histogram of flowering start times.
-flowering_start_histogram:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/flowering_start_histogram.png
-  versioned: True
-
-# Histogram of flowering end times.
-flowering_end_histogram:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/flowering_end_histogram.png
-  versioned: True
-
-# Histogram of flowering durations.
-flowering_duration_histogram:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/flowering_duration_histogram.png
-  versioned: True
-
-# Histogram of flowering slopes.
-flowering_slope_histogram:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/flowering_slope_histogram.png
-  versioned: True
-
 # Histogram of final plot heights.
 plot_height_histogram:
   type: matplotlib.MatplotlibWriter
@@ -288,12 +258,6 @@ flowering_curves:
   dataset:
     type: matplotlib.MatplotlibWriter
   filename_suffix: .png
-
-# Mean flowering curve for each population.
-mean_flowering_curve:
-  type: matplotlib.MatplotlibWriter
-  filepath: data/08_reporting/mean_flowering_curve.png
-  versioned: True
 
 # Plot of the regression with the ground-truth heights.
 height_ground_truth_regression_plot:

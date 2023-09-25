@@ -28,3 +28,39 @@ ground_truth_regression_plot:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/ground_truth_regression.png
   versioned: True
+
+# Histogram of the peak flowering times.
+peak_flowering_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/peak_flowering_histogram.png
+  versioned: True
+
+# Histogram of flowering start times.
+flowering_start_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_start_histogram.png
+  versioned: True
+
+# Histogram of flowering end times.
+flowering_end_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_end_histogram.png
+  versioned: True
+
+# Histogram of flowering durations.
+flowering_duration_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_duration_histogram.png
+  versioned: True
+
+# Histogram of flowering slopes.
+flowering_slope_histogram:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_slope_histogram.png
+  versioned: True
+
+# Mean flowering curve for each population.
+mean_flowering_curve:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/mean_flowering_curve.png
+  versioned: True

@@ -27,6 +27,8 @@ from ..common import (
     DetectionColumns,
     GroundTruthColumns,
     batch_iter,
+    FloweringTimeColumns,
+    FloweringSlopeColumns
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -73,6 +75,22 @@ class ImageExtents(enum.Enum):
     Y2 = "y2"
     """
     The y-coordinate of the bottom right corner of the image.
+    """
+
+
+@enum.unique
+class GenotypeColumns(enum.Enum):
+    """
+    Names of the columns in the genotype table.
+    """
+
+    GENOTYPE = "TREATMENT"
+    """
+    Genotype identifier.
+    """
+    PLOT = "PLOT"
+    """
+    Plot that this genotype is planted in.
     """
 
 
@@ -1146,6 +1164,30 @@ def add_plot_index(
     return plot_data
 
 
+def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans up the genotype data that was loaded from the genotype spreadsheet.
+
+    Args:
+        raw_genotypes: The raw genotype information that was loaded.
+
+    Returns:
+        The cleaned genotype table.
+
+    """
+    # Remove extraneous columns.
+    needed_columns = {e.value for e in GenotypeColumns}
+    cleaned = raw_genotypes.drop(
+        columns=frozenset(raw_genotypes.columns) - needed_columns
+    )
+
+    # Index by plot number.
+    cleaned.set_index(GenotypeColumns.PLOT.value, inplace=True)
+    cleaned.sort_index(inplace=True)
+
+    return cleaned
+
+
 def plot_ground_truth_vs_predicted(
     counts_with_gt: pd.DataFrame,
 ) -> plot.Figure:
@@ -1172,5 +1214,223 @@ def plot_ground_truth_vs_predicted(
     )
     axes.set_titles("Predicted vs. Ground-Truth Counts")
     axes.set(xlabel="Ground-Truth", ylabel="Automatic")
+
+    return plot.gcf()
+
+
+def _merge_genotype_info(
+    *, flower_data: pd.DataFrame, genotypes: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Merges a dataframe indexed by plot with genotype information, filters out
+    the extraneous genotypes, and averages all the replicates.
+
+    Args:
+        flower_data: The flowering data, indexed by plot number.
+        genotypes: The dataframe containing genotype information.
+
+    Returns:
+        The merged data.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = pd.merge(
+        flower_data, genotypes, left_index=True, right_index=True
+    )
+
+    # Average the replicates for each genotype together.
+    group_columns = [
+        GenotypeColumns.GENOTYPE.value,
+    ]
+    if CountingColumns.DAP.value in combined_data.columns:
+        # Group by DAP too if the data are temporal.
+        group_columns.append(CountingColumns.DAP.value)
+    return combined_data.groupby(
+        group_columns,
+        as_index=False,
+    ).agg("mean")
+
+
+def _plot_flowering_time_histogram(
+    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
+) -> plot.Figure:
+    """
+    Draws a histogram of some flowering attribute, predicated on DAP.
+
+    Args:
+        flower_data: The flowering data we want to plot. Should have one row
+            for each plot and have a DAP column.
+        genotypes: The dataframe containing genotype information.
+        title: The title to use for the plot.
+
+    Returns:
+        The plot that it made.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=flower_data, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=CountingColumns.DAP.value,
+        # Use one bin for each session.
+        bins=len(flower_data[CountingColumns.SESSION.value].unique()),
+    )
+    axes.set_title(title)
+    axes.set(xlabel="Days After Planting", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_peak_flowering_dist(
+    *, peak_flowering_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the peak flowering times.
+
+    Args:
+        peak_flowering_times: Dataset containing peak flowering times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+    )
+
+
+def plot_flowering_start_dist(
+    *, flowering_start_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering end times.
+
+    Args:
+        flowering_start_times: Dataset containing flowering start times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        flowering_start_times, **kwargs, title="Flowering Start Time"
+    )
+
+
+def plot_flowering_end_dist(
+    *, flowering_end_times: pd.DataFrame, **kwargs: Any
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering start times.
+
+    Args:
+        flowering_end_times: Dataset containing flowering start times for
+            each plot.
+        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
+
+    Returns:
+        The plot that it made.
+
+    """
+    return _plot_flowering_time_histogram(
+        flowering_end_times, **kwargs, title="Flowering End Time"
+    )
+
+
+def plot_flowering_duration_dist(
+        *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a histogram of the flowering start times.
+
+    Args:
+        flowering_durations: Dataset containing flowering durations for each
+            plot.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot that it made.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=flowering_durations, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=FloweringTimeColumns.DURATION.value,
+    )
+    axes.set_title("Flowering Duration")
+    axes.set(xlabel="Days", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_flowering_slope_dist(
+        *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Plots a histogram of the slopes of the initial flowering ramp-up for each
+    genotype.
+
+    Args:
+        flowering_slopes: The extracted flowering slope data.
+        genotypes: The dataframe containing genotype information.
+
+    Returns:
+        The plot that it created.
+
+    """
+    combined_data = _merge_genotype_info(
+        flower_data=flowering_slopes, genotypes=genotypes
+    )
+
+    # Plot it.
+    axes = sns.histplot(
+        data=combined_data,
+        x=FloweringSlopeColumns.SLOPE.value,
+    )
+    axes.set_title("Flowering Slope")
+    axes.set(xlabel="Slope (flowers/day)", ylabel="# of Genotypes")
+
+    return plot.gcf()
+
+
+def plot_mean_flowering_curve(
+        *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+) -> plot.Figure:
+    """
+    Creates mean flowering curves for each population.
+
+    Args:
+        cumulative_counts: The complete counting results, with cumulative
+            counts.
+        genotypes: The cleaned genotype information.
+
+    Returns:
+        The plot of the flowering curves.
+
+    """
+    # Merge flowering and genotype data together for easy plotting.
+    combined_data = _merge_genotype_info(
+        flower_data=cumulative_counts, genotypes=genotypes
+    )
+
+    # Plot the curve.
+    axes = sns.lineplot(
+        data=combined_data,
+        x=CountingColumns.DAP.value,
+        y=CountingColumns.COUNT.value,
+    )
+    axes.set_title("Average Flowering Curves")
+    axes.set(xlabel="Days After Planting", ylabel="Cumulative # of Flowers")
 
     return plot.gcf()

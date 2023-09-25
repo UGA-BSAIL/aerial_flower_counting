@@ -17,6 +17,11 @@ from ..common import (
     merge_ground_truth,
     choose_best_counts,
     plot_ground_truth_regression,
+    compute_cumulative_counts,
+    compute_flowering_ramps,
+    compute_flowering_peak,
+    compute_flowering_start_end,
+    compute_flowering_duration,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -32,26 +37,32 @@ from .nodes import (
     load_ground_truth,
     plot_ground_truth_vs_predicted,
     prune_duplicate_detections,
-    _detections_to_polygons,
+    plot_peak_flowering_dist,
+    plot_flowering_start_dist,
+    plot_flowering_end_dist,
+    clean_genotypes,
+    plot_flowering_duration_dist,
+    plot_flowering_slope_dist,
+    plot_mean_flowering_curve,
 )
 from .camera_utils import CameraConfig
 
 SESSIONS = {
-    # "2023-07-27",
-    # "2023-08-01",
-    # "2023-08-03",
-    # "2023-08-07",
-    # "2023-08-10",
-    # "2023-08-14",
+    "2023-07-27",
+    "2023-08-01",
+    "2023-08-03",
+    "2023-08-07",
+    "2023-08-10",
+    "2023-08-14",
     "2023-08-18",
-    # "2023-08-21",
-    # "2023-08-24",
-    # "2023-08-28",
-    # "2023-09-01",
-    # "2023-09-05",
-    # "2023-09-07",
-    # "2023-09-12",
-    # "2023-09-14",
+    "2023-08-21",
+    "2023-08-24",
+    "2023-08-28",
+    "2023-09-01",
+    "2023-09-05",
+    "2023-09-07",
+    "2023-09-12",
+    "2023-09-14",
 }
 """
 The set of all the sessions that we want to process.
@@ -198,6 +209,96 @@ def _create_analysis_pipeline() -> Pipeline:
     """
     return Pipeline(
         [
+            # Compute flowering metrics.
+            node(
+                compute_cumulative_counts,
+                "counting_results",
+                "cumulative_counts",
+            ),
+            node(
+                compute_flowering_peak, "counting_results", "flowering_peaks"
+            ),
+            node(
+                compute_flowering_start_end,
+                dict(
+                    counting_results="counting_results",
+                    start_threshold="params:flower_start_threshold",
+                    end_threshold="params:flower_end_threshold",
+                ),
+                ["flowering_starts", "flowering_ends"],
+            ),
+            node(
+                compute_flowering_duration,
+                dict(
+                    flowering_starts="flowering_starts",
+                    flowering_ends="flowering_ends",
+                ),
+                "flowering_durations",
+            ),
+            node(
+                compute_flowering_ramps,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    flowering_start_times="flowering_starts",
+                    cumulative_counts="cumulative_counts",
+                ),
+                "flowering_slopes",
+            ),
+            # Plot flowering metrics.
+            node(
+                clean_genotypes,
+                "genotype_spreadsheet_2023",
+                "cleaned_genotypes",
+                name="clean_genotypes",
+            ),
+            node(
+                plot_peak_flowering_dist,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    genotypes="cleaned_genotypes",
+                ),
+                "peak_flowering_histogram",
+            ),
+            node(
+                plot_flowering_start_dist,
+                dict(
+                    flowering_start_times="flowering_starts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_start_histogram",
+            ),
+            node(
+                plot_flowering_end_dist,
+                dict(
+                    flowering_end_times="flowering_ends",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_end_histogram",
+            ),
+            node(
+                plot_flowering_duration_dist,
+                dict(
+                    flowering_durations="flowering_durations",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_duration_histogram",
+            ),
+            node(
+                plot_flowering_slope_dist,
+                dict(
+                    flowering_slopes="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_slope_histogram",
+            ),
+            node(
+                plot_mean_flowering_curve,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "mean_flowering_curve",
+            ),
             # Plot the ground truth regression.
             node(
                 merge_ground_truth,
@@ -228,17 +329,17 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    pipeline += _create_image_extents_pipeline()
+    # pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    for session in SESSIONS:
-        (
-            session_detection_pipeline,
-            output_node,
-        ) = _create_session_detection_pipeline(session)
-        pipeline += session_detection_pipeline
-        session_detection_nodes.append(output_node)
+    # for session in SESSIONS:
+    #     (
+    #         session_detection_pipeline,
+    #         output_node,
+    #     ) = _create_session_detection_pipeline(session)
+    #     pipeline += session_detection_pipeline
+    #     session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
@@ -251,11 +352,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 f"camera_config",
             ),
             # Combine the session detections into a single table.
-            node(
-                collect_session_results,
-                session_detection_nodes,
-                "detection_results",
-            ),
+            # node(
+            #     collect_session_results,
+            #     session_detection_nodes,
+            #     "detection_results",
+            # ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,

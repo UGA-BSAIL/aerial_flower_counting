@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
-import statsmodels.formula.api as sm
 import torch.cuda
 from loguru import logger
 from matplotlib import pyplot as plot
@@ -26,7 +25,7 @@ from ..common import (
     CountingColumns,
     DetectionColumns,
     GroundTruthColumns,
-    batch_iter,
+    batch_iter, FloweringSlopeColumns, FloweringTimeColumns,
 )
 from .visualization import draw_detections
 
@@ -112,34 +111,6 @@ class HeightColumns(enum.Enum):
     HEIGHT = "height"
     """
     The computed height value for this plot.
-    """
-
-
-@enum.unique
-class FloweringSlopeColumns(enum.Enum):
-    """
-    Names of the columns in the flowering slope dataframe.
-    """
-
-    SLOPE = "slope"
-    """
-    The slope of the line fitted to the flowering curve.
-    """
-    INTERCEPT = "intercept"
-    """
-    The intercept of the line fitted to the flowering curve.
-    """
-
-
-@enum.unique
-class FloweringTimeColumns(enum.Enum):
-    """
-    Names of the columns in the flowering time dataframe.
-    """
-
-    DURATION = "duration"
-    """
-    The total flowering duration, in days.
     """
 
 
@@ -753,194 +724,6 @@ def merge_height_ground_truth(
     return pd.merge(
         plot_heights, ground_truth_heights, left_index=True, right_index=True
     )
-
-
-def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
-    """
-    Computes the peak flowering times for each plot.
-
-    Args:
-        counting_results: The complete counting results.
-
-    Returns:
-        A dataframe in the same format as the input, but containing only the
-        rows that represent the peak flower count for each plot.
-
-    """
-
-    def _find_peak(plot_counts: pd.DataFrame) -> pd.DataFrame:
-        plot_counts.sort_values(by=CountingColumns.DAP.value, inplace=True)
-        return plot_counts.iloc[
-            plot_counts[CountingColumns.COUNT.value].argmax()
-        ]
-
-    # Find the rows with the maximum count for each plot.
-    plot_groups = counting_results.groupby([counting_results.index])
-    return plot_groups.apply(_find_peak)
-
-
-def compute_flowering_start_end(
-    counting_results: pd.DataFrame,
-    *,
-    start_threshold: float,
-    end_threshold: float,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Computes the flowering window for each plot.
-
-    Args:
-        counting_results: The complete counting results.
-        start_threshold: The threshold at which to consider flowering started.
-        end_threshold: The threshold at which to consider flowering to be over.
-
-    Returns:
-        Two dataframes in the same format as the input, but containing only the
-        rows that represent the start and end of flowering for each plot,
-        respectively.
-
-    """
-    counting_results.sort_values(by=CountingColumns.DAP.value, inplace=True)
-
-    def _get_flowering_start(plot_counts: pd.DataFrame) -> pd.DataFrame:
-        # Find the total number of flowers for this plot.
-        cumulative_counts = plot_counts[CountingColumns.COUNT.value].cumsum()
-        total_flowers = cumulative_counts.max()
-        # Find the thresholds.
-        start_flowers = total_flowers * start_threshold
-
-        # Filter to the correct row.
-        up_to_start = plot_counts[cumulative_counts <= start_flowers]
-        if up_to_start.empty:
-            # Edge case: start is as the beginning then.
-            return plot_counts.iloc[0]
-        return up_to_start.iloc[
-            up_to_start[CountingColumns.DAP.value].argmax()
-        ]
-
-    def _get_flowering_end(plot_counts: pd.DataFrame) -> pd.DataFrame:
-        # Find the total number of flowers for this plot.
-        cumulative_counts = plot_counts[CountingColumns.COUNT.value].cumsum()
-        total_flowers = cumulative_counts.max()
-        # Find the thresholds.
-        end_flowers = total_flowers * end_threshold
-
-        # Filter to the correct row.
-        end_and_after = plot_counts[cumulative_counts >= end_flowers]
-        return end_and_after.iloc[
-            end_and_after[CountingColumns.DAP.value].argmin()
-        ]
-
-    # Find the rows for each plot that signify the start of counting.
-    plot_groups = counting_results.groupby([counting_results.index])
-    return (
-        plot_groups.parallel_apply(_get_flowering_start),
-        plot_groups.parallel_apply(_get_flowering_end),
-    )
-
-
-def compute_flowering_duration(
-    *, flowering_starts: pd.DataFrame, flowering_ends: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Computes the total flowering duration.
-
-    Args:
-        flowering_starts: The flowering start times.
-        flowering_ends: The flowering end times.
-
-    Returns:
-        Dataframe containing the flowering durations.
-
-    """
-    flowering_starts.sort_index(inplace=True)
-    flowering_ends.sort_index(inplace=True)
-
-    durations = (
-        flowering_ends[CountingColumns.DAP.value]
-        - flowering_starts[CountingColumns.DAP.value]
-    )
-    return pd.DataFrame(data={FloweringTimeColumns.DURATION.value: durations})
-
-
-def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
-    """
-    Computes cumulative flower counts for each plot.
-
-    Args:
-        counting_results: The complete counting results.
-
-    Returns:
-        The same counting results, but the "count" column is now cumulative.
-
-    """
-
-    def _count_cumulative(plot_counts: pd.DataFrame) -> pd.DataFrame:
-        # Sort by DAP.
-        plot_counts.sort_values(by=[CountingColumns.DAP.value], inplace=True)
-        # Calculate cumulative counts.
-        plot_counts[CountingColumns.COUNT.value] = plot_counts[
-            CountingColumns.COUNT.value
-        ].cumsum()
-
-        return plot_counts
-
-    plot_groups = counting_results.groupby(
-        [counting_results.index], group_keys=False
-    )
-    return plot_groups.parallel_apply(_count_cumulative)
-
-
-def compute_flowering_ramps(
-    *,
-    peak_flowering_times: pd.DataFrame,
-    flowering_start_times: pd.DataFrame,
-    cumulative_counts: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Computes the slope of the initial ramp in flowering.
-
-    Args:
-        peak_flowering_times: The peak flowering time data.
-        flowering_start_times: The flowering start time data.
-        cumulative_counts: The complete counting results, with cumulative
-            counts.
-
-    Returns:
-        A `DataFrame` indexed by plot with flowering ramp information.
-
-    """
-
-    def _fit_line_for_plot(plot_counts: pd.DataFrame) -> pd.Series:
-        # All plots should be the same in this DF.
-        plot_num = plot_counts.index[0]
-        # Filter the counting results to only those between the flowering
-        # start and end.
-        start_dap = flowering_start_times.loc[plot_num][
-            CountingColumns.DAP.value
-        ]
-        peak_dap = peak_flowering_times.loc[plot_num][
-            CountingColumns.DAP.value
-        ]
-        plot_daps = plot_counts[CountingColumns.DAP.value]
-        plot_counts_ramp = plot_counts[
-            (plot_daps >= start_dap) & (plot_daps <= peak_dap)
-        ]
-
-        # Fit a line to the resulting counts.
-        model = sm.ols(
-            f"{CountingColumns.COUNT.value} ~ {CountingColumns.DAP.value}",
-            data=plot_counts_ramp,
-        ).fit()
-
-        return pd.Series(
-            {
-                FloweringSlopeColumns.SLOPE.value: model.params[1],
-                FloweringSlopeColumns.INTERCEPT.value: model.params[0],
-            },
-        )
-
-    plot_groups = cumulative_counts.groupby([cumulative_counts.index])
-    return plot_groups.parallel_apply(_fit_line_for_plot)
 
 
 def compute_flower_sizes(
