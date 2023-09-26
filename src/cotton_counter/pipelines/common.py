@@ -3,6 +3,7 @@ Common functionality between the two versions of the pipeline.
 """
 import enum
 from datetime import date
+from functools import partial
 from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
@@ -37,6 +38,47 @@ class FloweringTimeColumns(enum.Enum):
     DURATION = "duration"
     """
     The total flowering duration, in days.
+    """
+
+
+@enum.unique
+class OutlierColumns(enum.Enum):
+    """
+    Names of columns for the outlier info DF.
+    """
+
+    TYPE = "outlier_type"
+    """
+    The type of outlier See the `Outlier` enum for the possible values.
+    """
+
+    START = "start_outlier"
+    END = "end_outlier"
+    DURATION = "duration_outlier"
+    PEAK = "peak_outlier"
+    SLOPE = "slope_outlier"
+    """
+    Outlier types for specific metrics.
+    """
+
+
+@enum.unique
+class GenotypeColumns(enum.Enum):
+    """
+    Names of the columns in the genotype table.
+    """
+
+    GENOTYPE = "Genotype"
+    """
+    Genotype identifier.
+    """
+    PLOT = "2021 IDENTIFIER #"
+    """
+    Plot that this genotype is planted in.
+    """
+    POPULATION = "Population"
+    """
+    Genotype population.
     """
 
 
@@ -448,7 +490,7 @@ def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
         ]
 
     # Find the rows with the maximum count for each plot.
-    plot_groups = counting_results.groupby([counting_results.index])
+    plot_groups = counting_results.groupby(counting_results.index)
     return plot_groups.apply(_find_peak)
 
 
@@ -505,10 +547,16 @@ def compute_flowering_start_end(
 
     # Find the rows for each plot that signify the start of counting.
     plot_groups = counting_results.groupby([counting_results.index])
-    return (
-        plot_groups.parallel_apply(_get_flowering_start),
-        plot_groups.parallel_apply(_get_flowering_end),
-    )
+    if len(counting_results) > 1:
+        return (
+            plot_groups.parallel_apply(_get_flowering_start),
+            plot_groups.parallel_apply(_get_flowering_end),
+        )
+    else:
+        return (
+            plot_groups.apply(_get_flowering_start),
+            plot_groups.apply(_get_flowering_end),
+        )
 
 
 def compute_flowering_duration(
@@ -558,9 +606,13 @@ def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
         return plot_counts
 
     plot_groups = counting_results.groupby(
-        [counting_results.index], group_keys=False
+        counting_results.index, group_keys=False
     )
-    return plot_groups.parallel_apply(_count_cumulative)
+    if len(counting_results) > 1:
+        return plot_groups.parallel_apply(_count_cumulative)
+    else:
+        # Work around a bug in Pandarallel.
+        return plot_groups.apply(_count_cumulative)
 
 
 def compute_flowering_ramps(
@@ -613,4 +665,84 @@ def compute_flowering_ramps(
         )
 
     plot_groups = cumulative_counts.groupby([cumulative_counts.index])
-    return plot_groups.parallel_apply(_fit_line_for_plot)
+    if len(cumulative_counts) > 1:
+        return plot_groups.parallel_apply(_fit_line_for_plot)
+    else:
+        return plot_groups.apply(_fit_line_for_plot)
+
+
+def create_metric_table(
+    *,
+    peak_flowering_times: pd.DataFrame,
+    flowering_starts: pd.DataFrame,
+    flowering_ends: pd.DataFrame,
+    flowering_durations: pd.DataFrame,
+    flowering_slopes: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    outliers: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """
+    Combines all the per-plot metrics into a single, human-readable table.
+
+    Args:
+        peak_flowering_times: The peak flowering times.
+        flowering_starts: The flowering start times.
+        flowering_ends: The flowering end times.
+        flowering_durations: The flowering durations.
+        flowering_slopes: The flowering slopes.
+        genotypes: The genotype information.
+        outliers: Optional outlier information, which will also be included
+            if present.
+
+    Returns:
+        The combined table with all metrics.
+
+    """
+    # Everything should have the same index, so merge it all together.
+    merge = partial(pd.merge, left_index=True, right_index=True)
+    peak_and_start = merge(
+        peak_flowering_times, flowering_starts, suffixes=("_peak", "_start")
+    )
+    end_and_duration = merge(flowering_ends, flowering_durations)
+    slope_and_genotype = merge(flowering_slopes, genotypes)
+    combined = merge(peak_and_start, end_and_duration)
+    combined = merge(combined, slope_and_genotype)
+
+    # Average across genotypes.
+    combined = combined.groupby(
+        GenotypeColumns.GENOTYPE.value, as_index=False
+    ).mean()
+    combined.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
+
+    if outliers is not None:
+        combined = merge(combined, outliers)
+
+    # Convert to human-readable names.
+    combined.rename(
+        columns={
+            f"{CountingColumns.SESSION.value}_peak": "Peak Session",
+            f"{CountingColumns.DAP.value}_peak": "Peak DAP",
+            f"{CountingColumns.COUNT.value}_peak": "Peak Count",
+            f"{CountingColumns.SESSION.value}_start": "Start Session",
+            f"{CountingColumns.DAP.value}_start": "Start DAP",
+            f"{CountingColumns.COUNT.value}_start": "Start Count",
+            CountingColumns.SESSION.value: "End Session",
+            CountingColumns.DAP.value: "End DAP",
+            CountingColumns.COUNT.value: "End Count",
+            FloweringTimeColumns.DURATION.value: "Duration (days)",
+            FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
+            FloweringSlopeColumns.INTERCEPT.value: "Intercept",
+            GenotypeColumns.GENOTYPE.value: "Genotype",
+            GenotypeColumns.POPULATION.value: "Population",
+            OutlierColumns.START.value: "Start Outlier",
+            OutlierColumns.END.value: "End Outlier",
+            OutlierColumns.DURATION.value: "Duration Outlier",
+            OutlierColumns.PEAK.value: "Peak Outlier",
+            OutlierColumns.SLOPE.value: "Slope Outlier",
+        },
+        inplace=True,
+    )
+    # Turn the index into a column so it shows up in the spreadsheet.
+    combined.insert(0, "Genotype", combined.index.values)
+
+    return combined

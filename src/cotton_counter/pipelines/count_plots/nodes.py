@@ -25,7 +25,7 @@ from ..common import (
     CountingColumns,
     DetectionColumns,
     GroundTruthColumns,
-    batch_iter, FloweringSlopeColumns, FloweringTimeColumns,
+    batch_iter, FloweringSlopeColumns, FloweringTimeColumns, GenotypeColumns,
 )
 from .visualization import draw_detections
 
@@ -71,26 +71,6 @@ class HeightGtColumns(enum.Enum):
     MAX_HEIGHT = "mean_height"
     """
     The max height of the plants.
-    """
-
-
-@enum.unique
-class GenotypeColumns(enum.Enum):
-    """
-    Names of the columns in the genotype table.
-    """
-
-    GENOTYPE = "Genotype"
-    """
-    Genotype identifier.
-    """
-    PLOT = "2021 IDENTIFIER #"
-    """
-    Plot that this genotype is planted in.
-    """
-    POPULATION = "Population"
-    """
-    Genotype population.
     """
 
 
@@ -504,66 +484,6 @@ def create_height_table(plot_heights: pd.DataFrame) -> pd.DataFrame:
     plot_heights.insert(0, "Plot", plot_heights.index.values)
 
     return plot_heights
-
-
-def create_metric_table(
-    *,
-    peak_flowering_times: pd.DataFrame,
-    flowering_starts: pd.DataFrame,
-    flowering_ends: pd.DataFrame,
-    flowering_durations: pd.DataFrame,
-    flowering_slopes: pd.DataFrame,
-    genotypes: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Combines all the per-plot metrics into a single, human-readable table.
-
-    Args:
-        peak_flowering_times: The peak flowering times.
-        flowering_starts: The flowering start times.
-        flowering_ends: The flowering end times.
-        flowering_durations: The flowering durations.
-        flowering_slopes: The flowering slopes.
-        genotypes: The genotype information.
-
-    Returns:
-        The combined table with all metrics.
-
-    """
-    # Everything should have the same index, so merge it all together.
-    merge = partial(pd.merge, left_index=True, right_index=True)
-    peak_and_start = merge(
-        peak_flowering_times, flowering_starts, suffixes=("_peak", "_start")
-    )
-    end_and_duration = merge(flowering_ends, flowering_durations)
-    slope_and_genotype = merge(flowering_slopes, genotypes)
-    combined = merge(peak_and_start, end_and_duration)
-    combined = merge(combined, slope_and_genotype)
-
-    # Convert to human-readable names.
-    combined.rename(
-        columns={
-            f"{CountingColumns.SESSION.value}_peak": "Peak Session",
-            f"{CountingColumns.DAP.value}_peak": "Peak DAP",
-            f"{CountingColumns.COUNT.value}_peak": "Peak Count",
-            f"{CountingColumns.SESSION.value}_start": "Start Session",
-            f"{CountingColumns.DAP.value}_start": "Start DAP",
-            f"{CountingColumns.COUNT.value}_start": "Start Count",
-            CountingColumns.SESSION.value: "End Session",
-            CountingColumns.DAP.value: "End DAP",
-            CountingColumns.COUNT.value: "End Count",
-            FloweringTimeColumns.DURATION.value: "Duration (days)",
-            FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
-            FloweringSlopeColumns.INTERCEPT.value: "Intercept",
-            GenotypeColumns.GENOTYPE.value: "Genotype",
-            GenotypeColumns.POPULATION.value: "Population",
-        },
-        inplace=True,
-    )
-    # Turn the index into a column so it shows up in the spreadsheet.
-    combined.insert(0, "Plot", combined.index.values)
-
-    return combined
 
 
 def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:

@@ -3,7 +3,7 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import partial, reduce, cache
+from functools import partial, reduce
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
@@ -29,6 +29,8 @@ from ..common import (
     batch_iter,
     FloweringTimeColumns,
     FloweringSlopeColumns,
+    OutlierColumns,
+    GenotypeColumns,
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -79,7 +81,7 @@ class ImageExtents(enum.Enum):
 
 
 @enum.unique
-class GenotypeColumns(enum.Enum):
+class RawGenotypeColumns(enum.Enum):
     """
     Names of the columns in the genotype table.
     """
@@ -111,27 +113,6 @@ class Outlier(enum.IntEnum):
     EXTREME = 2
     """
     An extreme outlier.
-    """
-
-
-@enum.unique
-class OutlierColumns(enum.Enum):
-    """
-    Names of columns for the outlier info DF.
-    """
-
-    TYPE = "outlier_type"
-    """
-    The type of outlier See the `Outlier` enum for the possible values.
-    """
-
-    START = "start_outlier"
-    END = "end_outlier"
-    DURATION = "duration_outlier"
-    PEAK = "peak_outlier"
-    SLOPE = "slope_outlier"
-    """
-    Outlier types for specific metrics.
     """
 
 
@@ -280,6 +261,7 @@ def find_image_extents(
     width_px, height_px = image().size
 
     shapes = []
+    used_image_ids = []
     transformer = CameraTransformer(dem_dataset)
     for image_id in images:
         # Project from the image corners into UTM.
@@ -306,13 +288,14 @@ def find_image_extents(
             logger.warning("Extent for {} is invalid, skipping.", image_id)
             continue
         shapes.append(extent)
+        used_image_ids.append(image_id)
 
     return [
         Feature(
             geometry=Geometry.from_dict(mapping(s)),
             properties=Properties(image_id=i, session=session_name),
         )
-        for i, s in zip(images, shapes)
+        for i, s in zip(used_image_ids, shapes)
     ]
 
 
@@ -511,6 +494,10 @@ def _prune_with_hungarian(
         The indices of the detections that should be removed.
 
     """
+    # The edge case is where we have no detections.
+    if len(centroids1) == 0 or len(centroids2) == 0:
+        return set()
+
     # Construct the cost matrix based on the centroid distances.
     centroids1 = np.array([centroids1]).transpose(1, 0, 2)
     centroids2 = np.array([centroids2])
@@ -1217,14 +1204,22 @@ def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
 
     """
     # Remove extraneous columns.
-    needed_columns = {e.value for e in GenotypeColumns}
+    needed_columns = {e.value for e in RawGenotypeColumns}
     cleaned = raw_genotypes.drop(
         columns=frozenset(raw_genotypes.columns) - needed_columns
     )
 
     # Index by plot number.
-    cleaned.set_index(GenotypeColumns.PLOT.value, inplace=True)
+    cleaned.set_index(RawGenotypeColumns.PLOT.value, inplace=True)
     cleaned.sort_index(inplace=True)
+
+    # Standardize the column names.
+    cleaned.rename(
+        columns={
+            RawGenotypeColumns.GENOTYPE.value: GenotypeColumns.GENOTYPE.value,
+        },
+        inplace=True,
+    )
 
     return cleaned
 
@@ -1264,7 +1259,9 @@ def _find_outlier_genotypes(
     ] = Outlier.EXTREME.value
 
     # Build the dataframe.
-    return pd.Series(index=metric.index, data=is_outlier)
+    return pd.Series(
+        index=dataset[GenotypeColumns.GENOTYPE.value], data=is_outlier
+    )
 
 
 def find_all_outliers(
@@ -1365,7 +1362,11 @@ def plot_ground_truth_vs_predicted(
 
 
 def _merge_genotype_info(
-    *, flower_data: pd.DataFrame, genotypes: pd.DataFrame
+    *,
+    flower_data: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    outliers: pd.DataFrame | None = None,
+    group_on_dap: bool = False,
 ) -> pd.DataFrame:
     """
     Merges a dataframe indexed by plot with genotype information, filters out
@@ -1374,6 +1375,9 @@ def _merge_genotype_info(
     Args:
         flower_data: The flowering data, indexed by plot number.
         genotypes: The dataframe containing genotype information.
+        outliers: The outlier data. If provided, it will merge this too.
+        group_on_dap: If true, will also group by DAP, instead of averaging
+            DAPs.
 
     Returns:
         The merged data.
@@ -1388,17 +1392,29 @@ def _merge_genotype_info(
     group_columns = [
         GenotypeColumns.GENOTYPE.value,
     ]
-    if CountingColumns.DAP.value in combined_data.columns:
+    if group_on_dap:
         # Group by DAP too if the data are temporal.
         group_columns.append(CountingColumns.DAP.value)
-    return combined_data.groupby(
+    combined_data = combined_data.groupby(
         group_columns,
         as_index=False,
     ).agg("mean")
 
+    if outliers is not None:
+        combined_data.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
+        combined_data = pd.merge(
+            combined_data, outliers, left_index=True, right_index=True
+        )
+    return combined_data
+
 
 def _plot_flowering_time_histogram(
-    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
+    flower_data: pd.DataFrame,
+    *,
+    genotypes: pd.DataFrame,
+    outliers: pd.DataFrame,
+    outlier_col: OutlierColumns,
+    title: str,
 ) -> plot.Figure:
     """
     Draws a histogram of some flowering attribute, predicated on DAP.
@@ -1407,6 +1423,8 @@ def _plot_flowering_time_histogram(
         flower_data: The flowering data we want to plot. Should have one row
             for each plot and have a DAP column.
         genotypes: The dataframe containing genotype information.
+        outliers: The outlier data.
+        outlier_col: The outlier column to use for hue.
         title: The title to use for the plot.
 
     Returns:
@@ -1414,15 +1432,17 @@ def _plot_flowering_time_histogram(
 
     """
     combined_data = _merge_genotype_info(
-        flower_data=flower_data, genotypes=genotypes
+        flower_data=flower_data, genotypes=genotypes, outliers=outliers
     )
 
     # Plot it.
     axes = sns.histplot(
         data=combined_data,
         x=CountingColumns.DAP.value,
+        hue=outlier_col.value,
         # Use one bin for each session.
         bins=len(flower_data[CountingColumns.SESSION.value].unique()),
+        multiple="stack",
     )
     axes.set_title(title)
     axes.set(xlabel="Days After Planting", ylabel="# of Genotypes")
@@ -1446,7 +1466,10 @@ def plot_peak_flowering_dist(
 
     """
     return _plot_flowering_time_histogram(
-        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+        peak_flowering_times,
+        **kwargs,
+        title="Peak Flowering Time",
+        outlier_col=OutlierColumns.PEAK,
     )
 
 
@@ -1466,7 +1489,10 @@ def plot_flowering_start_dist(
 
     """
     return _plot_flowering_time_histogram(
-        flowering_start_times, **kwargs, title="Flowering Start Time"
+        flowering_start_times,
+        **kwargs,
+        title="Flowering Start Time",
+        outlier_col=OutlierColumns.START,
     )
 
 
@@ -1486,12 +1512,18 @@ def plot_flowering_end_dist(
 
     """
     return _plot_flowering_time_histogram(
-        flowering_end_times, **kwargs, title="Flowering End Time"
+        flowering_end_times,
+        **kwargs,
+        title="Flowering End Time",
+        outlier_col=OutlierColumns.END,
     )
 
 
 def plot_flowering_duration_dist(
-    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+    *,
+    flowering_durations: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    outliers: pd.DataFrame,
 ) -> plot.Figure:
     """
     Plots a histogram of the flowering start times.
@@ -1500,19 +1532,22 @@ def plot_flowering_duration_dist(
         flowering_durations: Dataset containing flowering durations for each
             plot.
         genotypes: The cleaned genotype information.
+        outliers: The outlier data.
 
     Returns:
         The plot that it made.
 
     """
     combined_data = _merge_genotype_info(
-        flower_data=flowering_durations, genotypes=genotypes
+        flower_data=flowering_durations, genotypes=genotypes, outliers=outliers
     )
 
     # Plot it.
     axes = sns.histplot(
         data=combined_data,
         x=FloweringTimeColumns.DURATION.value,
+        hue=OutlierColumns.DURATION.value,
+        multiple="stack",
     )
     axes.set_title("Flowering Duration")
     axes.set(xlabel="Days", ylabel="# of Genotypes")
@@ -1521,7 +1556,10 @@ def plot_flowering_duration_dist(
 
 
 def plot_flowering_slope_dist(
-    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+    *,
+    flowering_slopes: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    outliers: pd.DataFrame,
 ) -> plot.Figure:
     """
     Plots a histogram of the slopes of the initial flowering ramp-up for each
@@ -1530,19 +1568,22 @@ def plot_flowering_slope_dist(
     Args:
         flowering_slopes: The extracted flowering slope data.
         genotypes: The dataframe containing genotype information.
+        outliers: The outlier data.
 
     Returns:
         The plot that it created.
 
     """
     combined_data = _merge_genotype_info(
-        flower_data=flowering_slopes, genotypes=genotypes
+        flower_data=flowering_slopes, genotypes=genotypes, outliers=outliers
     )
 
     # Plot it.
     axes = sns.histplot(
         data=combined_data,
         x=FloweringSlopeColumns.SLOPE.value,
+        hue=OutlierColumns.SLOPE.value,
+        multiple="stack",
     )
     axes.set_title("Flowering Slope")
     axes.set(xlabel="Slope (flowers/day)", ylabel="# of Genotypes")
@@ -1567,7 +1608,7 @@ def plot_mean_flowering_curve(
     """
     # Merge flowering and genotype data together for easy plotting.
     combined_data = _merge_genotype_info(
-        flower_data=cumulative_counts, genotypes=genotypes
+        flower_data=cumulative_counts, genotypes=genotypes, group_on_dap=True
     )
 
     # Plot the curve.

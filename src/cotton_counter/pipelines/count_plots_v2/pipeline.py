@@ -22,6 +22,7 @@ from ..common import (
     compute_flowering_peak,
     compute_flowering_start_end,
     compute_flowering_duration,
+    create_metric_table,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -44,6 +45,7 @@ from .nodes import (
     plot_flowering_duration_dist,
     plot_flowering_slope_dist,
     plot_mean_flowering_curve,
+    find_all_outliers,
 )
 from .camera_utils import CameraConfig
 
@@ -63,6 +65,8 @@ SESSIONS = {
     "2023-09-07",
     "2023-09-12",
     "2023-09-14",
+    "2023-09-18",
+    "2023-09-21",
 }
 """
 The set of all the sessions that we want to process.
@@ -244,7 +248,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 ),
                 "flowering_slopes",
             ),
-            # Plot flowering metrics.
+            # Find outliers.
             node(
                 clean_genotypes,
                 "genotype_spreadsheet_2023",
@@ -252,10 +256,38 @@ def _create_analysis_pipeline() -> Pipeline:
                 name="clean_genotypes",
             ),
             node(
+                find_all_outliers,
+                dict(
+                    start="flowering_starts",
+                    end="flowering_ends",
+                    duration="flowering_durations",
+                    peak="flowering_peaks",
+                    slope="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "outliers",
+            ),
+            # Save the metric table.
+            node(
+                create_metric_table,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    flowering_starts="flowering_starts",
+                    flowering_ends="flowering_ends",
+                    flowering_durations="flowering_durations",
+                    flowering_slopes="flowering_slopes",
+                    outliers="outliers",
+                    genotypes="cleaned_genotypes",
+                ),
+                "human_readable_metrics",
+            ),
+            # Plot flowering metrics.
+            node(
                 plot_peak_flowering_dist,
                 dict(
                     peak_flowering_times="flowering_peaks",
                     genotypes="cleaned_genotypes",
+                    outliers="outliers",
                 ),
                 "peak_flowering_histogram",
             ),
@@ -264,6 +296,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     flowering_start_times="flowering_starts",
                     genotypes="cleaned_genotypes",
+                    outliers="outliers",
                 ),
                 "flowering_start_histogram",
             ),
@@ -272,6 +305,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     flowering_end_times="flowering_ends",
                     genotypes="cleaned_genotypes",
+                    outliers="outliers",
                 ),
                 "flowering_end_histogram",
             ),
@@ -280,6 +314,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     flowering_durations="flowering_durations",
                     genotypes="cleaned_genotypes",
+                    outliers="outliers",
                 ),
                 "flowering_duration_histogram",
             ),
@@ -288,6 +323,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     flowering_slopes="flowering_slopes",
                     genotypes="cleaned_genotypes",
+                    outliers="outliers",
                 ),
                 "flowering_slope_histogram",
             ),

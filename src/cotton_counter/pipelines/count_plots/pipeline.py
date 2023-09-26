@@ -18,7 +18,7 @@ from ..common import (
     merge_ground_truth,
     plot_ground_truth_regression, compute_flowering_peak,
     compute_flowering_start_end, compute_flowering_duration,
-    compute_cumulative_counts, compute_flowering_ramps,
+    compute_cumulative_counts, compute_flowering_ramps, create_metric_table,
 )
 from .nodes import (
     FieldConfig,
@@ -31,7 +31,6 @@ from .nodes import (
     compute_flower_sizes,
     compute_heights,
     create_height_table,
-    create_metric_table,
     create_per_plot_table,
     detect_flowers,
     draw_qualitative_results,

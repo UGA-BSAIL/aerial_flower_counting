@@ -17,6 +17,12 @@ counting_results_gt_sample:
   filepath: data/03_primary/counting_results_gt_sample.parquet
   versioned: True
 
+# Dataset containing per-plot metrics in a human-readable format.
+human_readable_metrics:
+  type: pandas.ExcelDataSet
+  filepath: data/08_reporting/plot_metrics.xlsx
+  versioned: True
+
 # Plot of ground-truth vs. predicted data.
 ground_truth_vs_predicted:
   type: matplotlib.MatplotlibWriter
