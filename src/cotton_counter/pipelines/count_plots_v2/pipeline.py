@@ -23,6 +23,14 @@ from ..common import (
     compute_flowering_start_end,
     compute_flowering_duration,
     create_metric_table,
+    plot_mean_flowering_curve,
+    plot_peak_flowering_dist,
+    plot_flowering_start_dist,
+    plot_flowering_end_dist,
+    plot_flowering_duration_dist,
+    plot_flowering_slope_dist, plot_peak_flowering_comparison,
+    plot_flowering_start_comparison, plot_flowering_end_comparison,
+    plot_flowering_duration_comparison, plot_flowering_slope_comparison,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -38,13 +46,7 @@ from .nodes import (
     load_ground_truth,
     plot_ground_truth_vs_predicted,
     prune_duplicate_detections,
-    plot_peak_flowering_dist,
-    plot_flowering_start_dist,
-    plot_flowering_end_dist,
     clean_genotypes,
-    plot_flowering_duration_dist,
-    plot_flowering_slope_dist,
-    plot_mean_flowering_curve,
     find_all_outliers,
 )
 from .camera_utils import CameraConfig
@@ -287,45 +289,80 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     peak_flowering_times="flowering_peaks",
                     genotypes="cleaned_genotypes",
-                    outliers="outliers",
                 ),
                 "peak_flowering_histogram",
+            ),
+            node(
+                plot_peak_flowering_comparison,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    genotypes="cleaned_genotypes",
+                ),
+                "peak_flowering_comparison",
             ),
             node(
                 plot_flowering_start_dist,
                 dict(
                     flowering_start_times="flowering_starts",
                     genotypes="cleaned_genotypes",
-                    outliers="outliers",
                 ),
                 "flowering_start_histogram",
+            ),
+            node(
+                plot_flowering_start_comparison,
+                dict(
+                    flowering_start_times="flowering_starts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_start_comparison",
             ),
             node(
                 plot_flowering_end_dist,
                 dict(
                     flowering_end_times="flowering_ends",
                     genotypes="cleaned_genotypes",
-                    outliers="outliers",
                 ),
                 "flowering_end_histogram",
+            ),
+            node(
+                plot_flowering_end_comparison,
+                dict(
+                    flowering_end_times="flowering_ends",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_end_comparison",
             ),
             node(
                 plot_flowering_duration_dist,
                 dict(
                     flowering_durations="flowering_durations",
                     genotypes="cleaned_genotypes",
-                    outliers="outliers",
                 ),
                 "flowering_duration_histogram",
+            ),
+            node(
+                plot_flowering_duration_comparison,
+                dict(
+                    flowering_durations="flowering_durations",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_duration_comparison",
             ),
             node(
                 plot_flowering_slope_dist,
                 dict(
                     flowering_slopes="flowering_slopes",
                     genotypes="cleaned_genotypes",
-                    outliers="outliers",
                 ),
                 "flowering_slope_histogram",
+            ),
+            node(
+                plot_flowering_slope_comparison,
+                dict(
+                    flowering_slopes="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_slope_comparison",
             ),
             node(
                 plot_mean_flowering_curve,
@@ -376,6 +413,7 @@ def create_pipeline(**kwargs) -> Pipeline:
     #     ) = _create_session_detection_pipeline(session)
     #     pipeline += session_detection_pipeline
     #     session_detection_nodes.append(output_node)
+    return pipeline + _create_analysis_pipeline()
 
     pipeline += Pipeline(
         [

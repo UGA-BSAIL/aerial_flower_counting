@@ -65,6 +65,36 @@ flowering_slope_histogram:
   filepath: data/08_reporting/flowering_slope_histogram.png
   versioned: True
 
+# Comparison of the peak flowering times for different populations.
+peak_flowering_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/peak_flowering_comparison.png
+  versioned: True
+
+# Comparison of flowering start times for different populations.
+flowering_start_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_start_comparison.png
+  versioned: True
+
+# Comparison of flowering end times for different populations.
+flowering_end_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_end_comparison.png
+  versioned: True
+
+# Comparison of flowering durations for different populations.
+flowering_duration_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_duration_comparison.png
+  versioned: True
+
+# Comparison of flowering slopes for different populations.
+flowering_slope_comparison:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/flowering_slope_comparison.png
+  versioned: True
+
 # Mean flowering curve for each population.
 mean_flowering_curve:
   type: matplotlib.MatplotlibWriter
