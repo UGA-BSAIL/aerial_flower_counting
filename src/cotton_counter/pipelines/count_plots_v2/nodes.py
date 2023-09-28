@@ -691,7 +691,11 @@ def _label_plots(
     # Assign real plot numbers to them.
     sessions = set(sessions)
     for i, boundary in enumerate(boundaries_sorted):
-        yield boundary, field_config.get_plot_num_row_major(i), sessions
+        plot_num = field_config.get_plot_num_row_major(i)
+        if plot_num < 0:
+            # This is an empty or invalid plot.
+            continue
+        yield boundary, plot_num, sessions
 
 
 def _label_plots_gt(

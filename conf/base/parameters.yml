@@ -5,7 +5,7 @@ model_weights_file: "yolov8m_flower_active_7.pt"
 prediction_batch_size: 16
 
 # Minimum confidence we allow for flower detections.
-min_confidence: 0.25
+min_confidence: 0.5
 
 # Whether to do a try run without running the detector.
 dry_run: false

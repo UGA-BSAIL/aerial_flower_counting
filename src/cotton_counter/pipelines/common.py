@@ -789,7 +789,8 @@ def merge_genotype_info(
 
     # Average the replicates for each genotype together.
     group_columns = [
-        GenotypeColumns.GENOTYPE.value, GenotypeColumns.POPULATION.value
+        GenotypeColumns.GENOTYPE.value,
+        GenotypeColumns.POPULATION.value,
     ]
     if group_on_dap:
         # Group by DAP too if the data are temporal.
@@ -899,8 +900,8 @@ def _plot_flowering_time_means(
 
     """
     # Merge flowering and genotype data together for easy plotting.
-    combined_data = pd.merge(
-        flower_data, genotypes, left_index=True, right_index=True
+    combined_data = merge_genotype_info(
+        flower_data=flower_data, genotypes=genotypes
     )
 
     # Plot it.
