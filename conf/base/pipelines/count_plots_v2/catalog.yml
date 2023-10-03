@@ -261,6 +261,10 @@ images_2023-09-21:
   path: ${corrected_image_dir}/2023-09-21
   << : *image_params
 
+images_2023-09-28:
+  path: ${corrected_image_dir}/2023-09-28
+  << : *image_params
+
   # Dataset containing the DEMs.
 dems:
   type: PartitionedDataSet

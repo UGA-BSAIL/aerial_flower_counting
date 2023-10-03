@@ -1129,7 +1129,6 @@ def plot_flowering_duration_dist(
     combined_data = merge_genotype_info(
         flower_data=flowering_durations,
         genotypes=genotypes,
-        filter_populations={"Pima", "Maxxa"},
     )
 
     # Plot it.

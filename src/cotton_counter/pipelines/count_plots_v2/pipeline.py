@@ -28,9 +28,12 @@ from ..common import (
     plot_flowering_start_dist,
     plot_flowering_end_dist,
     plot_flowering_duration_dist,
-    plot_flowering_slope_dist, plot_peak_flowering_comparison,
-    plot_flowering_start_comparison, plot_flowering_end_comparison,
-    plot_flowering_duration_comparison, plot_flowering_slope_comparison,
+    plot_flowering_slope_dist,
+    plot_peak_flowering_comparison,
+    plot_flowering_start_comparison,
+    plot_flowering_end_comparison,
+    plot_flowering_duration_comparison,
+    plot_flowering_slope_comparison,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -51,7 +54,7 @@ from .nodes import (
 )
 from .camera_utils import CameraConfig
 
-SESSIONS = {
+_ALL_SESSIONS = {
     "2023-07-27",
     "2023-08-01",
     "2023-08-03",
@@ -69,10 +72,16 @@ SESSIONS = {
     "2023-09-14",
     "2023-09-18",
     "2023-09-21",
+    "2023-09-28",
 }
 """
 The set of all the sessions that we want to process.
 """
+_GT_SESSIONS = _ALL_SESSIONS - {"2023-09-28"}
+"""
+The set of sessions that include ground-truth.
+"""
+SESSIONS = _ALL_SESSIONS
 
 
 def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
@@ -137,7 +146,7 @@ def _create_ground_truth_pipeline() -> Pipeline:
     """
     nodes = []
     session_node_names = []
-    for session in SESSIONS:
+    for session in _GT_SESSIONS:
         load_gt_session = partial(load_ground_truth, session_name=session)
         nodes.append(
             node(
