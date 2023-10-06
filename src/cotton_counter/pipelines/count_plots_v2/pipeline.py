@@ -33,7 +33,7 @@ from ..common import (
     plot_flowering_start_comparison,
     plot_flowering_end_comparison,
     plot_flowering_duration_comparison,
-    plot_flowering_slope_comparison,
+    plot_flowering_slope_comparison, _GT_SESSIONS, SESSIONS,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -53,35 +53,6 @@ from .nodes import (
     find_all_outliers,
 )
 from .camera_utils import CameraConfig
-
-_ALL_SESSIONS = {
-    "2023-07-27",
-    "2023-08-01",
-    "2023-08-03",
-    "2023-08-07",
-    "2023-08-10",
-    "2023-08-14",
-    "2023-08-18",
-    "2023-08-21",
-    "2023-08-24",
-    "2023-08-28",
-    "2023-09-01",
-    "2023-09-05",
-    "2023-09-07",
-    "2023-09-12",
-    "2023-09-14",
-    "2023-09-18",
-    "2023-09-21",
-    "2023-09-28",
-}
-"""
-The set of all the sessions that we want to process.
-"""
-_GT_SESSIONS = _ALL_SESSIONS - {"2023-09-28"}
-"""
-The set of sessions that include ground-truth.
-"""
-SESSIONS = _ALL_SESSIONS
 
 
 def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:

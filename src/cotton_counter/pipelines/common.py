@@ -13,6 +13,36 @@ from matplotlib import pyplot as plot
 from statsmodels.formula import api as sm
 
 
+_ALL_SESSIONS = {
+    "2023-07-27",
+    "2023-08-01",
+    "2023-08-03",
+    "2023-08-07",
+    "2023-08-10",
+    "2023-08-14",
+    "2023-08-18",
+    "2023-08-21",
+    "2023-08-24",
+    "2023-08-28",
+    "2023-09-01",
+    "2023-09-05",
+    "2023-09-07",
+    "2023-09-12",
+    "2023-09-14",
+    "2023-09-18",
+    "2023-09-21",
+    "2023-09-28",
+}
+"""
+The set of all the sessions that we want to process.
+"""
+_GT_SESSIONS = _ALL_SESSIONS - {"2023-09-28"}
+"""
+The set of sessions that include ground-truth.
+"""
+SESSIONS = _ALL_SESSIONS
+
+
 @enum.unique
 class FloweringSlopeColumns(enum.Enum):
     """

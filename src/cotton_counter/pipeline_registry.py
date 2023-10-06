@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from kedro.pipeline import Pipeline
 
-from .pipelines import count_plots, count_plots_v2
+from .pipelines import count_plots, count_plots_v2,  prepare_data
 
 
 def register_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
@@ -21,8 +21,10 @@ def register_pipelines(**kwargs: Any) -> Dict[str, Pipeline]:
     """
     plot_counting_pipeline = count_plots.create_pipeline()
     plot_counting_pipeline_v2 = count_plots_v2.create_pipeline()
+    prepare_data_pipeline = prepare_data.create_pipeline()
 
     return {
         "count_plots": plot_counting_pipeline,
         "count_plots_v2": plot_counting_pipeline_v2,
+        "prepare_data": prepare_data_pipeline,
     }
