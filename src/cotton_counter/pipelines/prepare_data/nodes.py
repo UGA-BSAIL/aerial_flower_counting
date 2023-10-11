@@ -1,7 +1,8 @@
 import numpy as np
-from typing import Dict, Callable
+from typing import Dict, Callable, List
 from PIL import Image
 from functools import partial
+from fiona import Feature
 
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]

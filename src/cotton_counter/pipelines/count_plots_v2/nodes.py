@@ -30,7 +30,8 @@ from ..common import (
     FloweringTimeColumns,
     FloweringSlopeColumns,
     OutlierColumns,
-    GenotypeColumns, merge_genotype_info,
+    GenotypeColumns,
+    merge_genotype_info,
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -258,32 +259,23 @@ def find_image_extents(
 
     # Find the image size.
     image = next(iter(images.values()))
-    width_px, height_px = image().size
+    image_size = image().size
 
     shapes = []
     used_image_ids = []
-    transformer = CameraTransformer(dem_dataset)
+    transformer = CameraTransformer(
+        dem_dataset=dem_dataset, camera_config=camera_config
+    )
     for image_id in images:
         # Project from the image corners into UTM.
-        px_to_utm = partial(
-            transformer.pixel_to_utm,
-            camera_config=camera_config,
-            camera_id=image_id,
-        )
         try:
-            top_left = px_to_utm(np.array([0.0, 0.0]))
-            top_right = px_to_utm(np.array([width_px, 0.0]))
-            bottom_right = px_to_utm(
-                np.array([width_px, height_px], dtype=np.float32)
+            extent = transformer.get_image_extent(
+                camera_id=image_id, image_size=image_size
             )
-            bottom_left = px_to_utm(np.array([0.0, height_px]))
         except MissingImageError:
             logger.warning("No transform data for {}, skipping.", image_id)
             continue
 
-        extent = Polygon(
-            [top_left, top_right, bottom_right, bottom_left, top_left]
-        )
         if not extent.is_valid:
             logger.warning("Extent for {} is invalid, skipping.", image_id)
             continue
@@ -327,8 +319,10 @@ def flowers_to_geographic(
         DetectionColumns.Y2.value,
     ]
     dem_dataset = dem_dataset[f"{session_name}_dem"]()
-    transformer = CameraTransformer(dem_dataset)
     camera_config = camera_config[f"{session_name}_cameras"]
+    transformer = CameraTransformer(
+        dem_dataset=dem_dataset, camera_config=camera_config
+    )
 
     # Convert the coordinates to geographic.
     def _convert(row: pd.Series) -> pd.Series:
@@ -344,11 +338,10 @@ def flowers_to_geographic(
 
         try:
             top_x, top_y, _ = transformer.pixel_to_utm(
-                box_top_left, camera_config=camera_config, camera_id=camera_id
+                box_top_left, camera_id=camera_id
             )
             bottom_x, bottom_y, _ = transformer.pixel_to_utm(
                 box_bottom_right,
-                camera_config=camera_config,
                 camera_id=camera_id,
             )
         except MissingImageError:

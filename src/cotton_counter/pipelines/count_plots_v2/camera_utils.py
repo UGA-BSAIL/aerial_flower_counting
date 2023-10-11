@@ -3,12 +3,17 @@ Utilities for converting between camera and geographic coordinates.
 """
 from typing import Dict, Tuple, Callable
 from xml.etree import ElementTree as ET
+from functools import partial
 
 import numpy as np
+import rasterio.transform
 from pydantic.dataclasses import dataclass
 from pygeodesy import EcefKarney, toUtm8
+from fiona import Feature
 
 from rasterio import DatasetReader
+from rasterio.transform import GCPTransformer, GroundControlPoint
+from shapely.geometry import Polygon
 from loguru import logger
 
 from ...type_helpers import ArbitraryTypesConfig
@@ -212,13 +217,17 @@ class CameraTransformer:
     Transforms points from camera to geographic coordinates.
     """
 
-    def __init__(self, dem_dataset: DatasetReader):
+    def __init__(
+        self, *, dem_dataset: DatasetReader, camera_config: CameraConfig
+    ):
         """
         Args:
             dem_dataset: The associated DEM, so we can use depth information.
+            camera_config: The camera configuration.
 
         """
         self.__dem_dataset = dem_dataset
+        self.__camera_config = camera_config
 
     def __find_dem_intersection(
         self,
@@ -275,17 +284,13 @@ class CameraTransformer:
 
         return point
 
-    @staticmethod
-    def __camera_to_utm(
-        point: np.array, *, camera_config: CameraConfig, camera_id: str
-    ) -> np.array:
+    def __camera_to_utm(self, point: np.array, *, camera_id: str) -> np.array:
         """
         Converts camera coordinates to UTM.
 
         Args:
             point: The point to convert in camera coordinates, as a 3-element
                 array of `[x, y, s]`.
-            camera_config: The camera configuration.
             camera_id: The ID of the camera we are transforming from.
 
         Returns:
@@ -293,7 +298,9 @@ class CameraTransformer:
 
         """
         try:
-            camera_transform = camera_config.camera_transforms[camera_id]
+            camera_transform = self.__camera_config.camera_transforms[
+                camera_id
+            ]
         except KeyError:
             logger.warning(
                 "Could not find transform data for camera {}.", camera_id
@@ -301,7 +308,7 @@ class CameraTransformer:
             raise MissingImageError(
                 f"Could not find transform data for camera {camera_id}."
             )
-        chunk_transform = camera_config.chunk_transform
+        chunk_transform = self.__camera_config.chunk_transform
 
         camera_ecef = (
             chunk_transform @ camera_transform @ np.append(point, [1.0])
@@ -315,21 +322,20 @@ class CameraTransformer:
         )
 
     def pixel_to_utm(
-        self, pixel: np.array, *, camera_config: CameraConfig, camera_id: str
+        self, pixel: np.array, *, camera_id: str
     ) -> Tuple[float, float, float]:
         """
         Converts pixels in image-space to UTM.
 
         Args:
             pixel: The pixel to convert, as a 2-element array of `[x, y]`.
-            camera_config: The camera configuration.
             camera_id: The ID of the camera we are transforming from.
 
         Returns:
             The easting, northing, and height of the pixel in UTM.
 
         """
-        intrinsics = camera_config.camera_intrinsics
+        intrinsics = self.__camera_config.camera_intrinsics
         intrinsics_inv = np.linalg.inv(intrinsics)
 
         # Convert pixels to camera coordinates.
@@ -337,11 +343,10 @@ class CameraTransformer:
 
         # Find the line in 3D space that this pixel falls on.
         cam_utm_point_1 = self.__camera_to_utm(
-            np.zeros(3), camera_config=camera_config, camera_id=camera_id
+            np.zeros(3), camera_id=camera_id
         )
         cam_utm_point_2 = self.__camera_to_utm(
             cam_coords,
-            camera_config=camera_config,
             camera_id=camera_id,
         )
 
@@ -350,4 +355,72 @@ class CameraTransformer:
             self.__find_dem_intersection(
                 cam_utm_point_1, cam_utm_point_2
             ).tolist()
+        )
+
+    def get_image_extent(
+        self, *, camera_id: str, image_size: Tuple[int, int]
+    ) -> Polygon:
+        """
+        Returns the extent of the image in UTM coordinates.
+
+        Args:
+            camera_id: The ID of the camera we are transforming from.
+            image_size: The width and height of the image in pixels.
+
+        Returns:
+            Polygon representing the FOV of the image in the real world.
+
+        """
+        px_to_utm = partial(self.pixel_to_utm, camera_id=camera_id)
+        width_px, height_px = image_size
+
+        top_left = px_to_utm(np.array([0.0, 0.0]))
+        top_right = px_to_utm(np.array([width_px, 0.0]))
+        bottom_right = px_to_utm(
+            np.array([width_px, height_px], dtype=np.float32)
+        )
+        bottom_left = px_to_utm(np.array([0.0, height_px]))
+
+        return Polygon(
+            [top_left, top_right, bottom_right, bottom_left, top_left]
+        )
+
+    def get_image_transform(
+        self,
+        *,
+        camera_id: str | None = None,
+        image_size: Tuple[int, int],
+        extent: Feature | None = None,
+    ) -> GCPTransformer:
+        """
+        Generates the transform to use for a particular input image.
+
+        Args:
+            camera_id: The ID of the camera that this image corresponds to.
+            image_size: The width and height of the image in pixels.
+            extent: The image extent in the real world. Can be provided if
+                available in order to avoid having to recalculate it.
+
+        Returns:
+            The transform between image pixels and world coordinates.
+
+        """
+        width_px, height_px = image_size
+        if extent is None:
+            assert (
+                camera_id is not None
+            ), "Either `extent` or `camera_id` must be provided"
+            extent = self.get_image_extent(
+                camera_id=camera_id, image_size=image_size
+            )
+        top_left, top_right, bottom_right, bottom_left = extent.exterior.coords
+
+        return rasterio.transform.from_gcps(
+            [
+                GroundControlPoint(0.0, 0.0, *top_left),
+                GroundControlPoint(height_px, 0.0, *bottom_left),
+                GroundControlPoint(height_px, width_px, *bottom_right),
+                GroundControlPoint(0.0, width_px, *top_right),
+                GroundControlPoint(height_px, width_px, *bottom_right),
+            ]
         )
