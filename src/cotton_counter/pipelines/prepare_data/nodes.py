@@ -1,8 +1,11 @@
 import numpy as np
-from typing import Dict, Callable, List
+from typing import Dict, Callable, List, Iterable
 from PIL import Image
 from functools import partial
 from fiona import Feature
+from rasterio import DatasetReader
+from rasterio.io import MemoryFile
+from shapely.geometry import Polygon
 
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
@@ -63,3 +66,34 @@ def compute_excess_green(dataset: ImageDataSet) -> ImageDataSet:
         partitions[key] = partial(_excess_green_pil, image)
 
     return partitions
+
+
+def _georeference_images(
+    images: ImageDataSet, extents: List[Feature]
+) -> Iterable[DatasetReader]:
+    """
+    Creates georeferenced versions of each image.
+
+    Args:
+        images: The images to georeference.
+        extents: The pre-computed image extents.
+
+    Yields:
+        Each image, as a georeferenced raster dataset.
+
+    """
+    # Organize the extents by image.
+    id_to_polygon = {}
+    for feature in extents:
+        key = f"{feature.properties['session']}_{feature.properties['image_id']}"
+        id_to_polygon[key] = Polygon(
+            feature.geometry.coordinates[0]
+        )
+
+    for key, image in images:
+        extent = id_to_polygon[key]
+        image = image()
+        with MemoryFile(image.tobytes()) as memfile:
+            with memfile.open() as dataset:
+
+
