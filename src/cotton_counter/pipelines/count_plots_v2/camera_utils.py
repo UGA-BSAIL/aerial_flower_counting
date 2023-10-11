@@ -9,7 +9,6 @@ import numpy as np
 import rasterio.transform
 from pydantic.dataclasses import dataclass
 from pygeodesy import EcefKarney, toUtm8
-from fiona import Feature
 
 from rasterio import DatasetReader
 from rasterio.transform import GCPTransformer, GroundControlPoint
@@ -212,6 +211,37 @@ class DemHeightEstimator:
         return point[-1] - surface_height
 
 
+def get_image_transform(
+    *,
+    image_size: Tuple[int, int],
+    extent: Polygon,
+) -> GCPTransformer:
+    """
+    Generates the transform to use for a particular input image.
+
+    Args:
+        image_size: The width and height of the image in pixels.
+        extent: The image extent in the real world. Can be provided if
+            available in order to avoid having to recalculate it.
+
+    Returns:
+        The transform between image pixels and world coordinates.
+
+    """
+    width_px, height_px = image_size
+    top_left, top_right, bottom_right, bottom_left = extent.coords[:4]
+
+    return rasterio.transform.from_gcps(
+        [
+            GroundControlPoint(0.0, 0.0, *top_left),
+            GroundControlPoint(height_px, 0.0, *bottom_left),
+            GroundControlPoint(height_px, width_px, *bottom_right),
+            GroundControlPoint(0.0, width_px, *top_right),
+            GroundControlPoint(height_px, width_px, *bottom_right),
+        ]
+    )
+
+
 class CameraTransformer:
     """
     Transforms points from camera to geographic coordinates.
@@ -388,9 +418,8 @@ class CameraTransformer:
     def get_image_transform(
         self,
         *,
-        camera_id: str | None = None,
+        camera_id: str,
         image_size: Tuple[int, int],
-        extent: Feature | None = None,
     ) -> GCPTransformer:
         """
         Generates the transform to use for a particular input image.
@@ -398,29 +427,13 @@ class CameraTransformer:
         Args:
             camera_id: The ID of the camera that this image corresponds to.
             image_size: The width and height of the image in pixels.
-            extent: The image extent in the real world. Can be provided if
-                available in order to avoid having to recalculate it.
 
         Returns:
             The transform between image pixels and world coordinates.
 
         """
         width_px, height_px = image_size
-        if extent is None:
-            assert (
-                camera_id is not None
-            ), "Either `extent` or `camera_id` must be provided"
-            extent = self.get_image_extent(
-                camera_id=camera_id, image_size=image_size
-            )
-        top_left, top_right, bottom_right, bottom_left = extent.exterior.coords
-
-        return rasterio.transform.from_gcps(
-            [
-                GroundControlPoint(0.0, 0.0, *top_left),
-                GroundControlPoint(height_px, 0.0, *bottom_left),
-                GroundControlPoint(height_px, width_px, *bottom_right),
-                GroundControlPoint(0.0, width_px, *top_right),
-                GroundControlPoint(height_px, width_px, *bottom_right),
-            ]
+        extent = self.get_image_extent(
+            camera_id=camera_id, image_size=image_size
         )
+        return get_image_transform(extent=extent, image_size=image_size)

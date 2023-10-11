@@ -3,7 +3,7 @@ from typing import Dict, Callable, List, Iterable
 from PIL import Image
 from functools import partial
 from fiona import Feature
-from rasterio import DatasetReader
+from rasterio import DatasetReader, CRS
 from rasterio.io import MemoryFile
 from shapely.geometry import Polygon
 
@@ -93,7 +93,12 @@ def _georeference_images(
     for key, image in images:
         extent = id_to_polygon[key]
         image = image()
-        with MemoryFile(image.tobytes()) as memfile:
-            with memfile.open() as dataset:
+        width, height = image.size
+        crs = CRS.from_epsg(32617)
+        transform =
+
+        with MemoryFile() as memfile:
+            with memfile.open(driver="GTiff", height=height, width=width,
+                              count=3, crs=crs, transform)
 
 
