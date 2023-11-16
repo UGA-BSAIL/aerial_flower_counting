@@ -15,7 +15,7 @@ from rasterio.transform import GCPTransformer, GroundControlPoint
 from shapely.geometry import Polygon
 from loguru import logger
 
-from ...type_helpers import ArbitraryTypesConfig
+from ..type_helpers import ArbitraryTypesConfig
 
 
 class MissingImageError(Exception):

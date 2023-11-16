@@ -10,10 +10,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plot
+from shapely import Polygon, from_ragged_array, GeometryType, STRtree
 from statsmodels.formula import api as sm
 
 
-_ALL_SESSIONS = {
+_GT_SESSIONS = {
     "2023-07-27",
     "2023-08-01",
     "2023-08-03",
@@ -31,14 +32,17 @@ _ALL_SESSIONS = {
     "2023-09-14",
     "2023-09-18",
     "2023-09-21",
-    "2023-09-28",
 }
 """
-The set of all the sessions that we want to process.
-"""
-_GT_SESSIONS = _ALL_SESSIONS - {"2023-09-28"}
-"""
 The set of sessions that include ground-truth.
+"""
+_NON_GT_SESSIONS = {"2023-09-28", "2023-10-04", "2023-10-11"}
+"""
+The set of sessions that don't include ground-truth.
+"""
+_ALL_SESSIONS = _GT_SESSIONS | _NON_GT_SESSIONS
+"""
+The set of all the sessions that we want to process.
 """
 SESSIONS = _ALL_SESSIONS
 
@@ -1209,3 +1213,61 @@ def plot_flowering_duration_comparison(
     # Make it wider so the x labels don't overlap.
     figure.set_size_inches(12, 6)
     return figure
+
+
+def detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
+    """
+    Converts detections from a dataframe to polygons.
+
+    Args:
+        detections: The detections.
+
+    Returns:
+        The polygons.
+
+    """
+    # Extract raw coordinates as an array of points.
+    x1, y1, x2, y2 = [
+        c.value
+        for c in [
+            DetectionColumns.X1,
+            DetectionColumns.Y1,
+            DetectionColumns.X2,
+            DetectionColumns.Y2,
+        ]
+    ]
+    coords = detections[[x1, y1, x2, y1, x2, y2, x1, y2, x1, y1]]
+    coords = coords.to_numpy().reshape(-1, 2)
+
+    # Five points for every detection box.
+    offsets = np.arange(0, len(coords) + 1, 5)
+    # One ring for every box.
+    num_rings = np.arange(0, len(coords) // 5 + 1)
+
+    return from_ragged_array(
+        GeometryType.POLYGON, coords, (offsets, num_rings)
+    )
+
+
+def query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
+    """
+    Queries the tree for the indices of the polygons that intersect the given
+    polygon.
+
+    Args:
+        tree: The tree.
+        poly: The polygon.
+
+    Returns:
+        The indices of the polygons that intersect the given polygon.
+
+    """
+    indices = tree.query_nearest(poly)
+    nearby_polys = tree.geometries[indices]
+
+    # Filter to only ones that actually intersect and are not identical.
+    return [
+        i
+        for i, p in zip(indices, nearby_polys)
+        if not p.equals(poly) and p.intersects(poly)
+    ]

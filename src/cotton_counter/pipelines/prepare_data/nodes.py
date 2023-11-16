@@ -6,6 +6,8 @@ from fiona import Feature
 from rasterio import DatasetReader, CRS
 from rasterio.io import MemoryFile
 from shapely.geometry import Polygon
+from ..camera_utils import get_image_transform
+from ..common import query_intersecting, detections_to_polygons
 
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
@@ -85,20 +87,28 @@ def _georeference_images(
     # Organize the extents by image.
     id_to_polygon = {}
     for feature in extents:
-        key = f"{feature.properties['session']}_{feature.properties['image_id']}"
-        id_to_polygon[key] = Polygon(
-            feature.geometry.coordinates[0]
+        key = (
+            f"{feature.properties['session']}_{feature.properties['image_id']}"
         )
+        id_to_polygon[key] = Polygon(feature.geometry.coordinates[0])
 
     for key, image in images:
         extent = id_to_polygon[key]
         image = image()
         width, height = image.size
         crs = CRS.from_epsg(32617)
-        transform =
+        transform = get_image_transform(image_size=image.size, extent=extent)
 
         with MemoryFile() as memfile:
-            with memfile.open(driver="GTiff", height=height, width=width,
-                              count=3, crs=crs, transform)
+            with memfile.open(
+                driver="GTiff",
+                height=height,
+                width=width,
+                count=3,
+                crs=crs,
+                transform=transform,
+            ) as dataset:
+                dataset.write(np.array(image))
 
-
+            with memfile.open() as dataset:
+                yield dataset

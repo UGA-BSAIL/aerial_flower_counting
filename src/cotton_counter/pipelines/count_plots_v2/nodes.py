@@ -3,7 +3,7 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import partial, reduce
+from functools import reduce
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
@@ -18,10 +18,10 @@ from pandarallel import pandarallel
 from PIL import Image
 from shapely import Polygon, STRtree, intersection
 from shapely.geometry import mapping
-from shapely import affinity, from_ragged_array, GeometryType
+from shapely import affinity
 from ultralytics import YOLO
 
-from .camera_utils import CameraConfig, CameraTransformer, MissingImageError
+from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
     CountingColumns,
     DetectionColumns,
@@ -32,6 +32,8 @@ from ..common import (
     OutlierColumns,
     GenotypeColumns,
     merge_genotype_info,
+    detections_to_polygons,
+    query_intersecting,
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -379,64 +381,6 @@ def _load_polygons(features: List[Feature]) -> Iterable[Polygon]:
         yield Polygon(feature.geometry.coordinates[0])
 
 
-def _detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
-    """
-    Converts detections from a dataframe to polygons.
-
-    Args:
-        detections: The detections.
-
-    Returns:
-        The polygons.
-
-    """
-    # Extract raw coordinates as an array of points.
-    x1, y1, x2, y2 = [
-        c.value
-        for c in [
-            DetectionColumns.X1,
-            DetectionColumns.Y1,
-            DetectionColumns.X2,
-            DetectionColumns.Y2,
-        ]
-    ]
-    coords = detections[[x1, y1, x2, y1, x2, y2, x1, y2, x1, y1]]
-    coords = coords.to_numpy().reshape(-1, 2)
-
-    # Five points for every detection box.
-    offsets = np.arange(0, len(coords) + 1, 5)
-    # One ring for every box.
-    num_rings = np.arange(0, len(coords) // 5 + 1)
-
-    return from_ragged_array(
-        GeometryType.POLYGON, coords, (offsets, num_rings)
-    )
-
-
-def _query_intersecting(tree: STRtree, poly: Polygon) -> List[int]:
-    """
-    Queries the tree for the indices of the polygons that intersect the given
-    polygon.
-
-    Args:
-        tree: The tree.
-        poly: The polygon.
-
-    Returns:
-        The indices of the polygons that intersect the given polygon.
-
-    """
-    indices = tree.query_nearest(poly)
-    nearby_polys = tree.geometries[indices]
-
-    # Filter to only ones that actually intersect and are not identical.
-    return [
-        i
-        for i, p in zip(indices, nearby_polys)
-        if not p.equals(poly) and p.intersects(poly)
-    ]
-
-
 def _prune_by_size(
     *, indices1: List[int], indices2: List[int], prune_rows: Set[int]
 ) -> Set[int]:
@@ -533,7 +477,7 @@ def prune_duplicate_detections(
     # We initially need to find overlapping images so that we know which
     # regions to focus on.
     image_extent_polys = list(_load_polygons(image_extents))
-    detection_polys = list(_detections_to_polygons(detections))
+    detection_polys = list(detections_to_polygons(detections))
     extent_polys_to_id = {
         p: f.properties["image_id"]
         for p, f in zip(image_extent_polys, image_extents)
@@ -546,7 +490,7 @@ def prune_duplicate_detections(
         p: i for p, i in zip(detection_polys, detections.index)
     }
     image_extent_tree = STRtree(image_extent_polys)
-    detections_tree = STRtree(list(_detections_to_polygons(detections)))
+    detections_tree = STRtree(list(detections_to_polygons(detections)))
 
     prune_rows = set()
 
@@ -558,7 +502,7 @@ def prune_duplicate_detections(
         # Find the intersection between the images.
         intersecting_region = intersection(extent1, extent2)
         # Find all detections in that region.
-        detections_indices = _query_intersecting(
+        detections_indices = query_intersecting(
             detections_tree, intersecting_region
         )
         detections_in_region: List[Polygon] = detections_tree.geometries[
@@ -594,7 +538,7 @@ def prune_duplicate_detections(
 
     for extent in image_extent_polys:
         # Find all intersecting images.
-        intersecting_indices = _query_intersecting(image_extent_tree, extent)
+        intersecting_indices = query_intersecting(image_extent_tree, extent)
         intersecting = image_extent_tree.geometries[intersecting_indices]
         for other_extent in intersecting:
             # Remove duplicates in the intersecting region.
@@ -618,7 +562,7 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     features = []
     for (_, row), polygon in zip(
-        detections.iterrows(), _detections_to_polygons(detections)
+        detections.iterrows(), detections_to_polygons(detections)
     ):
         features.append(
             {
@@ -876,7 +820,7 @@ def _find_detections_in_regions(
 
     for plot_boundary, plot_num, plot_sessions in labeled_plots:
         # Figure out which detections intersect this plot.
-        plot_detection_indices = _query_intersecting(
+        plot_detection_indices = query_intersecting(
             detections_tree, plot_boundary
         )
         plot_detections = detections_tree.geometries[plot_detection_indices]
@@ -922,7 +866,7 @@ def _find_detections_in_plots(
     """
     return _find_detections_in_regions(
         detections=detections,
-        detection_polys=_detections_to_polygons(detections),
+        detection_polys=detections_to_polygons(detections),
         labeled_plots=_label_plots(
             plot_boundaries=_load_polygons(plot_boundaries),
             field_config=field_config,
@@ -1018,7 +962,7 @@ def _find_detections_in_gt_sampling_regions(
     """
     all_detections = []
 
-    detection_polys = _detections_to_polygons(detections)
+    detection_polys = detections_to_polygons(detections)
     for sample_num in range(40):
         sample_detections = _find_detections_in_regions(
             detections=detections.copy(),
