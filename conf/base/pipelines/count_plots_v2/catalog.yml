@@ -228,3 +228,20 @@ bounding_box_shapes:
       - [box_num, int]
       - [plot_num, int]
   epsg_crs: 32617
+
+# Intermediate datasets for detections with associated plot numbers.
+detection_results_plot_num:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_results_plot_num.parquet
+  versioned: True
+
+detection_results_gt_sample:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_results_gt_sample.parquet
+  versioned: True
+
+# Dataset containing information about specific genotypes to harvest.
+genotypes_to_collect:
+  type: pandas.ExcelDataSet
+  filepath: data/08_reporting/genotypes_to_collect.xlsx
+  versioned: True

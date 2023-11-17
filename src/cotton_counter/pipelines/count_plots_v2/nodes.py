@@ -3,7 +3,7 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import reduce
+from functools import reduce, partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
@@ -34,6 +34,7 @@ from ..common import (
     merge_genotype_info,
     detections_to_polygons,
     query_intersecting,
+    FloweringHabit,
 )
 from .field_config import FieldConfig
 from rasterio import DatasetReader
@@ -1280,6 +1281,218 @@ def find_all_outliers(
             OutlierColumns.SLOPE.value,
         ],
     )
+
+
+def _find_spread(
+    *,
+    start: pd.DataFrame,
+    end: pd.DataFrame,
+    peak: pd.DataFrame,
+    slope: pd.DataFrame,
+    genotypes: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Calculates a "spread" metric across all attributes for each genotype. This
+    provides a rough measure of how similar all the replicates for a
+    particular genotype are to each-other.
+
+    Args:
+        start: The flowering start dates.
+        end: The flowering end dates.
+        peak: The flowering peaks.
+        slope: The flowering slopes.
+        genotypes: The associated genotype information.
+
+    Returns:
+        A single DataFrame containing the spread information.
+
+    """
+    # Merge genotype info.
+    merge_std = partial(
+        merge_genotype_info,
+        aggregation="std",
+        genotypes=genotypes,
+    )
+    start_df = merge_std(flower_data=start)
+    start = start_df[CountingColumns.DAP.value]
+    end = merge_std(flower_data=end)[CountingColumns.DAP.value]
+    # Omission of duration is deliberate here, since that's entirely derived
+    # from start and end.
+    peak = merge_std(flower_data=peak)[CountingColumns.DAP.value]
+    shape = merge_std(flower_data=slope)
+    slope = shape[FloweringSlopeColumns.SLOPE.value]
+    intercept = shape[FloweringSlopeColumns.INTERCEPT.value]
+
+    # Normalize the values.
+    start_spread = start / (start.max() - start.min())
+    end_spread = end / (end.max() - end.min())
+    peak_spread = peak / (peak.max() - peak.min())
+    slope_spread = slope / (slope.max() - slope.min())
+    intercept_spread = intercept / (intercept.max() - intercept.min())
+
+    # Combine it into one spread value.
+    spread = (
+        start_spread
+        + end_spread
+        + peak_spread
+        + slope_spread
+        + intercept_spread
+    )
+    return pd.concat(
+        [
+            start_df[
+                [
+                    GenotypeColumns.GENOTYPE.value,
+                    GenotypeColumns.POPULATION.value,
+                ]
+            ],
+            spread,
+        ],
+        axis=1,
+    ).rename(columns={0: CountingColumns.SPREAD.value})
+
+
+def _classify_flowering_habits(
+    *,
+    peak: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    habit_quantiles: List = [0.33, 0.33, 0.66, 0.66],
+) -> pd.DataFrame:
+    """
+    Divides genotypes into early-flowering, optimal-flowering,
+    and late-flowering groups based upon GA 230 as a reference for when
+    the optimal flowering time is.
+
+    Args:
+        peak: The flowering peaks.
+        genotypes: The associated genotype information.
+        habit_quantiles: The quantile thresholds to use for the upper limit
+            on the early-flowering group, the lower limit on the optimal
+            flowering group, the upper limit on the optimal flowering group,
+            and the lower limit on the late flowering group.
+
+    Returns:
+        The peak flowering data with an additional column classifying each
+        genotype as early, optimal, or late-flowering.
+
+    """
+    # Determine the average peak value for the GA 230 population.
+    peak_genotypes = merge_genotype_info(flower_data=peak, genotypes=genotypes)
+    peak_time_ga230 = peak_genotypes[
+        peak_genotypes[GenotypeColumns.POPULATION.value] == "GA 230"
+    ][CountingColumns.DAP.value]
+    mean_peak_time = peak_time_ga230.mean()
+    logger.info("GA 230 mean peak time is {} DAP.", mean_peak_time)
+
+    # Determine the cutoff times for each group.
+    peak_time = peak_genotypes[CountingColumns.DAP.value]
+    cutoff_times = peak_time.quantile(habit_quantiles)
+
+    # Get the candidate genotypes for each group based on the cutoffs.
+    (
+        early_max,
+        optimal_min,
+        optimal_max,
+        late_min,
+    ) = cutoff_times
+    early_candidates = peak_genotypes[peak_time <= early_max]
+    optimal_candidates = peak_genotypes[
+        (peak_time >= optimal_min) & (peak_time <= optimal_max)
+    ]
+    late_candidates = peak_genotypes[peak_time >= late_min]
+
+    # Combine into a single DF.
+    early_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
+    optimal_candidates[
+        CountingColumns.HABIT.value
+    ] = FloweringHabit.OPTIMAL.value
+    late_candidates[CountingColumns.HABIT.value] = FloweringHabit.LATE.value
+    return pd.concat(
+        [early_candidates, optimal_candidates, late_candidates],
+        axis=0,
+        ignore_index=True,
+    )
+
+
+def find_genotypes_to_collect(
+    *,
+    start: pd.DataFrame,
+    end: pd.DataFrame,
+    peak: pd.DataFrame,
+    slope: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    num_to_select: int,
+    **kwargs: Any,
+) -> pd.DataFrame:
+    """
+    Finds an ideal set of genotypes to collect plant samples from. These are
+    divided into early-flowering, late-flowering, and optimal-flowering
+    groups based on how close their peak flowering time is to GA 320. Within
+    these groups, genotypes will be selected that have the lowest variance
+    between replicates.
+
+    Args:
+        start: The flowering start dates.
+        end: The flowering end dates.
+        peak: The flowering peaks.
+        slope: The flowering slopes.
+        genotypes: The associated genotype information.
+        num_to_select: Total number of genotypes that we wish to select.
+        **kwargs: Will be forwarded to `_classify_flowering_habits`.
+
+    Returns:
+        A single DataFrame containing the selected genotypes.
+
+    """
+    flowering_habits = _classify_flowering_habits(
+        genotypes=genotypes, peak=peak, **kwargs
+    )
+    flowering_habits.set_index(
+        GenotypeColumns.GENOTYPE.value, append=False, inplace=True
+    )
+
+    # We're going to choose the actual genotypes based on which ones have the
+    # lowest spread.
+    spread = _find_spread(
+        start=start,
+        end=end,
+        peak=peak,
+        slope=slope,
+        genotypes=genotypes,
+    )
+    spread.set_index(
+        GenotypeColumns.GENOTYPE.value, append=False, inplace=True
+    )
+    # Drop a duplicate Population column before merging.
+    spread = spread.drop(columns=GenotypeColumns.POPULATION.value)
+    flowering_habits = pd.merge(
+        spread, flowering_habits, left_index=True, right_index=True
+    )
+
+    flowering_habits.sort_values(CountingColumns.SPREAD.value, inplace=True)
+    habit_groups = flowering_habits.groupby(
+        CountingColumns.HABIT.value, as_index=False
+    )
+    early_flowering = habit_groups.get_group(FloweringHabit.EARLY.value)
+    optimal_flowering = habit_groups.get_group(FloweringHabit.OPTIMAL.value)
+    late_flowering = habit_groups.get_group(FloweringHabit.LATE.value)
+
+    # Take only the ones we need.
+    num_to_select_per_group = num_to_select // 3
+    early_flowering = early_flowering.iloc[:num_to_select_per_group]
+    optimal_flowering = optimal_flowering.iloc[:num_to_select_per_group]
+    late_flowering = late_flowering.iloc[:num_to_select_per_group]
+
+    to_collect = pd.concat(
+        [early_flowering, optimal_flowering, late_flowering]
+    )
+    # Clean it up a bit for exporting to a spreadsheet.
+    to_collect.reset_index(names="Genotype", inplace=True)
+    to_collect.drop(
+        columns=[DetectionColumns.PLOT_NUM.value, CountingColumns.COUNT.value],
+        inplace=True,
+    )
+    return to_collect
 
 
 def plot_ground_truth_vs_predicted(

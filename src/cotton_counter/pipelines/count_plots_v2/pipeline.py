@@ -33,7 +33,9 @@ from ..common import (
     plot_flowering_start_comparison,
     plot_flowering_end_comparison,
     plot_flowering_duration_comparison,
-    plot_flowering_slope_comparison, _GT_SESSIONS, SESSIONS,
+    plot_flowering_slope_comparison,
+    _GT_SESSIONS,
+    SESSIONS,
 )
 from .field_config import FieldConfig
 from .nodes import (
@@ -51,6 +53,7 @@ from .nodes import (
     prune_duplicate_detections,
     clean_genotypes,
     find_all_outliers,
+    find_genotypes_to_collect,
 )
 from ..camera_utils import CameraConfig
 
@@ -375,6 +378,20 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_ground_truth_vs_predicted,
                 "counting_results_gt_merged",
                 "ground_truth_vs_predicted",
+            ),
+            # Determine which genotypes should be collected in the field.
+            node(
+                find_genotypes_to_collect,
+                dict(
+                    start="flowering_starts",
+                    end="flowering_ends",
+                    peak="flowering_peaks",
+                    slope="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                    num_to_select="params:num_genotypes_to_collect",
+                    habit_quantiles="params:genotype_habit_quantiles",
+                ),
+                "genotypes_to_collect",
             ),
         ]
     )

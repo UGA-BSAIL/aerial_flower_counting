@@ -116,6 +116,26 @@ class GenotypeColumns(enum.Enum):
     """
 
 
+@enum.unique
+class FloweringHabit(enum.Enum):
+    """
+    Describes the flowering habit of a genotype.
+    """
+
+    EARLY = "early"
+    """
+    Flowers early relative to GA 230.
+    """
+    OPTIMAL = "optimal"
+    """
+    Flowers at about the same time as GA 230.
+    """
+    LATE = "late"
+    """
+    Flowers late relative to GA 230.
+    """
+
+
 def batch_iter(iterable: Iterable, *, batch_size: int) -> Iterable[List]:
     """
     Condenses an iterable into batches.
@@ -250,6 +270,15 @@ class CountingColumns(enum.Enum):
     DAP = GroundTruthColumns.DAP.value
     """
     The number of days after planting that this count was taken at.
+    """
+
+    SPREAD = "spread"
+    """
+    Column for the overall spread measurement between replications.
+    """
+    HABIT = "habit"
+    """
+    Column categorizing the overall flowering habit.
     """
 
 
@@ -789,6 +818,7 @@ def merge_genotype_info(
     outliers: pd.DataFrame | None = None,
     group_on_dap: bool = False,
     filter_populations: Set[str] | None = None,
+    aggregation: str = "mean",
 ) -> pd.DataFrame:
     """
     Merges a dataframe indexed by plot with genotype information, filters out
@@ -802,6 +832,8 @@ def merge_genotype_info(
             DAPs.
         filter_populations: If specified, will only keep data from these
             specific populations.
+        aggregation: The aggregation to perform across the replicates.
+            Defaults to taking the mean.
 
     Returns:
         The merged data.
@@ -832,7 +864,7 @@ def merge_genotype_info(
     combined_data = combined_data.groupby(
         group_columns,
         as_index=False,
-    ).agg("mean")
+    ).agg(aggregation)
 
     if outliers is not None:
         combined_data.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
