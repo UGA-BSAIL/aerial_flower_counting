@@ -4,17 +4,16 @@ Common functionality between the two versions of the pipeline.
 import enum
 from datetime import date
 from functools import partial
-from typing import Dict, Iterable, List, Tuple, Set, Any
+from typing import Any, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plot
-from shapely import Polygon, from_ragged_array, GeometryType, STRtree
+from shapely import GeometryType, Polygon, STRtree, from_ragged_array
 from statsmodels.formula import api as sm
 
-
-_GT_SESSIONS = {
+GT_SESSIONS = {
     "2023-07-27",
     "2023-08-01",
     "2023-08-03",
@@ -40,11 +39,15 @@ _NON_GT_SESSIONS = {"2023-09-28", "2023-10-04", "2023-10-11"}
 """
 The set of sessions that don't include ground-truth.
 """
-_ALL_SESSIONS = _GT_SESSIONS | _NON_GT_SESSIONS
+_ALL_FLOWER_SESSIONS = GT_SESSIONS | _NON_GT_SESSIONS
 """
 The set of all the sessions that we want to process.
 """
-SESSIONS = _ALL_SESSIONS
+BOLL_SESSIONS = {"2023-11-17"}
+"""
+The set of sessions that contain cotton bolls.
+"""
+SESSIONS = BOLL_SESSIONS
 
 
 @enum.unique

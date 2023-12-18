@@ -8,54 +8,56 @@ from typing import Tuple
 import pandas as pd
 from kedro.pipeline import Pipeline, node
 
+from ..camera_utils import CameraConfig
 from ..common import (
+    BOLL_SESSIONS,
+    GT_SESSIONS,
+    SESSIONS,
     add_dap_counting,
     add_dap_ground_truth,
+    choose_best_counts,
     collect_session_results,
     compute_counts,
+    compute_cumulative_counts,
+    compute_flowering_duration,
+    compute_flowering_peak,
+    compute_flowering_ramps,
+    compute_flowering_start_end,
+    create_metric_table,
     filter_low_confidence,
     merge_ground_truth,
-    choose_best_counts,
-    plot_ground_truth_regression,
-    compute_cumulative_counts,
-    compute_flowering_ramps,
-    compute_flowering_peak,
-    compute_flowering_start_end,
-    compute_flowering_duration,
-    create_metric_table,
-    plot_mean_flowering_curve,
-    plot_peak_flowering_dist,
-    plot_flowering_start_dist,
-    plot_flowering_end_dist,
-    plot_flowering_duration_dist,
-    plot_flowering_slope_dist,
-    plot_peak_flowering_comparison,
-    plot_flowering_start_comparison,
-    plot_flowering_end_comparison,
     plot_flowering_duration_comparison,
+    plot_flowering_duration_dist,
+    plot_flowering_end_comparison,
+    plot_flowering_end_dist,
     plot_flowering_slope_comparison,
-    _GT_SESSIONS,
-    SESSIONS,
+    plot_flowering_slope_dist,
+    plot_flowering_start_comparison,
+    plot_flowering_start_dist,
+    plot_ground_truth_regression,
+    plot_mean_flowering_curve,
+    plot_peak_flowering_comparison,
+    plot_peak_flowering_dist,
 )
 from .field_config import FieldConfig
 from .nodes import (
     add_plot_index,
+    clean_genotypes,
+    detect_bolls,
     detect_flowers,
-    find_detections_in_gt_sampling_regions_pre_september,
+    find_all_outliers,
     find_detections_in_gt_sampling_regions_post_september,
-    find_detections_in_plots_pre_september,
+    find_detections_in_gt_sampling_regions_pre_september,
     find_detections_in_plots_post_september,
+    find_detections_in_plots_pre_september,
+    find_genotypes_to_collect,
     find_image_extents,
     flowers_to_geographic,
     flowers_to_shapefile,
     load_ground_truth,
     plot_ground_truth_vs_predicted,
     prune_duplicate_detections,
-    clean_genotypes,
-    find_all_outliers,
-    find_genotypes_to_collect,
 )
-from ..camera_utils import CameraConfig
 
 
 def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
@@ -70,7 +72,22 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
             for the detections.
 
     """
-    detect_flowers_session = partial(detect_flowers, session_name=session)
+    detection_inputs = dict(
+        images=f"images_{session}",
+        batch_size="params:prediction_batch_size",
+        dry_run="params:dry_run",
+        weights_file="params:flower_model_weights_file",
+    )
+    detect_session = partial(
+        detect_flowers,
+        session_name=session,
+    )
+    if session in BOLL_SESSIONS:
+        detect_session = partial(
+            detect_bolls,
+            session_name=session,
+        )
+        detection_inputs["weights_file"] = "params:boll_model_weights_file"
 
     output_node = f"detections_{session}"
     return (
@@ -78,13 +95,8 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
             [
                 # Detect flowers.
                 node(
-                    detect_flowers_session,
-                    dict(
-                        images=f"images_{session}",
-                        weights_file="params:model_weights_file",
-                        batch_size="params:prediction_batch_size",
-                        dry_run="params:dry_run",
-                    ),
+                    detect_session,
+                    detection_inputs,
                     f"detections_px_{session}",
                 ),
                 # Convert to geographic coordinates.
@@ -92,7 +104,7 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                     partial(flowers_to_geographic, session_name=session),
                     dict(
                         detections=f"detections_px_{session}",
-                        camera_config=f"camera_config",
+                        camera_config="camera_config",
                         dem_dataset="dems",
                     ),
                     f"detections_unfiltered_{session}",
@@ -120,7 +132,7 @@ def _create_ground_truth_pipeline() -> Pipeline:
     """
     nodes = []
     session_node_names = []
-    for session in _GT_SESSIONS:
+    for session in GT_SESSIONS:
         load_gt_session = partial(load_ground_truth, session_name=session)
         nodes.append(
             node(
@@ -168,8 +180,8 @@ def _create_image_extents_pipeline() -> Pipeline:
                 image_extents_session,
                 dict(
                     images=f"images_{session}",
-                    camera_config=f"camera_config",
-                    dem_dataset=f"dems",
+                    camera_config="camera_config",
+                    dem_dataset="dems",
                 ),
                 output_node,
             ),
@@ -399,17 +411,17 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    # pipeline += _create_image_extents_pipeline()
+    pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     session_detection_nodes = []
-    # for session in SESSIONS:
-    #     (
-    #         session_detection_pipeline,
-    #         output_node,
-    #     ) = _create_session_detection_pipeline(session)
-    #     pipeline += session_detection_pipeline
-    #     session_detection_nodes.append(output_node)
+    for session in SESSIONS:
+        (
+            session_detection_pipeline,
+            output_node,
+        ) = _create_session_detection_pipeline(session)
+        pipeline += session_detection_pipeline
+        session_detection_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
@@ -417,16 +429,16 @@ def create_pipeline(**kwargs) -> Pipeline:
             node(
                 CameraConfig.load_partitioned,
                 dict(
-                    camera_xml=f"auto_camera_config",
+                    camera_xml="auto_camera_config",
                 ),
-                f"camera_config",
+                "camera_config",
             ),
             # Combine the session detections into a single table.
-            # node(
-            #     collect_session_results,
-            #     session_detection_nodes,
-            #     "detection_results",
-            # ),
+            node(
+                collect_session_results,
+                session_detection_nodes,
+                "detection_results",
+            ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,

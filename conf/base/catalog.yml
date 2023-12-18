@@ -85,6 +85,10 @@ images_2023-10-11:
   path: ${corrected_image_dir}/2023-10-11
   << : *image_params
 
+images_2023-11-17:
+  path: ${corrected_image_dir}/2023-11-17
+  << : *image_params
+
   # Dataset containing the excess green values for the input images.
 excess_green:
   type: cotton_counter.data_sets.ParallelPartitionedDataSet

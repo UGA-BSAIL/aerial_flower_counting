@@ -3,41 +3,45 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import reduce, partial
+from functools import partial, reduce
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
-from scipy import optimize
 import seaborn as sns
+import torch
+import torch.nn.functional as F
 from fiona.model import Feature, Geometry, Properties
 from loguru import logger
 from matplotlib import pyplot as plot
 from pandarallel import pandarallel
 from PIL import Image
-from shapely import Polygon, STRtree, intersection
+from rasterio import DatasetReader
+from scipy import optimize
+from shapely import Polygon, STRtree, affinity, intersection
 from shapely.geometry import mapping
-from shapely import affinity
+from torchvision import transforms
 from ultralytics import YOLO
 
 from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
     CountingColumns,
     DetectionColumns,
-    GroundTruthColumns,
-    batch_iter,
-    FloweringTimeColumns,
-    FloweringSlopeColumns,
-    OutlierColumns,
-    GenotypeColumns,
-    merge_genotype_info,
-    detections_to_polygons,
-    query_intersecting,
     FloweringHabit,
+    FloweringSlopeColumns,
+    FloweringTimeColumns,
+    GenotypeColumns,
+    GroundTruthColumns,
+    OutlierColumns,
+    batch_iter,
+    detections_to_polygons,
+    merge_genotype_info,
+    query_intersecting,
 )
+from .dm_count.models import make_divisible
+from .dm_count.models import yolov8 as dm_count_yolov8
 from .field_config import FieldConfig
-from rasterio import DatasetReader
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """
@@ -46,6 +50,11 @@ Type alias for a dataset containing multiple images.
 RasterDataSet = Dict[str, Callable[[], DatasetReader]]
 """
 Type alias for a dataset containing multiple rasters.
+"""
+
+_TORCH_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+"""
+Device to use for inference.
 """
 
 sns.set_theme(
@@ -143,20 +152,166 @@ def _split_image_grid(
             )
 
 
-def detect_flowers(
+_DETECTION_COLUMNS = [
+    DetectionColumns.X1.value,
+    DetectionColumns.Y1.value,
+    DetectionColumns.X2.value,
+    DetectionColumns.Y2.value,
+]
+"""
+Columns representing a detection bounding box.
+"""
+
+
+def _detect_bolls_in_batch(
+    *,
+    image_ids: List[str],
+    patches: List[Image.Image],
+    offsets: List[np.array],
+    model: torch.nn.Module,
+) -> List[pd.DataFrame]:
+    """
+    Applies the boll detection model to a single batch of images.
+
+    Args:
+        image_ids: The corresponding image IDs of the patches.
+        patches: The image patches to apply the model to.
+        offsets: The pixel offsets of the patches in the original image.
+        model: The model to apply.
+
+    Returns:
+        The detections for each patch, in standard format.
+
+    """
+    # Input must have dimensions that are divisible by 32.
+    input_rows = make_divisible(patches[0].height, 32)
+    input_cols = make_divisible(patches[0].width, 32)
+    # Pre-process the input images.
+    process = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Resize((input_rows, input_cols)),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ]
+    )
+    torch_patches = [process(p) for p in patches]
+    torch_patches = torch.stack(torch_patches).to(_TORCH_DEVICE)
+
+    # Apply the model to get a density map.
+    logger.debug("Finding cotton bolls in {}...", image_ids[0])
+    density_maps, _ = model(torch_patches)
+
+    # Filter the density map to find boll locations.
+    point_maps = F.max_pool2d(
+        density_maps, kernel_size=(3, 3), stride=1, padding=1
+    )
+    keep = (point_maps == density_maps).float()
+    point_maps = point_maps * keep
+    point_maps = point_maps.detach().cpu().numpy()
+
+    results = []
+    for image_id, point_map, offset, patch in zip(
+        image_ids, point_maps, offsets, patches
+    ):
+        # Convert to indices.
+        point_map = point_map.squeeze(axis=0)
+        point_indices = np.argwhere(point_map)
+        # Normalize density between 0 and 1 to get a sort of pseudo-confidence.
+        confidence = point_map[point_map > 0]
+        if len(confidence) > 0:
+            confidence -= confidence.min()
+            if confidence.max() > 0:
+                confidence /= confidence.max()
+        # Output is not the same size as the input. Make sure the pixel
+        # values are scaled to the input.
+        point_indices = (
+            point_indices.astype(float)
+            / point_map.shape
+            * np.array([patch.height, patch.width])
+        )
+        # Apply the offsets, which shift the coordinates into pixel-space
+        # for the input image instead of the patch.
+        point_indices = point_indices[:, ::-1]
+        point_indices += offset
+
+        # Since these are point detections, we'll set both corners to be the
+        # same.
+        points_df = pd.DataFrame(
+            data=np.tile(point_indices, (1, 2)), columns=_DETECTION_COLUMNS
+        )
+        points_df[DetectionColumns.CONFIDENCE.value] = confidence
+        points_df[DetectionColumns.BOX_NUM.value] = np.arange(len(points_df))
+        points_df[DetectionColumns.IMAGE_ID.value] = image_id
+        results.append(points_df)
+
+    return results
+
+
+def _detect_flowers_in_batch(
+    *,
+    image_ids: List[str],
+    patches: List[Image.Image],
+    offsets: List[np.array],
+    model: YOLO,
+) -> List[pd.DataFrame]:
+    """
+    Applies the flower detection model to a single batch of images.
+
+    Args:
+        image_ids: The corresponding image IDs of the patches.
+        patches: The image patches to apply the model to.
+        offsets: The pixel offsets of the patches in the original image.
+        model: The model to apply.
+
+    Returns:
+        The detections for each patch, in standard format.
+
+    """
+    yolo_results = model.predict(patches, imgsz=patches[0].size[::-1])
+
+    # Convert the results to a dataframe.
+    results = []
+    for image_id, image_results, offset in zip(
+        image_ids, yolo_results, offsets
+    ):
+        results_df = pd.DataFrame(
+            data=image_results.boxes.xyxyn.cpu().numpy(),
+            columns=_DETECTION_COLUMNS,
+        )
+        # Convert to pixels.
+        results_df *= np.tile(np.array(patches[0].size), (2,))
+        # Apply the offsets, which shifts the coordinates into
+        # pixel-space for the input image instead of the patches.
+        results_df += np.tile(offset, (2,))
+
+        # Add additional columns.
+        results_df[
+            DetectionColumns.CONFIDENCE.value
+        ] = image_results.boxes.conf.cpu().numpy()
+        results_df[DetectionColumns.BOX_NUM.value] = np.arange(len(results_df))
+        results_df[DetectionColumns.IMAGE_ID.value] = image_id
+
+        results.append(results_df)
+
+    return results
+
+
+def _detect_organs(
     images: ImageDataSet,
     *,
-    weights_file: Path,
+    detector: Callable[
+        [List[str], List[Image.Image], List[np.array]], List[pd.DataFrame]
+    ],
     session_name: str,
     batch_size: int,
     dry_run: bool = False,
 ) -> pd.DataFrame:
     """
-    Performs flower detection for the images in a session.
+    Performs organ detection for the images in a session.
 
     Args:
-        images: The images to detect flowers in.
-        weights_file: The location of the file to load the model weights from.
+        images: The images to detect organs in.
+        detector: The function to use for detection.
         session_name: The name of the session.
         batch_size: The batch size to use for inference.
         dry_run: If true, just return an empty dataframe without actually
@@ -166,26 +321,18 @@ def detect_flowers(
         A dataframe containing the detected flowers.
 
     """
-    # Load the model.
-    model = YOLO(weights_file)
 
     # Split individual images up into more manageable chunks.
-    def _iter_patches() -> Iterable[Tuple[str, np.array, np.array]]:
+    def _iter_patches() -> Iterable[Tuple[str, Image.Image, np.array]]:
         for image_id_, image in images.items():
             for i, (patch, offsets_) in enumerate(_split_image_grid(image())):
                 yield f"{image_id_}_patch_{i}", patch, offsets_
 
     # Predict on batches.
-    detection_columns = [
-        DetectionColumns.X1.value,
-        DetectionColumns.Y1.value,
-        DetectionColumns.X2.value,
-        DetectionColumns.Y2.value,
-    ]
     results = [
         pd.DataFrame(
             data={},
-            columns=detection_columns
+            columns=_DETECTION_COLUMNS
             + [
                 DetectionColumns.IMAGE_ID.value,
                 DetectionColumns.CONFIDENCE.value,
@@ -201,39 +348,75 @@ def detect_flowers(
         image_ids, image_batch, offsets = zip(*batch)
         # Perform inference.
         image_batch = [im.convert("RGB") for im in image_batch]
-        yolo_results = model.predict(
-            image_batch, imgsz=image_batch[0].size[::-1]
+
+        results.extend(
+            detector(
+                image_ids=image_ids,
+                patches=image_batch,
+                offsets=offsets,
+            )
         )
-
-        # Convert the results to a dataframe.
-        for image_id, image_results, offset in zip(
-            image_ids, yolo_results, offsets
-        ):
-            results_df = pd.DataFrame(
-                data=image_results.boxes.xyxyn.cpu().numpy(),
-                columns=detection_columns,
-            )
-            # Convert to pixels.
-            results_df *= np.tile(np.array(image_batch[0].size), (2,))
-            # Apply the offsets, which shifts the coordinates into
-            # pixel-space for the input image instead of the patches.
-            results_df += np.tile(offset, (2,))
-
-            # Add additional columns.
-            results_df[
-                DetectionColumns.CONFIDENCE.value
-            ] = image_results.boxes.conf.cpu().numpy()
-            results_df[DetectionColumns.BOX_NUM.value] = np.arange(
-                len(results_df)
-            )
-            results_df[DetectionColumns.IMAGE_ID.value] = image_id
-
-            results.append(results_df)
 
     all_results = pd.concat(results, ignore_index=True)
     # Add a column for the session name.
     all_results[DetectionColumns.SESSION.value] = session_name
     return all_results
+
+
+def detect_flowers(
+    *args: Any, weights_file: Path, **kwargs: Any
+) -> pd.DataFrame:
+    """
+    Detects flowers in the images.
+
+    Args:
+        *args: Will be forwarded to `_detect_organs()`.
+        weights_file: The path to the model weights file.
+        **kwargs: Will be forwarded to `_detect_organs()`.
+
+    Returns:
+        A dataframe containing the detected flowers.
+
+    """
+    # Load the model.
+    model = YOLO(weights_file)
+    detector = partial(_detect_flowers_in_batch, model=model)
+
+    return _detect_organs(
+        *args,
+        detector=detector,
+        **kwargs,
+    )
+
+
+def detect_bolls(
+    *args: Any, weights_file: Path, **kwargs: Any
+) -> pd.DataFrame:
+    """
+    Detects boll locations in the images.
+
+    Args:
+        *args: Will be forwarded to `_detect_organs()`.
+        weights_file: The path to the model weights file.
+        **kwargs: Will be forwarded to `_detect_organs()`.
+
+    Returns:
+        A dataframe containing the detected boll locations.
+
+    """
+    # Load the model.
+    model = dm_count_yolov8()
+    model.to(_TORCH_DEVICE)
+    model.load_state_dict(torch.load(weights_file, _TORCH_DEVICE))
+    model.eval()
+
+    detector = partial(_detect_bolls_in_batch, model=model)
+
+    return _detect_organs(
+        *args,
+        detector=detector,
+        **kwargs,
+    )
 
 
 def find_image_extents(
