@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plot
-from shapely import GeometryType, Polygon, STRtree, from_ragged_array
+from shapely import GeometryType, Point, Polygon, STRtree, from_ragged_array
 from statsmodels.formula import api as sm
 
 GT_SESSIONS = {
@@ -1248,6 +1248,31 @@ def plot_flowering_duration_comparison(
     # Make it wider so the x labels don't overlap.
     figure.set_size_inches(12, 6)
     return figure
+
+
+def detections_to_points(detections: pd.DataFrame) -> Iterable[Point]:
+    """
+    Converts detections from a dataframe to points.
+
+    Args:
+        detections: The detections.
+
+    Returns:
+        The points.
+
+    """
+    # Extract raw coordinates as an array of points.
+    x1, y1 = [
+        c.value
+        for c in [
+            DetectionColumns.X1,
+            DetectionColumns.Y1,
+        ]
+    ]
+    coords = detections[[x1, y1]]
+    coords = coords.to_numpy().reshape(-1, 2)
+
+    return from_ragged_array(GeometryType.POINT, coords, [])
 
 
 def detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:

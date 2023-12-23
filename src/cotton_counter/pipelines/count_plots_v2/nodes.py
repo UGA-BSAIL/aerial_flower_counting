@@ -19,7 +19,7 @@ from pandarallel import pandarallel
 from PIL import Image
 from rasterio import DatasetReader
 from scipy import optimize
-from shapely import Polygon, STRtree, affinity, intersection
+from shapely import Point, Polygon, STRtree, affinity, intersection
 from shapely.geometry import mapping
 from torchvision import transforms
 from ultralytics import YOLO
@@ -35,6 +35,7 @@ from ..common import (
     GroundTruthColumns,
     OutlierColumns,
     batch_iter,
+    detections_to_points,
     detections_to_polygons,
     merge_genotype_info,
     query_intersecting,
@@ -746,7 +747,7 @@ def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     features = []
     for (_, row), polygon in zip(
-        detections.iterrows(), detections_to_polygons(detections)
+        detections.iterrows(), detections_to_points(detections)
     ):
         features.append(
             {
@@ -968,7 +969,7 @@ def _label_plots_gt_monte_carlo(
 def _find_detections_in_regions(
     *,
     detections: pd.DataFrame,
-    detection_polys: Iterable[Polygon],
+    detection_polys: Iterable[Polygon | Point],
     labeled_plots: Iterable[Tuple[Polygon, int, Set[str]]],
 ) -> pd.DataFrame:
     """
@@ -1050,7 +1051,7 @@ def _find_detections_in_plots(
     """
     return _find_detections_in_regions(
         detections=detections,
-        detection_polys=detections_to_polygons(detections),
+        detection_polys=detections_to_points(detections),
         labeled_plots=_label_plots(
             plot_boundaries=_load_polygons(plot_boundaries),
             field_config=field_config,

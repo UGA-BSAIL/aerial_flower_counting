@@ -220,7 +220,7 @@ bounding_box_shapes:
   filepath: data/08_reporting/bounding_boxes.shp
   versioned: True
   schema:
-    geometry: Polygon
+    geometry: Point
     properties:
       - [confidence, float]
       - [session, str]
