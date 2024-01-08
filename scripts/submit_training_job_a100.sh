@@ -13,7 +13,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:a100:1
 #SBATCH --time=48:00:00
-#SBATCH --mem=32gb
+#SBATCH --mem=40gb
 #SBATCH --account=lift-phenomics
 #SBATCH --qos=lift-phenomics
 #SBATCH --mail-user=djpetti@gmail.com
@@ -55,4 +55,4 @@ function prepare_environment() {
 prepare_environment
 
 # Run the training.
-python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/aerial_dataset.yaml $@
+python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/ssl_active_learning_dataset.yaml $@

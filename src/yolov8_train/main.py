@@ -47,10 +47,10 @@ def train(dataset: Path, *, model: str, name: Optional[str] = None) -> None:
     model.train(
         data=dataset,
         epochs=100,
-        imgsz=720,
+        imgsz=[540, 960],
         project="flower_counting",
         name=name,
-        batch=-1,
+        batch=64,
     )
 
 
