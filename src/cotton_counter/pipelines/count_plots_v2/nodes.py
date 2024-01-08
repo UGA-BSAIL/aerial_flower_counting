@@ -23,6 +23,7 @@ from shapely import Point, Polygon, STRtree, affinity, intersection
 from shapely.geometry import mapping
 from torchvision import transforms
 from ultralytics import YOLO
+from scipy import stats
 
 from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
@@ -1540,7 +1541,8 @@ def _classify_flowering_habits(
     *,
     peak: pd.DataFrame,
     genotypes: pd.DataFrame,
-    habit_quantiles: List = [0.33, 0.33, 0.66, 0.66],
+    early_late_quantiles: Tuple[float, float] = (0.33, 0.66),
+    optimal_quantile_range: float = 0.15,
 ) -> pd.DataFrame:
     """
     Divides genotypes into early-flowering, optimal-flowering,
@@ -1550,10 +1552,12 @@ def _classify_flowering_habits(
     Args:
         peak: The flowering peaks.
         genotypes: The associated genotype information.
-        habit_quantiles: The quantile thresholds to use for the upper limit
-            on the early-flowering group, the lower limit on the optimal
-            flowering group, the upper limit on the optimal flowering group,
-            and the lower limit on the late flowering group.
+        early_late_quantiles: The quantile thresholds to use for the upper limit
+            on the early-flowering group and the lower limit on the late
+            flowering group.
+        optimal_quantile_range: The value that will be added and subtracted
+            from the optimal quantile to determine the quantile range for
+            optimal flowering.
 
     Returns:
         The peak flowering data with an additional column classifying each
@@ -1570,6 +1574,15 @@ def _classify_flowering_habits(
 
     # Determine the cutoff times for each group.
     peak_time = peak_genotypes[CountingColumns.DAP.value]
+    optimal_quantile = stats.percentileofscore(peak_time, mean_peak_time) / 100
+    max_early, min_late = early_late_quantiles
+    habit_quantiles = [
+        max_early,
+        optimal_quantile - optimal_quantile_range,
+        optimal_quantile + optimal_quantile_range,
+        min_late,
+    ]
+    logger.debug("Using habit quantiles: {}", habit_quantiles)
     cutoff_times = peak_time.quantile(habit_quantiles)
 
     # Get the candidate genotypes for each group based on the cutoffs.

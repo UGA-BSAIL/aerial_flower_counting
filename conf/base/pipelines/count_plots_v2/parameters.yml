@@ -3,6 +3,7 @@ v2_field_planted_date: 2023-05-19
 
 # Number of genotypes we want to collect from the field.
 num_genotypes_to_collect: 40
-# Quantile ranges that define the early, optimal, and late flowering habits.
-# The order is: max for early, min for optimal, max for optimal, min for late
-genotype_habit_quantiles: [0.05, 0.45, 0.55, 0.95]
+# Quantile ranges that define the early and late flowering habits.
+early_late_quantiles: [0.05, 0.95]
+# Quantile range that defines the optimal flowering habit.
+optimal_quantile_range: 0.025

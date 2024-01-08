@@ -401,7 +401,8 @@ def _create_analysis_pipeline() -> Pipeline:
                     slope="flowering_slopes",
                     genotypes="cleaned_genotypes",
                     num_to_select="params:num_genotypes_to_collect",
-                    habit_quantiles="params:genotype_habit_quantiles",
+                    early_late_quantiles="params:early_late_quantiles",
+                    optimal_quantile_range="params:optimal_quantile_range"
                 ),
                 "genotypes_to_collect",
             ),
