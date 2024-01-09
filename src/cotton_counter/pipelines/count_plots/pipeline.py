@@ -256,15 +256,15 @@ def create_pipeline(**kwargs):
                     flower_masks="mask_results",
                     gsds="params:session_gsds",
                 ),
-                "flower_sizes_no_dap_no_plot",
+                "flower_sizes_no_plot_with_empty",
             ),
             node(
                 add_plot_index,
                 dict(
-                    plot_data="flower_sizes_no_dap_no_plot",
+                    plot_data="flower_sizes_no_plot_with_empty",
                     field_config="j2_field_config",
                 ),
-                "flower_sizes",
+                "flower_sizes_with_empty",
             ),
             # Compute heights.
             # node(
@@ -312,6 +312,15 @@ def create_pipeline(**kwargs):
                     field_config="j2_field_config",
                 ),
                 "cumulative_counts",
+            ),
+            node(
+                clean_empty_plots,
+                dict(
+                    plot_df="flower_sizes_with_empty",
+                    empty_plots="empty_plots_j2",
+                    field_config="j2_field_config",
+                ),
+                "flower_sizes",
             ),
             # node(
             #     clean_empty_plots,
@@ -377,6 +386,7 @@ def create_pipeline(**kwargs):
                     flowering_ends="flowering_ends",
                     flowering_durations="flowering_durations",
                     flowering_slopes="flowering_slopes",
+                    flower_sizes="flower_sizes",
                     genotypes="cleaned_genotypes",
                 ),
                 "human_readable_metrics",

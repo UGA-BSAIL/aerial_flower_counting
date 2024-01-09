@@ -593,7 +593,9 @@ def add_plot_index(
     return plot_data
 
 
-def collect_session_results(*session_results: pd.DataFrame,) -> pd.DataFrame:
+def collect_session_results(
+    *session_results: pd.DataFrame,
+) -> pd.DataFrame:
     """
     Collects the results from an entire set of sessions into a single Pandas
     DataFrame.
@@ -807,6 +809,7 @@ def create_metric_table(
     flowering_ends: pd.DataFrame,
     flowering_durations: pd.DataFrame,
     flowering_slopes: pd.DataFrame,
+    flower_sizes: pd.DataFrame,
     genotypes: pd.DataFrame,
 ) -> pd.DataFrame:
     """
@@ -818,6 +821,7 @@ def create_metric_table(
         flowering_ends: The flowering end times.
         flowering_durations: The flowering durations.
         flowering_slopes: The flowering slopes.
+        flower_sizes: The average size of the flowers.
         genotypes: The genotype information.
 
     Returns:
@@ -832,6 +836,7 @@ def create_metric_table(
     end_and_duration = merge(flowering_ends, flowering_durations)
     slope_and_genotype = merge(flowering_slopes, genotypes)
     combined = merge(peak_and_start, end_and_duration)
+    combined = merge(combined, flower_sizes)
     combined = merge(combined, slope_and_genotype)
 
     # Convert to human-readable names.
@@ -849,6 +854,7 @@ def create_metric_table(
             FloweringTimeColumns.DURATION.value: "Duration (days)",
             FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
             FloweringSlopeColumns.INTERCEPT.value: "Intercept",
+            FlowerSizeColumns.SIZE_CM.value: "Size (cm^2)",
             GenotypeColumns.GENOTYPE.value: "Genotype",
             GenotypeColumns.POPULATION.value: "Population",
         },
@@ -921,7 +927,8 @@ def clean_ground_truth(raw_ground_truth: pd.DataFrame) -> pd.DataFrame:
 
     # Index by plot number.
     cleaned.set_index(
-        GroundTruthColumns.PLOT.value, inplace=True,
+        GroundTruthColumns.PLOT.value,
+        inplace=True,
     )
     cleaned.sort_index(inplace=True)
 
@@ -1289,7 +1296,14 @@ def compute_flower_sizes(
     detection_results[
         FlowerSizeColumns.SIZE_CM.value
     ] = detection_results.parallel_apply(_compute_size, axis=1)
-    return detection_results.dropna()
+    detection_results.dropna(inplace=True)
+
+    # Average over all the boxes and sessions in a plot.
+    average_sizes = detection_results.groupby(
+        DetectionColumns.DETECTION_PLOT.value,
+        as_index=False,
+    ).mean()
+    return average_sizes
 
 
 def _merge_genotype_info(
@@ -1326,7 +1340,10 @@ def _merge_genotype_info(
     if CountingColumns.DAP.value in combined_data.columns:
         # Group by DAP too if the data are temporal.
         group_columns.append(CountingColumns.DAP.value)
-    return combined_data.groupby(group_columns, as_index=False,).agg("mean")
+    return combined_data.groupby(
+        group_columns,
+        as_index=False,
+    ).agg("mean")
 
 
 def _plot_flowering_time_histogram(
