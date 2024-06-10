@@ -1,6 +1,6 @@
 import wandb
 from ultralytics import YOLO
-from ultralytics.yolo.utils.torch_utils import get_flops, get_num_params
+from ultralytics.utils.torch_utils import get_flops, get_num_params
 
 
 def on_pretrain_routine_start(trainer):

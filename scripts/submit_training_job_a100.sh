@@ -7,15 +7,15 @@
 # `poetry install`.
 
 #SBATCH --partition=gpu
-#SBATCH -J self_supervised_model_train
+#SBATCH -J yolo_model_train
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:a100:1
 #SBATCH --time=48:00:00
 #SBATCH --mem=40gb
-#SBATCH --account=lift-phenomics
-#SBATCH --qos=lift-phenomics
+#SBATCH --account=cli2
+#SBATCH --qos=cli2
 #SBATCH --mail-user=djpetti@gmail.com
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=yolo_model_train.%j.out    # Standard output log
@@ -24,9 +24,9 @@
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
+OUTPUT_BASE_DIR="/blue/cli2/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
+LARGE_FILES_DIR="/blue/cli2/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.
@@ -55,4 +55,6 @@ function prepare_environment() {
 prepare_environment
 
 # Run the training.
-python -m src.yolov8_train -d /blue/lift-phenomics/daniel.petti/mot/data/05_model_input/detection_flower_dataset/ssl_active_learning_dataset.yaml $@
+yolo train model=yolov9c.pt imgsz=960 patience=75 \
+  data=/blue/cli2/daniel.petti/mot/data/05_model_input/detection_flower_dataset/ssl_active_learning_dataset.yaml \
+  batch=32 project=flower_counting
