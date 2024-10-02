@@ -74,6 +74,18 @@ except ImportError:
 class BaseModel(nn.Module):
     """The BaseModel class serves as a base class for all the models in the Ultralytics YOLO family."""
 
+    def __init__(self, *args, embedding_layer: int = 5, **kwargs):
+        """
+        Args:
+            *args: Will be forwarded to the superclass.
+            embedding_layer: The default layer to return embeddings from.
+            **kwargs: Will be forwarded to the superclass.
+
+        """
+        self.__embedding_layer = embedding_layer
+
+        super().__init__(*args, **kwargs)
+
     def forward(self, x, *args, **kwargs):
         """
         Forward pass of the model on a single scale. Wrapper for `_forward_once` method.
@@ -102,6 +114,9 @@ class BaseModel(nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
+        if embed is None:
+            embed = [self.__embedding_layer]
+
         if augment:
             return self._predict_augment(x)
         return self._predict_once(x, profile, visualize, embed)
@@ -293,7 +308,7 @@ class DetectionModel(BaseModel):
         if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose, OBB)) else self.forward(x)
+            forward = lambda x: self.forward(x)[0]
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             self.stride = m.stride
             m.bias_init()  # only run once

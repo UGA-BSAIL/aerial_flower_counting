@@ -24,7 +24,6 @@ numpy = "^1.22.3"
 torch = "^2.0.1"
 torchvision = "^0.16.2"
 pydantic = "^1.9.0"
-ultralytics = "^8.2.28"
 wandb = "^0.15.4"
 segment-anything = {git = "https://github.com/facebookresearch/segment-anything.git"}
 python-json-logger = "^2.0.7"
@@ -34,6 +33,7 @@ fiona = "^1.9.4.post1"
 shapely = "^2.0.1"
 scipy = "^1.11.2"
 tensorflow = "2.15"
+ultralytics = {path = "external/ultralytics"}
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^3.8.3"

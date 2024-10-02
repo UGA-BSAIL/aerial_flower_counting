@@ -27,64 +27,14 @@ class DetectionModelWithFeatures(DetectionModel):
         # we don't swap it out until now.
         self._predict_once = self._predict_once_with_features
 
-    @classmethod
-    def from_detection_model(
-        cls, model: DetectionModel
-    ) -> "DetectionModelWithFeatures":
+    def predict(self, *args: Any, **kwargs: Any):
         """
-        Builds a new instance based on a normal `DetectionModel`.
+        Calls the superclass's `predict()` method, but defaults to also
+        returning feature embeddings.
 
         Args:
-            model: The `DetectionModel`.
-
-        Returns:
-            An equivalent `DetectionModelWithFeatures`.
+            *args: Forwarded to superclass.
+            **kwargs: Forwarded to superclass.
 
         """
-        new_model = DetectionModelWithFeatures()
-
-        # Copy the underlying data.
-        new_model.yaml = model.yaml
-        new_model.names = model.names
-        new_model.inplace = model.inplace
-        new_model.model = deepcopy(model.model)
-
-        return new_model
-
-    def _predict_once_with_features(
-        self, x: Tensor, profile: bool = False, visualize: bool = False
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Same as the superclass version, but returns both the detector outputs
-        and the extracted features.
-
-        Args:
-            x: The inputs to predict on.
-            profile: Whether to profile computation time.
-            visualize: Whether to visualize feature maps.
-
-        Returns:
-            The detection output, and the feature output.
-
-        """
-        y, dt = [], []  # outputs
-        features = None
-        for layer_i, m in enumerate(self.model):
-            if m.f != -1:  # if not from previous layer
-                x = (
-                    y[m.f]
-                    if isinstance(m.f, int)
-                    else [x if j == -1 else y[j] for j in m.f]
-                )  # from earlier layers
-            if profile:
-                self._profile_one_layer(m, x, dt)
-
-            x = m(x)  # run
-            if layer_i == self.__feature_layer:
-                # Save the features.
-                features = x
-
-            y.append(x if m.i in self.save else None)  # save output
-            if visualize:
-                feature_visualization(x, m.type, m.i, save_dir=visualize)
-        return x, features
+        super().predict(*args, **kwargs, embed=self.__feature_layer)
