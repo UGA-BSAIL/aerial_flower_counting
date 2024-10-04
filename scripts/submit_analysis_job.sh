@@ -24,9 +24,9 @@
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
+OUTPUT_BASE_DIR="/blue/cli2/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
+LARGE_FILES_DIR="/blue/cli2/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.
@@ -36,7 +36,6 @@ function prepare_environment() {
 
   # Copy the code.
   cp -Rd "${SLURM_SUBMIT_DIR}/"* "${job_dir}/"
-  cp -Rd "${SLURM_SUBMIT_DIR}/.kedro"* "${job_dir}/"
 
   # Link to the input data directory and venv.
   rm -rf "${job_dir}/data"

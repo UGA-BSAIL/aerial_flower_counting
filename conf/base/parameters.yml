@@ -1,5 +1,5 @@
 # Locations where the detection model weights are saved.
-flower_model_weights_file: "yolov8m_flower_active_9.pt"
+flower_model_weights_file: "data/06_models/yolov8m_flower_active_9.pt"
 boll_model_weights_file: "data/06_models/dm_count/best_model_6.pth"
 
 # Batch size to use for inference.
@@ -9,4 +9,4 @@ prediction_batch_size: 16
 min_confidence: 0.5
 
 # Whether to do a try run without running the detector.
-dry_run: false
+dry_run: true

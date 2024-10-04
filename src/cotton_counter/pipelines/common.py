@@ -13,29 +13,11 @@ from matplotlib import pyplot as plot
 from shapely import GeometryType, Point, Polygon, STRtree, from_ragged_array
 from statsmodels.formula import api as sm
 
-GT_SESSIONS = {
-    "2023-07-27",
-    "2023-08-01",
-    "2023-08-03",
-    "2023-08-07",
-    "2023-08-10",
-    "2023-08-14",
-    "2023-08-18",
-    "2023-08-21",
-    "2023-08-24",
-    "2023-08-28",
-    "2023-09-01",
-    "2023-09-05",
-    "2023-09-07",
-    "2023-09-12",
-    "2023-09-14",
-    "2023-09-18",
-    "2023-09-21",
-}
+GT_SESSIONS = set()
 """
 The set of sessions that include ground-truth.
 """
-_NON_GT_SESSIONS = {"2023-09-28", "2023-10-04", "2023-10-11"}
+_NON_GT_SESSIONS = {"2024-08-21", "2024-09-04", "2024-09-10"}
 """
 The set of sessions that don't include ground-truth.
 """
@@ -43,11 +25,11 @@ _ALL_FLOWER_SESSIONS = GT_SESSIONS | _NON_GT_SESSIONS
 """
 The set of all the sessions that we want to process.
 """
-BOLL_SESSIONS = {"2023-11-17"}
+BOLL_SESSIONS = set()
 """
 The set of sessions that contain cotton bolls.
 """
-SESSIONS = BOLL_SESSIONS
+SESSIONS = BOLL_SESSIONS | _ALL_FLOWER_SESSIONS
 
 
 @enum.unique
@@ -557,7 +539,7 @@ def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
 
     # Find the rows with the maximum count for each plot.
     plot_groups = counting_results.groupby(counting_results.index)
-    return plot_groups.apply(_find_peak)
+    return plot_groups.apply(_find_peak, group_keys=False)
 
 
 def compute_flowering_start_end(
@@ -620,8 +602,8 @@ def compute_flowering_start_end(
         )
     else:
         return (
-            plot_groups.apply(_get_flowering_start),
-            plot_groups.apply(_get_flowering_end),
+            plot_groups.apply(_get_flowering_start, group_keys=False),
+            plot_groups.apply(_get_flowering_end, group_keys=False),
         )
 
 

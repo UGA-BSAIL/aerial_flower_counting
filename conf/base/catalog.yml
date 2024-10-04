@@ -5,91 +5,19 @@ _image_params: &image_params
   dataset:
     type: pillow.ImageDataSet
 
-images_2023-07-27:
-  path: ${corrected_image_dir}/2023-07-27
+images_2024-08-21:
+  path: ${corrected_image_dir}/2024-08-21
   << : *image_params
 
-images_2023-08-01:
-  path: ${corrected_image_dir}/2023-08-01
+images_2024-09-04:
+  path: ${corrected_image_dir}/2024-09-04
   << : *image_params
 
-images_2023-08-03:
-  path: ${corrected_image_dir}/2023-08-03
+images_2024-09-10:
+  path: ${corrected_image_dir}/2024-09-10
   << : *image_params
 
-images_2023-08-07:
-  path: ${corrected_image_dir}/2023-08-07
-  << : *image_params
-
-images_2023-08-10:
-  path: ${corrected_image_dir}/2023-08-10
-  << : *image_params
-
-images_2023-08-14:
-  path: ${corrected_image_dir}/2023-08-14
-  << : *image_params
-
-images_2023-08-18:
-  path: ${corrected_image_dir}/2023-08-18
-  << : *image_params
-
-images_2023-08-21:
-  path: ${corrected_image_dir}/2023-08-21
-  << : *image_params
-
-images_2023-08-24:
-  path: ${corrected_image_dir}/2023-08-24
-  << : *image_params
-
-images_2023-08-28:
-  path: ${corrected_image_dir}/2023-08-28
-  << : *image_params
-
-images_2023-09-01:
-  path: ${corrected_image_dir}/2023-09-01
-  << : *image_params
-
-images_2023-09-05:
-  path: ${corrected_image_dir}/2023-09-05
-  << : *image_params
-
-images_2023-09-07:
-  path: ${corrected_image_dir}/2023-09-07
-  << : *image_params
-
-images_2023-09-12:
-  path: ${corrected_image_dir}/2023-09-12
-  << : *image_params
-
-images_2023-09-14:
-  path: ${corrected_image_dir}/2023-09-14
-  << : *image_params
-
-images_2023-09-18:
-  path: ${corrected_image_dir}/2023-09-18
-  << : *image_params
-
-images_2023-09-21:
-  path: ${corrected_image_dir}/2023-09-21
-  << : *image_params
-
-images_2023-09-28:
-  path: ${corrected_image_dir}/2023-09-28
-  << : *image_params
-
-images_2023-10-04:
-  path: ${corrected_image_dir}/2023-10-04
-  << : *image_params
-
-images_2023-10-11:
-  path: ${corrected_image_dir}/2023-10-11
-  << : *image_params
-
-images_2023-11-17:
-  path: ${corrected_image_dir}/2023-11-17
-  << : *image_params
-
-  # Dataset containing the excess green values for the input images.
+# Dataset containing the excess green values for the input images.
 excess_green:
   type: cotton_counter.data_sets.ParallelPartitionedDataSet
   filename_suffix: ".png"

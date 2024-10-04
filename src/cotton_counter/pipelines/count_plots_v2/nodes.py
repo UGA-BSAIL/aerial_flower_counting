@@ -24,6 +24,7 @@ from shapely.geometry import mapping
 from torchvision import transforms
 from ultralytics import YOLO
 from scipy import stats
+from field_config import FieldConfig
 
 from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
@@ -43,7 +44,6 @@ from ..common import (
 )
 from .dm_count.models import make_divisible
 from .dm_count.models import yolov8 as dm_count_yolov8
-from .field_config import FieldConfig
 
 ImageDataSet = Dict[str, Callable[[], Image.Image]]
 """

@@ -162,7 +162,7 @@ class DemHeightEstimator:
         self.__dem_dataset = dem_dataset
 
         # Keeps track of the previous height measurement.
-        self.__previous_height = self.__dem_dataset.statistics(1).min
+        self.__previous_height = self.__dem_dataset.stats(indexes=[1])[0].min
 
     def __get_dem_height(self, point_xy: np.array) -> float:
         """

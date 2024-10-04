@@ -11,6 +11,10 @@ bottom_field_config_raw:
   type: yaml.YAMLDataSet
   filepath: data/01_raw/field_config_tifton_bottom.yml
 
+mars_field_config:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_MARS_2024.yml
+
 # Plot boundaries.
 plot_borders_top:
   type: cotton_counter.data_sets.ShapefileDataSet
@@ -23,6 +27,10 @@ plot_borders_middle:
 plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
   filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
+
+plot_borders_mars:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/mars/plot_outlines.shp
 
 # Plot borders for september onwards.
 plot_borders_top_sep:

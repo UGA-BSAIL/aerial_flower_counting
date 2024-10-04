@@ -115,7 +115,13 @@ class BaseModel(nn.Module):
             (torch.Tensor): The last output of the model.
         """
         if embed is None:
-            embed = [self.__embedding_layer]
+            try:
+                embed = [self.__embedding_layer]
+            except AttributeError:
+                LOGGER.warning(
+                    "Embedding layers were not specified. Assuming"
+                    " this is a vanilla model and ignoring embeddings."
+                )
 
         if augment:
             return self._predict_augment(x)

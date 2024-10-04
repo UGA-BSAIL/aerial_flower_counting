@@ -7,6 +7,7 @@ from typing import Tuple
 
 import pandas as pd
 from kedro.pipeline import Pipeline, node
+from field_config import FieldConfig
 
 from ..camera_utils import CameraConfig
 from ..common import (
@@ -39,7 +40,6 @@ from ..common import (
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
 )
-from .field_config import FieldConfig
 from .nodes import (
     add_plot_index,
     clean_genotypes,
@@ -143,21 +143,24 @@ def _create_ground_truth_pipeline() -> Pipeline:
         )
         session_node_names.append(f"gt_{session}_loaded")
 
-    nodes.extend(
-        [
-            # Merge them all together.
-            node(lambda *d: pd.concat(d), session_node_names, "gt_no_dap"),
-            # Add the DAP value.
-            node(
-                add_dap_ground_truth,
-                dict(
-                    ground_truth="gt_no_dap",
-                    field_planted_date="params:v2_field_planted_date",
+    if len(session_node_names) > 0:
+        nodes.extend(
+            [
+                # Merge them all together.
+                node(lambda *d: pd.concat(d), session_node_names, "gt_no_dap"),
+                # Add the DAP value.
+                node(
+                    add_dap_ground_truth,
+                    dict(
+                        ground_truth="gt_no_dap",
+                        field_planted_date="params:v2_field_planted_date",
+                    ),
+                    "gt_combined",
                 ),
-                "gt_combined",
-            ),
-        ]
-    )
+            ]
+        )
+    else:
+        nodes.append(node(lambda: pd.DataFrame(), None, "gt_combined"))
 
     return Pipeline(nodes)
 
@@ -402,7 +405,7 @@ def _create_analysis_pipeline() -> Pipeline:
                     genotypes="cleaned_genotypes",
                     num_to_select="params:num_genotypes_to_collect",
                     early_late_quantiles="params:early_late_quantiles",
-                    optimal_quantile_range="params:optimal_quantile_range"
+                    optimal_quantile_range="params:optimal_quantile_range",
                 ),
                 "genotypes_to_collect",
             ),
@@ -521,14 +524,34 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "detection_results_plot_num_bottom_post_sep",
             ),
             node(
+                find_detections_in_plots_pre_september,
+                dict(
+                    detections="filtered_detection_results",
+                    plot_boundaries="plot_borders_mars",
+                    field_config="mars_field_config",
+                ),
+                "detection_results_plot_num_mars_pre_sep",
+            ),
+            node(
+                find_detections_in_plots_post_september,
+                dict(
+                    detections="filtered_detection_results",
+                    plot_boundaries="plot_borders_mars",
+                    field_config="mars_field_config",
+                ),
+                "detection_results_plot_num_mars_post_sep",
+            ),
+            node(
                 lambda *d: pd.concat(d),
                 [
                     "detection_results_plot_num_top_pre_sep",
                     "detection_results_plot_num_middle_pre_sep",
                     "detection_results_plot_num_bottom_pre_sep",
+                    "detection_results_plot_num_mars_pre_sep",
                     "detection_results_plot_num_top_post_sep",
                     "detection_results_plot_num_middle_post_sep",
                     "detection_results_plot_num_bottom_post_sep",
+                    "detection_results_plot_num_mars_post_sep",
                 ],
                 "detection_results_plot_num",
             ),
