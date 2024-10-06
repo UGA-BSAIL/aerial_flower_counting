@@ -470,6 +470,11 @@ def create_pipeline(**kwargs) -> Pipeline:
                 "bottom_field_config",
             ),
             node(
+                FieldConfig.from_yml,
+                "mars_field_config_raw",
+                "mars_field_config",
+            ),
+            node(
                 find_detections_in_plots_pre_september,
                 dict(
                     detections="filtered_detection_results",

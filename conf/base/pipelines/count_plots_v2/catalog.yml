@@ -11,7 +11,7 @@ bottom_field_config_raw:
   type: yaml.YAMLDataSet
   filepath: data/01_raw/field_config_tifton_bottom.yml
 
-mars_field_config:
+mars_field_config_raw:
   type: yaml.YAMLDataSet
   filepath: data/01_raw/field_config_tifton_MARS_2024.yml
 

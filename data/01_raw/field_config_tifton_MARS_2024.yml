@@ -1,0 +1,74 @@
+# Field configuration for the double-spaced MARS field.
+
+# List of the rows in the field. Note that this layout is specified with each
+# "row" actually corresponding to a column in the actual field. This is easier
+# because of the way the plots are numbered.
+rows:
+  # This is not a complete row, so we fill the missing plots with -1.
+  row14:
+    - range:
+        start: -1
+        end: -1
+        repeats: 8
+    - range:
+        start: 1532
+        end: 1529
+  row13:
+    - range:
+        start: 1517
+        end: 1528
+  row12:
+    - range:
+        start: 1516
+        end: 1505
+  row11:
+    - range:
+        start: 1425
+        end: 1432
+    # For some reason, it wraps at 32.
+    - range:
+        start: 1501
+        end: 1504
+  row10:
+    - shift:
+        row: row12
+        amount: -92
+  row9:
+    - shift:
+        row: row13
+        amount: -116
+  row8:
+    - shift:
+        row: row12
+        amount: -184
+  row7:
+    - shift:
+        row: row13
+        amount: -208
+  row6:
+    - range:
+        start: 1308
+        end: 1301
+    - range:
+        start: 1232
+        end: 1229
+  row5:
+    - shift:
+        row: row13
+        amount: -300
+  row4:
+    - shift:
+        row: row12
+        amount: -300
+  row3:
+    - shift:
+        row: row11
+        amount: -300
+  row2:
+    - shift:
+        row: row10
+        amount: -300
+  row1:
+    - shift:
+        row: row9
+        amount: -300

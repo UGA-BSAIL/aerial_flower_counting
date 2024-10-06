@@ -538,8 +538,10 @@ def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
         ]
 
     # Find the rows with the maximum count for each plot.
-    plot_groups = counting_results.groupby(counting_results.index)
-    return plot_groups.apply(_find_peak, group_keys=False)
+    plot_groups = counting_results.groupby(
+        counting_results.index, group_keys=False
+    )
+    return plot_groups.apply(_find_peak)
 
 
 def compute_flowering_start_end(
@@ -1252,7 +1254,7 @@ def detections_to_points(detections: pd.DataFrame) -> Iterable[Point]:
         ]
     ]
     coords = detections[[x1, y1]]
-    coords = coords.to_numpy().reshape(-1, 2)
+    coords = coords.to_numpy().reshape(-1, 2).astype(float)
 
     return from_ragged_array(GeometryType.POINT, coords, [])
 
@@ -1279,7 +1281,7 @@ def detections_to_polygons(detections: pd.DataFrame) -> Iterable[Polygon]:
         ]
     ]
     coords = detections[[x1, y1, x2, y1, x2, y2, x1, y2, x1, y1]]
-    coords = coords.to_numpy().reshape(-1, 2)
+    coords = coords.to_numpy().reshape(-1, 2).astype(float)
 
     # Five points for every detection box.
     offsets = np.arange(0, len(coords) + 1, 5)
