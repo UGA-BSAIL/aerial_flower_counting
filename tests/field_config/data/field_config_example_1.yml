@@ -1,4 +1,5 @@
 # List of the rows in the field.
+row_direction: west_to_east
 rows:
   row1:
     # Specifies a range of sequential numbers for the plots in the row.
