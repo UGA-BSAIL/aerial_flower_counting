@@ -2,11 +2,14 @@
 Tests for the `utils` module.
 """
 
+from typing import Dict, Any
+
 import geopandas as gpd
 
 import pytest
 
-from src.field_config import FieldConfig, label_plots, RowDirection
+from src.field_config import FieldConfig, label_plots
+from src.field_config.field_config import RowDirection
 from .data import EXAMPLE_PLOTS_1
 
 
@@ -24,7 +27,7 @@ def example_1_plot_shapes() -> gpd.GeoDataFrame:
     ids=["N-S", "W-E"],
 )
 def test_label_plots(
-    example_field_1: FieldConfig,
+    example_field_1_yaml: Dict[str, Any],
     example_1_plot_shapes: gpd.GeoDataFrame,
     row_direction: RowDirection,
 ) -> None:
@@ -32,17 +35,25 @@ def test_label_plots(
     Tests that `label_plots` works.
 
     Args:
-        example_field_1: The field config to test with.
+        example_field_1_yaml: The field config to test with.
         example_1_plot_shapes: The shapes of the plots in the field.
         row_direction: The direction of the rows in the plots.
 
     """
+    # Arrange.
+    # Set the row direction.
+    if row_direction == RowDirection.NORTH_TO_SOUTH:
+        example_field_1_yaml["row_direction"] = "north_to_south"
+    elif row_direction == RowDirection.WEST_TO_EAST:
+        example_field_1_yaml["row_direction"] = "west_to_east"
+
+    field_config = FieldConfig.from_yml(example_field_1_yaml)
+
     # Act.
     labeled = list(
         label_plots(
             plot_boundaries=example_1_plot_shapes.geometry,
-            field_config=example_field_1,
-            row_direction=row_direction,
+            field_config=field_config,
         )
     )
 

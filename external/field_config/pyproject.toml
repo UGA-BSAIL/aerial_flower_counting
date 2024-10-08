@@ -1,6 +1,6 @@
 [project]
 name = "field_config"
-version = "0.2.0"
+version = "0.3.0"
 description = "Default template for PDM package"
 authors = [
     {name = "Daniel Petti", email = "djpetti@gmail.com"},

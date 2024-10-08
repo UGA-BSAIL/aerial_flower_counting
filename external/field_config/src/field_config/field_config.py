@@ -2,11 +2,23 @@
 Represents the configuration of a field.
 """
 
+import enum
 from typing import Iterable, Dict, Any
 from functools import singledispatch
 from tabulate import tabulate
+import numpy as np
 
 from .field_row import FieldRow
+
+
+@enum.unique
+class RowDirection(enum.IntEnum):
+    """
+    Represents possible directions for the rows.
+    """
+
+    NORTH_TO_SOUTH = enum.auto()
+    WEST_TO_EAST = enum.auto()
 
 
 class FieldConfig:
@@ -14,13 +26,27 @@ class FieldConfig:
     Represents the configuration of a field.
     """
 
-    def __init__(self, rows: Iterable[FieldRow]):
+    _ROW_DIRECTIONS = {
+        "north_to_south": RowDirection.NORTH_TO_SOUTH,
+        "west_to_east": RowDirection.WEST_TO_EAST,
+    }
+    """
+    Represents the names we can use for row directions in the YAML file.
+    """
+
+    def __init__(
+        self,
+        rows: Iterable[FieldRow],
+        direction: RowDirection = RowDirection.NORTH_TO_SOUTH,
+    ):
         """
         Args:
             rows: The rows in this field.
+            direction: The direction that the rows are pointing.
 
         """
         self.__rows = list(rows)
+        self.__row_direction = direction
 
     @classmethod
     def from_yml(cls, config: Dict[str, Any]) -> "FieldConfig":
@@ -64,10 +90,14 @@ class FieldConfig:
             # Parse all the sub-rows and then merge them.
             return FieldRow.merge(*[_parse_row(row, name) for row in spec])
 
+        # Parse the row direction.
+        direction = config.get("row_direction", "north_to_south")
+        direction = cls._ROW_DIRECTIONS[direction]
+
         for row_name, row_spec in config["rows"].items():
             rows_by_name[row_name] = _parse_row(row_spec, row_name)
 
-        return cls(rows_by_name.values())
+        return cls(rows_by_name.values(), direction=direction)
 
     def get_plot_num(self, row_index: int, plot_index: int) -> int:
         """
@@ -129,6 +159,17 @@ class FieldConfig:
         """
         return sum(len(row) for row in self.__rows)
 
+    @property
+    def row_direction(self) -> RowDirection:
+        """
+        Gets the direction of the rows in this field.
+
+        Returns:
+            The direction of the rows in this field.
+
+        """
+        return self.__row_direction
+
     def draw(self) -> None:
         """
         Prints a visual representation of the field.
@@ -140,5 +181,10 @@ class FieldConfig:
             for plot_i in range(len(row)):
                 table_row.append(self.get_plot_num(row_i, plot_i))
             table.append(table_row)
+
+        table = np.array(table)
+        if self.row_direction == RowDirection.NORTH_TO_SOUTH:
+            # Each row should be displayed vertically.
+            table = table.T
 
         print(tabulate(table, tablefmt="simple_grid"))
