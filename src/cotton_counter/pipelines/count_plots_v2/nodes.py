@@ -24,7 +24,7 @@ from shapely.geometry import mapping
 from torchvision import transforms
 from ultralytics import YOLO
 from scipy import stats
-from field_config import FieldConfig
+from field_config import FieldConfig, label_plots
 
 from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
@@ -784,37 +784,10 @@ def _label_plots(
         and the sessions that this is valid for.
 
     """
-    # Sort plots north-to-south and then west-to-east.
-    plot_boundaries = list(plot_boundaries)
-    plot_centers = [p.centroid for p in plot_boundaries]
-    boundaries_with_centers = [
-        (b, c) for b, c in zip(plot_boundaries, plot_centers)
-    ]
-    # Sort by x coordinate.
-    boundaries_with_centers_sorted_x = sorted(
-        boundaries_with_centers, key=lambda p: p[1].x
-    )
-    # Group by row.
-    boundaries_with_centers_by_row = list(
-        batch_iter(
-            boundaries_with_centers_sorted_x,
-            batch_size=field_config.num_plots // field_config.num_rows,
-        )
-    )
-    # Sort by y coordinate within rows.
-    boundaries_with_centers_sorted = [
-        sorted(row, key=lambda p: p[1].y, reverse=True)
-        for row in boundaries_with_centers_by_row
-    ]
-    boundaries_with_centers_sorted = reduce(
-        lambda x, y: x + y, boundaries_with_centers_sorted, []
-    )
-    boundaries_sorted = [b for b, _ in boundaries_with_centers_sorted]
-
-    # Assign real plot numbers to them.
     sessions = set(sessions)
-    for i, boundary in enumerate(boundaries_sorted):
-        plot_num = field_config.get_plot_num_row_major(i)
+    for boundary, plot_num in label_plots(
+        plot_boundaries=plot_boundaries, field_config=field_config
+    ):
         if plot_num < 0:
             # This is an empty or invalid plot.
             continue

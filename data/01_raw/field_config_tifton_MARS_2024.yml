@@ -1,5 +1,7 @@
 # Field configuration for the double-spaced MARS field.
 
+row_direction: west_to_east
+
 # List of the rows in the field. Note that this layout is specified with each
 # "row" actually corresponding to a column in the actual field. This is easier
 # because of the way the plots are numbered.
