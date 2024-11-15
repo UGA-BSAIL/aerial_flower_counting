@@ -396,9 +396,7 @@ class Exporter:
         LOGGER.info(f"\n{prefix} starting export with onnx {onnx.__version__} opset {opset_version}...")
         f = str(self.file.with_suffix(".onnx"))
 
-        output_names = ["output0", "output1", "output2"] if isinstance(
-            self.model, SegmentationModel
-        ) else ["output0", "output1"]
+        output_names = [f"output{n}" for n in range(len(self.output_shape))]
         dynamic = self.args.dynamic
         if dynamic:
             dynamic = {"images": {0: "batch", 2: "height", 3: "width"}}  # shape(1,3,640,640)
@@ -1051,20 +1049,30 @@ class Exporter:
         input_meta.content.contentPropertiesType = schema.ContentProperties.ImageProperties
 
         # Create output info
-        output1 = schema.TensorMetadataT()
-        output1.name = "output"
-        output1.description = "Coordinates of detected objects, class labels, and confidence score"
-        output1.associatedFiles = [label_file]
-        if self.model.task == "segment":
-            output2 = schema.TensorMetadataT()
-            output2.name = "output"
-            output2.description = "Mask protos"
-            output2.associatedFiles = [label_file]
+        outputs = []
+        for i in range(len(self.output_shape)):
+            output = schema.TensorMetadataT()
+            output.name = "output"
+
+            if i == 0:
+                # Box output
+                output.description = "Coordinates of detected objects, class labels, and confidence score"
+                output.associatedFiles = [label_file]
+            if i == 1 and self.model.task == "segment":
+                # Mask output
+                output.description = "Mask protos"
+                output.associatedFiles = [label_file]
+            else:
+                # Generic embeddings output
+                output.description = f"Embeddings {i}"
+                output.associatedFiles = []
+
+            outputs.append(output)
 
         # Create subgraph info
         subgraph = schema.SubGraphMetadataT()
         subgraph.inputTensorMetadata = [input_meta]
-        subgraph.outputTensorMetadata = [output1, output2] if self.model.task == "segment" else [output1]
+        subgraph.outputTensorMetadata = outputs
         model_meta.subgraphMetadata = [subgraph]
 
         b = flatbuffers.Builder(0)

@@ -37,6 +37,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
+from tensorflow.lite.python.schema_py_generated import Tensor
 
 from ultralytics.cfg import get_cfg, get_save_dir
 from ultralytics.data import load_inference_source
@@ -257,6 +258,11 @@ class BasePredictor:
                         continue
 
                 # Postprocess
+                features = None
+                if type(preds[0]) is not torch.Tensor:
+                    # We have an extra features output. We'll output this
+                    # unchanged.
+                    preds, *features = preds
                 with profilers[2]:
                     self.results = self.postprocess(preds, im, im0s)
                 self.run_callbacks("on_predict_postprocess_end")
@@ -278,7 +284,10 @@ class BasePredictor:
                     LOGGER.info("\n".join(s))
 
                 self.run_callbacks("on_predict_batch_end")
-                yield from self.results
+                results = self.results
+                if features is not None:
+                    results = zip(results, *features)
+                yield from results
 
         # Release assets
         for v in self.vid_writer.values():
