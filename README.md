@@ -6,7 +6,7 @@ This project contains reference code for the following paper:
 
 [Weakly-supervised learning to automatically count cotton flowers from aerial imagery](https://www.sciencedirect.com/science/article/pii/S0168169922000515)
 
-## Installing dependencies
+## Setup Instructions
 
 This code requires Python 3.8 and [Poetry](https://python-poetry.org/docs/).
 
@@ -15,7 +15,7 @@ To install, run
 poetry install --no-root
 ```
 
-## Running Pipelines
+## Usage
 
 This project uses [Kedro](https://kedro.readthedocs.io/en/stable/introduction/introduction.html).
 It implements different pipelines for various tasks. A pipeline can be run with:
@@ -31,13 +31,16 @@ The pipelines are:
 
 Training requires that you have access to the `TFRecords` files containing the
 dataset. These are specified in [`catalog.yml`](conf/base/catalog.yml), under
-`tfrecord_train`, `tfrecord_test`, `tfrecord_validate`, and 
-`tfrecord_test_alternate`. These are the training, testing, validation, and 
-supplemental testing datasets, respectively. (Only the first three are
-used for training. The last one is [part C](https://www.sciencedirect.com/science/article/pii/S0168169922000515#t0005)
+`tfrecord_train`, `tfrecord_tagged_patches_positive`, 
+`tfrecord_tagged_patches_negative`, `tfrecord_test`, `tfrecord_validate`, and 
+`tfrecord_test_alternate`. The first three are the training dataset, split 
+into point and binary-annotated portions. The last three are the testing, 
+validation, and supplemental testing datasets, respectively. (The last one is
+[part C](https://www.sciencedirect.com/science/article/pii/S0168169922000515#t0005)
 of the dataset used for extra evaluation.) Modify the `filepath` attribute of
 these catalog entries if necessary so that they point to the correct location
-on your computer.
+on your computer. See the "Data Information" section for where to download 
+the data.
 
 Once training is complete, the default location of the trained model is
 `output_data/06_models/fully_trained.hd5/`. Trained models will be versioned
@@ -94,3 +97,9 @@ kedro jupyter convert --all
 In order to automatically strip out all output cell contents before committing to `git`, you can run `kedro activate-nbstripout`. This will add a hook in `.git/config` which will run `nbstripout` before anything is committed to `git`.
 
 > *Note:* Your output cells will be left intact locally.
+
+## Data Information
+
+The training and evaluation data used for this project is available for
+download [here](https://uflorida-my.sharepoint.com/:u:/g/personal/daniel_petti_ufl_edu/EYyIFj7VM1pDleszo5yOKQ0Bb5bto4aLk1FHyuDS12HcSQ?e=9HDol9).
+
