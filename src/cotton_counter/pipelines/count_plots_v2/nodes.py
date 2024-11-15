@@ -714,11 +714,11 @@ def prune_duplicate_detections(
                 image2_indices.append(index)
                 image2_centroids.append(centroid)
 
-        return _prune_with_hungarian(
+        return _prune_by_size(
             indices1=image1_indices,
             indices2=image2_indices,
-            centroids1=image1_centroids,
-            centroids2=image2_centroids,
+            # centroids1=image1_centroids,
+            # centroids2=image2_centroids,
             prune_rows=prune_rows,
         )
 
