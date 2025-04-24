@@ -1320,6 +1320,9 @@ def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
         },
         inplace=True,
     )
+    cleaned[GenotypeColumns.GENOTYPE.value] = cleaned[
+        GenotypeColumns.GENOTYPE.value
+    ].astype(str)
 
     # Extract subpopulations.
     is_pd = cleaned[GenotypeColumns.GENOTYPE.value].str.startswith("PD05069")

@@ -1,0 +1,37 @@
+# List of the rows in the field.
+row_direction: "north_to_south"
+rows:
+  row1:
+    - range:
+        # The number of the first plot.
+        start: 1432
+        # The number of the last plot.
+        end: 1455
+        # The number of times each plot number repeats.
+        repeats: 2
+  row2:
+    - range:
+        start: 1479
+        end: 1456
+        repeats: 2
+  row3:
+    - range:
+        start: 1562
+        end: 1585
+        repeats: 2
+  row4:
+    - range:
+        start: 1609
+        end: 1586
+        repeats: 2
+  row5:
+    - range:
+        start: 1692
+        end: 1715
+        repeats: 2
+  row6:
+    - range:
+        start: 1739
+        end: 1716
+        repeats: 2
+

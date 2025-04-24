@@ -118,7 +118,8 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                     ),
                     output_node,
                 ),
-            ]
+            ],
+            tags=["detection"],
         ),
         output_node,
     )
@@ -162,7 +163,7 @@ def _create_ground_truth_pipeline() -> Pipeline:
     else:
         nodes.append(node(lambda: pd.DataFrame(), None, "gt_combined"))
 
-    return Pipeline(nodes)
+    return Pipeline(nodes, tags=["ground_truth"])
 
 
 def _create_image_extents_pipeline() -> Pipeline:
@@ -202,7 +203,7 @@ def _create_image_extents_pipeline() -> Pipeline:
         ]
     )
 
-    return Pipeline(nodes)
+    return Pipeline(nodes, tags=["analysis"])
 
 
 def _create_analysis_pipeline() -> Pipeline:
@@ -251,7 +252,7 @@ def _create_analysis_pipeline() -> Pipeline:
             # Find outliers.
             node(
                 clean_genotypes,
-                "genotype_spreadsheet_2023",
+                "genotype_spreadsheet_v2",
                 "cleaned_genotypes",
                 name="clean_genotypes",
             ),
@@ -370,6 +371,25 @@ def _create_analysis_pipeline() -> Pipeline:
                 ),
                 "mean_flowering_curve",
             ),
+            # Determine which genotypes should be collected in the field.
+            node(
+                find_genotypes_to_collect,
+                dict(
+                    start="flowering_starts",
+                    end="flowering_ends",
+                    peak="flowering_peaks",
+                    slope="flowering_slopes",
+                    genotypes="cleaned_genotypes",
+                    num_to_select="params:num_genotypes_to_collect",
+                    early_late_quantiles="params:early_late_quantiles",
+                    optimal_quantile_range="params:optimal_quantile_range",
+                ),
+                "genotypes_to_collect",
+            ),
+        ],
+        tags=["analysis"],
+    ) + Pipeline(
+        [
             # Plot the ground truth regression.
             node(
                 merge_ground_truth,
@@ -394,22 +414,8 @@ def _create_analysis_pipeline() -> Pipeline:
                 "counting_results_gt_merged",
                 "ground_truth_vs_predicted",
             ),
-            # Determine which genotypes should be collected in the field.
-            node(
-                find_genotypes_to_collect,
-                dict(
-                    start="flowering_starts",
-                    end="flowering_ends",
-                    peak="flowering_peaks",
-                    slope="flowering_slopes",
-                    genotypes="cleaned_genotypes",
-                    num_to_select="params:num_genotypes_to_collect",
-                    early_late_quantiles="params:early_late_quantiles",
-                    optimal_quantile_range="params:optimal_quantile_range",
-                ),
-                "genotypes_to_collect",
-            ),
-        ]
+        ],
+        tags=["ground_truth"],
     )
 
 
@@ -429,6 +435,18 @@ def create_pipeline(**kwargs) -> Pipeline:
 
     pipeline += Pipeline(
         [
+            # Combine the session detections into a single table.
+            node(
+                collect_session_results,
+                session_detection_nodes,
+                "detection_results",
+            ),
+        ],
+        tags=["detection"],
+    )
+
+    pipeline += Pipeline(
+        [
             # Load camera configuration.
             node(
                 CameraConfig.load_partitioned,
@@ -436,12 +454,6 @@ def create_pipeline(**kwargs) -> Pipeline:
                     camera_xml="auto_camera_config",
                 ),
                 "camera_config",
-            ),
-            # Combine the session detections into a single table.
-            node(
-                collect_session_results,
-                session_detection_nodes,
-                "detection_results",
             ),
             # Filter low confidence detections.
             node(
@@ -560,6 +572,37 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ],
                 "detection_results_plot_num",
             ),
+            # Convert detections to shapefile.
+            node(
+                flowers_to_shapefile,
+                "detection_results_plot_num",
+                "bounding_box_shapes",
+            ),
+            # Compute the flower counts.
+            node(
+                compute_counts,
+                "detection_results_plot_num",
+                "counting_results_no_dap_no_plot",
+            ),
+            node(
+                add_plot_index,
+                "counting_results_no_dap_no_plot",
+                "counting_results_no_dap",
+            ),
+            node(
+                add_dap_counting,
+                dict(
+                    counting_results="counting_results_no_dap",
+                    field_planted_date="params:v2_field_planted_date",
+                ),
+                "counting_results",
+            ),
+        ],
+        tags=["analysis"],
+    )
+
+    pipeline += Pipeline(
+        [
             # Also extract the detections within the GT sampling regions.
             node(
                 find_detections_in_gt_sampling_regions_pre_september,
@@ -633,31 +676,6 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ],
                 "detection_results_gt_sample",
             ),
-            # Convert detections to shapefile.
-            node(
-                flowers_to_shapefile,
-                "detection_results_plot_num",
-                "bounding_box_shapes",
-            ),
-            # Compute the flower counts.
-            node(
-                compute_counts,
-                "detection_results_plot_num",
-                "counting_results_no_dap_no_plot",
-            ),
-            node(
-                add_plot_index,
-                "counting_results_no_dap_no_plot",
-                "counting_results_no_dap",
-            ),
-            node(
-                add_dap_counting,
-                dict(
-                    counting_results="counting_results_no_dap",
-                    field_planted_date="params:v2_field_planted_date",
-                ),
-                "counting_results",
-            ),
             # Compute counts for the GT sample areas too.
             node(
                 compute_counts,
@@ -677,7 +695,8 @@ def create_pipeline(**kwargs) -> Pipeline:
                 ),
                 "counting_results_gt_sample",
             ),
-        ]
+        ],
+        tags=["ground_truth"],
     )
 
     return pipeline + _create_analysis_pipeline()

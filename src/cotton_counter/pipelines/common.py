@@ -6,6 +6,7 @@ from datetime import date
 from functools import partial
 from typing import Any, Dict, Iterable, List, Set, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,7 +18,23 @@ GT_SESSIONS = set()
 """
 The set of sessions that include ground-truth.
 """
-_NON_GT_SESSIONS = {"2024-08-21", "2024-09-04", "2024-09-10"}
+_NON_GT_SESSIONS = {
+    "2024-07-22",
+    "2024-07-29",
+    "2024-08-01",
+    "2024-08-09",
+    "2024-08-12",
+    "2024-08-19",
+    "2024-08-23",
+    "2024-08-27",
+    "2024-08-30",
+    "2024-09-03",
+    "2024-09-05",
+    "2024-09-09",
+    "2024-09-16",
+    "2024-09-20",
+    "2024-09-23",
+}
 """
 The set of sessions that don't include ground-truth.
 """
@@ -833,12 +850,16 @@ def merge_genotype_info(
 
     if filter_populations is not None:
         # Remove extraneous populations.
+        extracted = []
         for population in filter_populations:
-            combined_data = combined_data[
-                combined_data[GenotypeColumns.POPULATION.value].str.contains(
-                    population
-                )
-            ]
+            extracted.append(
+                combined_data[
+                    combined_data[
+                        GenotypeColumns.POPULATION.value
+                    ].str.contains(population)
+                ]
+            )
+        combined_data = pd.concat(extracted)
 
     # Average the replicates for each genotype together.
     group_columns = [
@@ -862,7 +883,10 @@ def merge_genotype_info(
 
 
 def plot_mean_flowering_curve(
-    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+    *,
+    cumulative_counts: pd.DataFrame,
+    genotypes: pd.DataFrame,
+    filter_populations: Set[str] | None = None,
 ) -> plot.Figure:
     """
     Creates mean flowering curves for each population.
@@ -871,6 +895,8 @@ def plot_mean_flowering_curve(
         cumulative_counts: The complete counting results, with cumulative
             counts.
         genotypes: The cleaned genotype information.
+        filter_populations: If specified, will only keep data from these
+            populations.
 
     Returns:
         The plot of the flowering curves.
@@ -878,7 +904,10 @@ def plot_mean_flowering_curve(
     """
     # Merge flowering and genotype data together for easy plotting.
     combined_data = merge_genotype_info(
-        flower_data=cumulative_counts, genotypes=genotypes, group_on_dap=True
+        flower_data=cumulative_counts,
+        genotypes=genotypes,
+        group_on_dap=True,
+        filter_populations=filter_populations,
     )
 
     # Plot the curve.
@@ -888,8 +917,14 @@ def plot_mean_flowering_curve(
         y=CountingColumns.COUNT.value,
         hue=GenotypeColumns.POPULATION.value,
     )
-    axes.set_title("Average Flowering Curves")
-    axes.set(xlabel="Days After Planting", ylabel="Cumulative # of Flowers")
+    axes.set_title("Average Flowering Curves", fontsize=20)
+    axes.set_xlabel("Days After Planting", fontsize=20)
+    axes.set_ylabel("Cumulative # of Flowers", fontsize=20)
+
+    axes.tick_params(axis="x", labelsize=14)  # Font size for x-axis ticks
+    axes.tick_params(axis="y", labelsize=14)  # Font size for y-axis ticks
+
+    plt.legend(fontsize=16)
 
     return plot.gcf()
 

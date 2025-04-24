@@ -1,15 +1,15 @@
 # Field configuration.
 top_field_config_raw:
   type: yaml.YAMLDataSet
-  filepath: data/01_raw/field_config_tifton_top.yml
+  filepath: data/01_raw/field_config_tifton_top_2024.yml
 
 middle_field_config_raw:
   type: yaml.YAMLDataSet
-  filepath: data/01_raw/field_config_tifton_middle.yml
+  filepath: data/01_raw/field_config_tifton_middle_2024.yml
 
 bottom_field_config_raw:
   type: yaml.YAMLDataSet
-  filepath: data/01_raw/field_config_tifton_bottom.yml
+  filepath: data/01_raw/field_config_tifton_bottom_2024.yml
 
 mars_field_config_raw:
   type: yaml.YAMLDataSet
@@ -18,15 +18,15 @@ mars_field_config_raw:
 # Plot boundaries.
 plot_borders_top:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_borders_top.shp
+  filepath: data/01_raw/plot_boundaries/top/2024/top_plot_boundaries.shp
 
 plot_borders_middle:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/middle/2023-08-14_plot_borders_middle.shp
+  filepath: data/01_raw/plot_boundaries/middle/2024/middle_plot_boundaries.shp
 
 plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
+  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_plot_boundaries.shp
 
 plot_borders_mars:
   type: cotton_counter.data_sets.ShapefileDataSet
@@ -35,15 +35,15 @@ plot_borders_mars:
 # Plot borders for september onwards.
 plot_borders_top_sep:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/top/2023-09-01_plot_borders_top.shp
+  filepath: data/01_raw/plot_boundaries/top/2024/top_plot_boundaries.shp
 
 plot_borders_middle_sep:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/middle/2023-09-01_plot_borders_middle.shp
+  filepath: data/01_raw/plot_boundaries/middle/2024/middle_plot_boundaries.shp
 
 plot_borders_bottom_sep:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/bottom/2023-09-01_plot_borders_bottom.shp
+  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_plot_boundaries.shp
 
 # Plot sampling locations for ground truth.
 plot_gt_sample_locations_top:
@@ -72,13 +72,12 @@ plot_gt_sample_locations_bottom_sep:
   filepath: data/01_raw/plot_boundaries/bottom/2023-09-01_plot_sampling_locations_bottom.shp
 
 # Dataset containing the genotype information.
-genotype_spreadsheet_2023:
+genotype_spreadsheet_v2:
   type: pandas.ExcelDataSet
-  filepath: "data/01_raw/2023 PT Field.xlsx"
+  filepath: "data/01_raw/2024_genotype_info.xlsx"
   versioned: False
   load_args:
     engine: openpyxl
-    sheet_name: "Listing"
 
 # Datasets containing the ground-truth.
 _gt_params: &gt_params

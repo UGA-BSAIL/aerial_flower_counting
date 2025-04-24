@@ -2,15 +2,17 @@
 Tools for visualizing results.
 """
 
-
 from PIL import ImageDraw, ImageFont, Image
 from typing import List
+from pathlib import Path
 import numpy as np
 from typing import Tuple
 import random
 
-
-_TAG_FONT = ImageFont.truetype("fonts/VeraBd.ttf", 24)
+_ROOT_DIR = Path(__file__).parents[4]
+_TAG_FONT = ImageFont.truetype(
+    (_ROOT_DIR / "fonts" / "VeraBd.ttf").as_posix(), 24
+)
 """
 Font to use for bounding box tags.
 """
