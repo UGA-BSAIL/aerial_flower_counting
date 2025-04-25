@@ -3,10 +3,12 @@ Contains nodes for the updated plot counting pipeline.
 """
 
 import enum
-from functools import partial, reduce
+import random
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
 
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -25,6 +27,7 @@ from torchvision import transforms
 from ultralytics import YOLO
 from scipy import stats
 from field_config import FieldConfig, label_plots
+from kedro.extras.datasets.pandas import ParquetDataSet
 
 from ..camera_utils import CameraConfig, CameraTransformer, MissingImageError
 from ..common import (
@@ -52,6 +55,14 @@ Type alias for a dataset containing multiple images.
 RasterDataSet = Dict[str, Callable[[], DatasetReader]]
 """
 Type alias for a dataset containing multiple rasters.
+"""
+DetectionDataSet = Dict[str, Callable[[], pd.DataFrame] | pd.DataFrame]
+"""
+Type alias for a dataset containing multiple session detections.
+"""
+FeatureDataSet = Dict[str, Callable[[], List[Feature]]]
+"""
+Type alias for a dataset containing multiple sets of session features.
 """
 
 _TORCH_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -298,6 +309,54 @@ def _detect_flowers_in_batch(
     return results
 
 
+def _fake_box_generator(
+    *,
+    image_ids: List[str],
+    patches: List[Image.Image],
+    offsets: List[np.array],
+) -> List[pd.DataFrame]:
+    """
+    Generates fake bounding boxes to use for dry runs.
+
+     Args:
+        image_ids: The corresponding image IDs of the patches.
+        patches: The image patches to apply the model to.
+        offsets: The pixel offsets of the patches in the original image.
+
+    Returns:
+        The detections for each patch, in standard format.
+
+    """
+    results = []
+    for image_id, offset in zip(image_ids, offsets):
+        px_size = np.array(patches[0].size)
+        num_boxes = random.randint(0, 4)
+
+        # Point coordinates
+        random_first_point = np.random.rand(num_boxes, 2) * px_size
+        random_size = np.random.rand(num_boxes, 2) * 100
+        second_point = random_first_point + random_size
+
+        # Confidence scores
+        confidence = np.random.rand(num_boxes)
+
+        # Combine the data
+        all_points = np.concatenate([random_first_point, second_point], axis=1)
+        # Apply the offsets, which shifts the coordinates into
+        # pixel-space for the input image instead of the patches.
+        all_points += np.tile(offset, (2,))
+
+        # Create the final DF.
+        results_df = pd.DataFrame(data=all_points, columns=_DETECTION_COLUMNS)
+        results_df[DetectionColumns.CONFIDENCE.value] = confidence
+        results_df[DetectionColumns.BOX_NUM.value] = np.arange(len(results_df))
+        results_df[DetectionColumns.IMAGE_ID.value] = image_id
+
+        results.append(results_df)
+
+    return results
+
+
 def _detect_organs(
     images: ImageDataSet,
     *,
@@ -327,7 +386,14 @@ def _detect_organs(
     # Split individual images up into more manageable chunks.
     def _iter_patches() -> Iterable[Tuple[str, Image.Image, np.array]]:
         for image_id_, image in images.items():
-            for i, (patch, offsets_) in enumerate(_split_image_grid(image())):
+            if dry_run:
+                # Don't bother loading the actual image.
+                image = np.zeros((5472, 3648, 3), dtype=np.uint8)
+                image = Image.fromarray(image)
+            else:
+                image = image()
+
+            for i, (patch, offsets_) in enumerate(_split_image_grid(image)):
                 yield f"{image_id_}_patch_{i}", patch, offsets_
 
     # Predict on batches.
@@ -342,8 +408,6 @@ def _detect_organs(
             ],
         )
     ]
-    if dry_run:
-        return results[0]
 
     for batch in batch_iter(_iter_patches(), batch_size=batch_size):
         # "unzip" the batch.
@@ -366,7 +430,7 @@ def _detect_organs(
 
 
 def detect_flowers(
-    *args: Any, weights_file: Path, **kwargs: Any
+    *args: Any, weights_file: Path, dry_run: bool = False, **kwargs: Any
 ) -> pd.DataFrame:
     """
     Detects flowers in the images.
@@ -374,25 +438,31 @@ def detect_flowers(
     Args:
         *args: Will be forwarded to `_detect_organs()`.
         weights_file: The path to the model weights file.
+        dry_run: If true, it will use simulated detections instead of running
+            the actual detector.
         **kwargs: Will be forwarded to `_detect_organs()`.
 
     Returns:
         A dataframe containing the detected flowers.
 
     """
-    # Load the model.
-    model = YOLO(weights_file)
-    detector = partial(_detect_flowers_in_batch, model=model)
+    if dry_run:
+        detector = _fake_box_generator
+    else:
+        # Load the model.
+        model = YOLO(weights_file)
+        detector = partial(_detect_flowers_in_batch, model=model)
 
     return _detect_organs(
         *args,
         detector=detector,
+        dry_run=dry_run,
         **kwargs,
     )
 
 
 def detect_bolls(
-    *args: Any, weights_file: Path, **kwargs: Any
+    *args: Any, weights_file: Path, dry_run: bool = False, **kwargs: Any
 ) -> pd.DataFrame:
     """
     Detects boll locations in the images.
@@ -400,23 +470,29 @@ def detect_bolls(
     Args:
         *args: Will be forwarded to `_detect_organs()`.
         weights_file: The path to the model weights file.
+        dry_run: If true, it will use simulated detections instead of running
+            the actual detector.
         **kwargs: Will be forwarded to `_detect_organs()`.
 
     Returns:
         A dataframe containing the detected boll locations.
 
     """
-    # Load the model.
-    model = dm_count_yolov8()
-    model.to(_TORCH_DEVICE)
-    model.load_state_dict(torch.load(weights_file, _TORCH_DEVICE))
-    model.eval()
+    if dry_run:
+        detector = _fake_box_generator
+    else:
+        # Load the model.
+        model = dm_count_yolov8()
+        model.to(_TORCH_DEVICE)
+        model.load_state_dict(torch.load(weights_file, _TORCH_DEVICE))
+        model.eval()
 
-    detector = partial(_detect_bolls_in_batch, model=model)
+        detector = partial(_detect_bolls_in_batch, model=model)
 
     return _detect_organs(
         *args,
         detector=detector,
+        dry_run=dry_run,
         **kwargs,
     )
 
@@ -598,8 +674,8 @@ def _prune_with_hungarian(
     *,
     indices1: List[int],
     indices2: List[int],
-    centroids1: List[List[int]],
-    centroids2: List[List[int]],
+    centroids1: List[Point],
+    centroids2: List[Point],
     prune_rows: Set[int],
 ) -> Set[int]:
     """
@@ -622,8 +698,8 @@ def _prune_with_hungarian(
         return set()
 
     # Construct the cost matrix based on the centroid distances.
-    centroids1 = np.array([centroids1]).transpose(1, 0, 2)
-    centroids2 = np.array([centroids2])
+    centroids1 = np.array([c.coords for c in centroids1]).transpose(1, 0, 2)
+    centroids2 = np.array([c.coords for c in centroids2])
     cost = np.linalg.norm(centroids1 - centroids2, axis=2)
 
     # Solve the assignment problem.
@@ -663,22 +739,28 @@ def prune_duplicate_detections(
     # We initially need to find overlapping images so that we know which
     # regions to focus on.
     image_extent_polys = list(_load_polygons(image_extents))
-    detection_polys = list(detections_to_polygons(detections))
+    detection_points = list(detections_to_points(detections))
     extent_polys_to_id = {
         p: f.properties["image_id"]
         for p, f in zip(image_extent_polys, image_extents)
     }
-    detection_polys_to_id = {
-        p: r[DetectionColumns.IMAGE_ID.value]
-        for p, (_, r) in zip(detection_polys, detections.iterrows())
+    detection_points_to_id = {
+        p: r[DetectionColumns.IMAGE_ID.value].split("_patch_")[0]
+        for p, (_, r) in zip(detection_points, detections.iterrows())
     }
-    detection_polys_to_row = {
-        p: i for p, i in zip(detection_polys, detections.index)
+    detection_points_to_row = {
+        p: i for p, i in zip(detection_points, detections.index)
     }
     image_extent_tree = STRtree(image_extent_polys)
-    detections_tree = STRtree(list(detections_to_polygons(detections)))
 
     prune_rows = set()
+
+    def _recreate_tree() -> STRtree:
+        logger.info("Removing {} duplicate detections.", len(prune_rows))
+        detections.drop(iter(prune_rows), inplace=True)
+        return STRtree(list(detections_to_points(detections)))
+
+    detections_tree = _recreate_tree()
 
     # Removes duplicate detections from the region where two input images
     # overlap.
@@ -691,7 +773,7 @@ def prune_duplicate_detections(
         detections_indices = query_intersecting(
             detections_tree, intersecting_region
         )
-        detections_in_region: List[Polygon] = detections_tree.geometries[
+        detections_in_region: List[Point] = detections_tree.geometries[
             detections_indices
         ]
 
@@ -704,9 +786,9 @@ def prune_duplicate_detections(
         image1_centroids = []
         image2_centroids = []
         for detection in detections_in_region:
-            image_id = detection_polys_to_id[detection].split("_patch_")[0]
-            index = detection_polys_to_row[detection]
-            centroid = [detection.centroid.x, detection.centroid.y]
+            image_id = detection_points_to_id[detection]
+            index = detection_points_to_row[detection]
+            centroid = [detection.x, detection.y]
             if image_id == extent1_id:
                 image1_indices.append(index)
                 image1_centroids.append(centroid)
@@ -714,15 +796,16 @@ def prune_duplicate_detections(
                 image2_indices.append(index)
                 image2_centroids.append(centroid)
 
-        return _prune_by_size(
+        pruned = _prune_by_size(
             indices1=image1_indices,
             indices2=image2_indices,
             # centroids1=image1_centroids,
             # centroids2=image2_centroids,
             prune_rows=prune_rows,
         )
+        return pruned
 
-    for extent in image_extent_polys:
+    for extent in tqdm(image_extent_polys):
         # Find all intersecting images.
         intersecting_indices = query_intersecting(image_extent_tree, extent)
         intersecting = image_extent_tree.geometries[intersecting_indices]
@@ -730,9 +813,47 @@ def prune_duplicate_detections(
             # Remove duplicates in the intersecting region.
             prune_rows.update(_prune_from_intersection(extent, other_extent))
 
+        if len(prune_rows) > 1000:
+            # Recreate the trees with removed detections.
+            detections_tree = _recreate_tree()
+            prune_rows = set()
+
     # Remove all the duplicates.
-    logger.info("Removing {} duplicate detections.", len(prune_rows))
-    return detections.drop(iter(prune_rows))
+    _recreate_tree()
+    return detections
+
+
+def prune_all_session_detections(
+    detections: DetectionDataSet, image_extents: List[Feature]
+) -> DetectionDataSet:
+    """
+    Prunes duplicate detections from all sessions at once.
+
+    Args:
+        detections: The dataset containing detections for all sessions.
+        image_extents: The dataset containing image extends for all sessions.
+
+    Returns:
+        A new dataset containing pruned detections for all sessions.
+
+    """
+    # Divide features by session.
+    features_by_session = {}
+    for extent_feature in image_extents:
+        session = extent_feature.properties["session"]
+        features_by_session.setdefault(session, []).append(extent_feature)
+
+    pruned_detections = {}
+    for session in detections:
+        session_detections = detections[session]()
+        session_extents = features_by_session[session]
+        pruned_detections[session] = partial(
+            prune_duplicate_detections,
+            detections=session_detections,
+            image_extents=session_extents,
+        )
+
+    return pruned_detections
 
 
 def flowers_to_shapefile(detections: pd.DataFrame) -> List[Dict[str, Any]]:
@@ -1696,3 +1817,63 @@ def plot_ground_truth_vs_predicted(
     axes.set(xlabel="Ground-Truth", ylabel="Automatic")
 
     return plot.gcf()
+
+
+def save_detections_partition(
+    detections: pd.DataFrame, session: str, *, path: Path
+) -> pd.DataFrame:
+    """
+    Saves a single partition from the detections dataset, containing
+    detections for that session.
+
+    Args:
+        detections: The detections for a session.
+        session: The name of the session.
+        path: The root path to the partitioned dataset.
+
+    Returns:
+        The original detections.
+
+    """
+    path = Path(path)
+    session_path = (path / session).with_suffix(".parquet")
+
+    dataset = ParquetDataSet(session_path.as_posix())
+    dataset.save(detections)
+
+    return detections
+
+
+def partitions_to_table(detections: DetectionDataSet) -> pd.DataFrame:
+    """
+    Combines all the detections from a partitioned dataset into a single
+    dataframe.
+
+    Args:
+        detections: The partitioned detections.
+
+    Returns:
+        The combined detections.
+
+    """
+    session_results = [d() for d in detections.values()]
+    return pd.concat(session_results, ignore_index=True)
+
+
+def tables_to_partitions(
+    *detections: pd.DataFrame, session_names: List[str]
+) -> DetectionDataSet:
+    """
+    Collects a bunch of separate detection tables into a single partitioned
+    dataset partitioned by session.
+
+    Args:
+        *detections: The individual session detections to combine.
+        session_names: The list of names of each session, in order.
+
+    Returns:
+        A partitioned dataset keyed by session.
+
+    """
+    partitions = {s: d for s, d in zip(session_names, detections)}
+    return partitions

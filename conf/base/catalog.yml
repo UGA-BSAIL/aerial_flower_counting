@@ -78,6 +78,26 @@ excess_green:
   dataset:
     type: pillow.ImageDataSet
 
+# Dataset containing the geo-referenced detection results for each session,
+# before filtering. Partitioned by session.
+session_geo_detections:
+  type: cotton_counter.data_sets.ParallelPartitionedDataSet
+  filename_suffix: ".parquet"
+  max_workers: 16
+  path: data/02_intermediate/session_geo_detections
+  dataset:
+    type: pandas.ParquetDataSet
+
+# Dataset containing the pruned detection results for each session,
+# before filtering. Partitioned by session.
+per_session_detection_results:
+  type: cotton_counter.data_sets.ParallelPartitionedDataSet
+  filename_suffix: ".parquet"
+  max_workers: 16
+  path: data/02_intermediate/session_pruned_detections
+  dataset:
+    type: pandas.ParquetDataSet
+
 # Dataset containing all the detection results.
 detection_results:
   type: pandas.ParquetDataSet

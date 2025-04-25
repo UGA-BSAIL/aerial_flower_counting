@@ -55,6 +55,11 @@ class CameraConfig:
             A mapping of the camera labels to the camera transform matrices.
 
         """
+        groups = cameras.findall("group")
+        for group in groups:
+            # We have groups. Extract the cameras from them.
+            cameras = group.findall("camera")
+
         return {
             camera.attrib["label"]: np.reshape(
                 np.fromstring(camera.find("transform").text, sep=" "), (4, 4)

@@ -4,6 +4,7 @@ Version two of the pipeline for auto-counting.
 from functools import partial, reduce
 from operator import add
 from typing import Tuple
+from pathlib import Path
 
 import pandas as pd
 from kedro.pipeline import Pipeline, node
@@ -17,7 +18,6 @@ from ..common import (
     add_dap_counting,
     add_dap_ground_truth,
     choose_best_counts,
-    collect_session_results,
     compute_counts,
     compute_cumulative_counts,
     compute_flowering_duration,
@@ -56,7 +56,10 @@ from .nodes import (
     flowers_to_shapefile,
     load_ground_truth,
     plot_ground_truth_vs_predicted,
-    prune_duplicate_detections,
+    save_detections_partition,
+    prune_all_session_detections,
+    partitions_to_table,
+    tables_to_partitions,
 )
 
 
@@ -68,8 +71,8 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
         session: The session to make a pipeline for.
 
     Returns:
-        The pipeline that it created, as well as the name of the output node
-            for the detections.
+        The pipeline that it created, and the name of the detections output
+        node.
 
     """
     detection_inputs = dict(
@@ -89,7 +92,12 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
         )
         detection_inputs["weights_file"] = "params:boll_model_weights_file"
 
-    output_node = f"detections_{session}"
+    px_detection_saver = partial(
+        save_detections_partition,
+        path=Path("data/02_intermediate/session_px_detections"),
+    )
+
+    output_node_name = f"detections_unfiltered_{session}"
     return (
         Pipeline(
             [
@@ -99,29 +107,25 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
                     detection_inputs,
                     f"detections_px_{session}",
                 ),
+                node(
+                    partial(px_detection_saver, session=session),
+                    f"detections_px_{session}",
+                    f"detections_px_{session}_saved",
+                ),
                 # Convert to geographic coordinates.
                 node(
                     partial(flowers_to_geographic, session_name=session),
                     dict(
-                        detections=f"detections_px_{session}",
+                        detections=f"detections_px_{session}_saved",
                         camera_config="camera_config",
                         dem_dataset="dems",
                     ),
-                    f"detections_unfiltered_{session}",
-                ),
-                # Remove duplicate detections.
-                node(
-                    prune_duplicate_detections,
-                    dict(
-                        detections=f"detections_unfiltered_{session}",
-                        image_extents=f"image_extents_{session}",
-                    ),
-                    output_node,
+                    output_node_name,
                 ),
             ],
             tags=["detection"],
         ),
-        output_node,
+        output_node_name,
     )
 
 
@@ -424,21 +428,35 @@ def create_pipeline(**kwargs) -> Pipeline:
     pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
-    session_detection_nodes = []
+    output_nodes = []
     for session in SESSIONS:
         (
             session_detection_pipeline,
             output_node,
         ) = _create_session_detection_pipeline(session)
         pipeline += session_detection_pipeline
-        session_detection_nodes.append(output_node)
+        output_nodes.append(output_node)
 
     pipeline += Pipeline(
         [
+            node(
+                partial(tables_to_partitions, session_names=SESSIONS),
+                output_nodes,
+                "session_geo_detections",
+            ),
+            # Remove duplicate detections.
+            node(
+                prune_all_session_detections,
+                dict(
+                    detections="session_geo_detections",
+                    image_extents="image_extents",
+                ),
+                "per_session_detection_results",
+            ),
             # Combine the session detections into a single table.
             node(
-                collect_session_results,
-                session_detection_nodes,
+                partitions_to_table,
+                "per_session_detection_results",
                 "detection_results",
             ),
         ],
