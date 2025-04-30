@@ -1452,7 +1452,12 @@ def clean_genotypes(raw_genotypes: pd.DataFrame) -> pd.DataFrame:
     # Everything else is testing.
     cleaned[GenotypeColumns.POPULATION.value] = "Testing"
     cleaned.loc[is_pd, GenotypeColumns.POPULATION.value] = "PD05069"
+    # The checks actually have multiple values for the genotype columns,
+    # with hyphens denoting different replicates, but we want to treat them
+    # all as one genotype for the purposes of analysis.
+    cleaned.loc[is_pd, GenotypeColumns.GENOTYPE.value] = "PD05069"
     cleaned.loc[is_ga, GenotypeColumns.POPULATION.value] = "GA 230"
+    cleaned.loc[is_ga, GenotypeColumns.GENOTYPE.value] = "GA 230"
     cleaned.loc[is_training, GenotypeColumns.POPULATION.value] = "Training"
 
     return cleaned
@@ -1741,6 +1746,10 @@ def find_genotypes_to_collect(
     flowering_habits = _classify_flowering_habits(
         genotypes=genotypes, peak=peak, **kwargs
     )
+    # Remove GA-230 from consideration, because it will be selected regardless.
+    flowering_habits = flowering_habits[
+        flowering_habits[GenotypeColumns.POPULATION.value] != "GA 230"
+    ]
     flowering_habits.set_index(
         GenotypeColumns.GENOTYPE.value, append=False, inplace=True
     )

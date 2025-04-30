@@ -822,7 +822,7 @@ def merge_genotype_info(
     outliers: pd.DataFrame | None = None,
     group_on_dap: bool = False,
     filter_populations: Set[str] | None = None,
-    aggregation: str = "mean",
+    aggregation: str | None = "mean",
 ) -> pd.DataFrame:
     """
     Merges a dataframe indexed by plot with genotype information, filters out
@@ -837,7 +837,8 @@ def merge_genotype_info(
         filter_populations: If specified, will only keep data from these
             specific populations.
         aggregation: The aggregation to perform across the replicates.
-            Defaults to taking the mean.
+            Defaults to taking the mean. If set to None, it will perform no
+            grouping at all and just return data for all the replicates.
 
     Returns:
         The merged data.
@@ -861,18 +862,19 @@ def merge_genotype_info(
             )
         combined_data = pd.concat(extracted)
 
-    # Average the replicates for each genotype together.
-    group_columns = [
-        GenotypeColumns.GENOTYPE.value,
-        GenotypeColumns.POPULATION.value,
-    ]
-    if group_on_dap:
-        # Group by DAP too if the data are temporal.
-        group_columns.append(CountingColumns.DAP.value)
-    combined_data = combined_data.groupby(
-        group_columns,
-        as_index=False,
-    ).agg(aggregation)
+    if aggregation is not None:
+        # Average the replicates for each genotype together.
+        group_columns = [
+            GenotypeColumns.GENOTYPE.value,
+            GenotypeColumns.POPULATION.value,
+        ]
+        if group_on_dap:
+            # Group by DAP too if the data are temporal.
+            group_columns.append(CountingColumns.DAP.value)
+        combined_data = combined_data.groupby(
+            group_columns,
+            as_index=False,
+        ).agg(aggregation)
 
     if outliers is not None:
         combined_data.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
@@ -908,6 +910,7 @@ def plot_mean_flowering_curve(
         genotypes=genotypes,
         group_on_dap=True,
         filter_populations=filter_populations,
+        aggregation=None,
     )
 
     # Plot the curve.
