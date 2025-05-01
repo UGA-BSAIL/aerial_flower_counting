@@ -123,6 +123,12 @@ human_readable_metrics:
   filepath: data/08_reporting/plot_metrics.xlsx
   versioned: True
 
+# Report containing excess green information.
+exg_report:
+  type: pandas.ExcelDataSet
+  filepath: data/08_reporting/plot_greenness.xlsx
+  versioned: True
+
 # Plot of ground-truth vs. predicted data.
 ground_truth_vs_predicted:
   type: matplotlib.MatplotlibWriter

@@ -282,6 +282,10 @@ class CountingColumns(enum.Enum):
     """
     Column categorizing the overall flowering habit.
     """
+    GREENNESS = "greenness"
+    """
+    Column representing the overall greeness of the plot.
+    """
 
 
 def collect_session_results(

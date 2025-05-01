@@ -18,15 +18,15 @@ mars_field_config_raw:
 # Plot boundaries.
 plot_borders_top:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/top/2024/top_plot_boundaries.shp
+  filepath: data/01_raw/plot_boundaries/top/2024/top_field_exg.shp
 
 plot_borders_middle:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/middle/2024/middle_plot_boundaries.shp
+  filepath: data/01_raw/plot_boundaries/middle/2024/middle_field_exg.shp
 
 plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_plot_boundaries.shp
+  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_field_exg.shp
 
 plot_borders_mars:
   type: cotton_counter.data_sets.ShapefileDataSet

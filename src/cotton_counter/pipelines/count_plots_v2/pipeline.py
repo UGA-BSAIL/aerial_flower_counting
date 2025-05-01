@@ -60,6 +60,8 @@ from .nodes import (
     prune_all_session_detections,
     partitions_to_table,
     tables_to_partitions,
+    analyze_excess_green,
+    combine_excess_green,
 )
 
 
@@ -252,6 +254,36 @@ def _create_analysis_pipeline() -> Pipeline:
                     cumulative_counts="cumulative_counts",
                 ),
                 "flowering_slopes",
+            ),
+            # Greenness
+            node(
+                analyze_excess_green,
+                dict(
+                    plot_boundaries="plot_borders_top",
+                    field_config="top_field_config",
+                ),
+                "exg_top",
+            ),
+            node(
+                analyze_excess_green,
+                dict(
+                    plot_boundaries="plot_borders_middle",
+                    field_config="middle_field_config",
+                ),
+                "exg_middle",
+            ),
+            node(
+                analyze_excess_green,
+                dict(
+                    plot_boundaries="plot_borders_bottom",
+                    field_config="bottom_field_config",
+                ),
+                "exg_bottom",
+            ),
+            node(
+                combine_excess_green,
+                ["exg_top", "exg_middle", "exg_bottom"],
+                "exg_report",
             ),
             # Find outliers.
             node(

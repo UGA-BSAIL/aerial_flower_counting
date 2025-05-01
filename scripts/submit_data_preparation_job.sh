@@ -13,8 +13,8 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --time=48:00:00
 #SBATCH --mem=48gb
-#SBATCH --account=lift-phenomics
-#SBATCH --qos=lift-phenomics
+#SBATCH --account=cli2
+#SBATCH --qos=cli2
 #SBATCH --mail-user=djpetti@gmail.com
 #SBATCH --mail-type=END,FAIL
 #SBATCH --output=data_preparation.%j.out    # Standard output log
@@ -23,9 +23,9 @@
 set -e
 
 # Base directory we use for job output.
-OUTPUT_BASE_DIR="/blue/lift-phenomics/$(whoami)/job_scratch/"
+OUTPUT_BASE_DIR="/blue/cli2/$(whoami)/job_scratch/"
 # Directory where our data and venv are located.
-LARGE_FILES_DIR="/blue/lift-phenomics/$(whoami)/aerial_flower/"
+LARGE_FILES_DIR="/blue/cli2/$(whoami)/aerial_flower/"
 
 function prepare_environment() {
   # Create the working directory for this job.

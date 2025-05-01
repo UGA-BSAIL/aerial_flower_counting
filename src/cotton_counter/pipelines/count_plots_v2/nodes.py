@@ -890,7 +890,7 @@ def _label_plots(
     *,
     plot_boundaries: Iterable[Polygon],
     field_config: FieldConfig,
-    sessions: List[str],
+    sessions: List[str] | None = None,
 ) -> Iterable[Tuple[Polygon, int, Set[str]]]:
     """
     Computes the plot number for each plot in a shapefile.
@@ -905,7 +905,8 @@ def _label_plots(
         and the sessions that this is valid for.
 
     """
-    sessions = set(sessions)
+    if sessions is not None:
+        sessions = set(sessions)
     for boundary, plot_num in label_plots(
         plot_boundaries=plot_boundaries, field_config=field_config
     ):
@@ -1886,3 +1887,67 @@ def tables_to_partitions(
     """
     partitions = {s: d for s, d in zip(session_names, detections)}
     return partitions
+
+
+def analyze_excess_green(
+    *,
+    plot_boundaries: List[Feature],
+    field_config: FieldConfig,
+) -> pd.DataFrame:
+    """
+    Computes the plot number for each plot in a shapefile.
+
+    Args:
+        plot_boundaries: The boundaries of the plots.
+        field_config: The configuration of the field.
+
+    Returns:
+        Flower counts with an added column indicating the excess green score.
+
+    """
+    labeled_plots = _label_plots(
+        plot_boundaries=_load_polygons(plot_boundaries),
+        field_config=field_config,
+    )
+
+    excess_green = {
+        CountingColumns.PLOT.value: [],
+        CountingColumns.GREENNESS.value: [],
+    }
+    for (_, plot_num, _), boundary in zip(labeled_plots, plot_boundaries):
+        # Each plot should be labeled with the mean excess green value.
+        plot_exg = boundary.properties["_mean"]
+        excess_green[CountingColumns.PLOT.value].append(plot_num)
+        excess_green[CountingColumns.GREENNESS.value].append(float(plot_exg))
+    excess_green = pd.DataFrame(excess_green)
+
+    # Normalize raw excess green values on a scale from 0-10.
+    key = CountingColumns.GREENNESS.value
+    excess_green[key] -= excess_green[key].min()
+    excess_green[key] /= excess_green[key].max()
+    excess_green[key] *= 10.0
+
+    # Take the min of the greenness values for any plots that have the same
+    # number. This happens because there are actually two individual plots
+    # next to each-other with the same number.
+    excess_green = excess_green.groupby(
+        CountingColumns.PLOT.value, as_index=False
+    ).min()
+
+    return excess_green
+
+
+def combine_excess_green(*excess_green: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combines excess green values from different fields.
+
+    Args:
+        *excess_green: The excess green values.
+
+    Returns:
+        The combined values.
+
+    """
+    combined = pd.concat(excess_green, ignore_index=True)
+    # Sort by greenness to make outliers easy to find.
+    return combined.sort_values(CountingColumns.GREENNESS.value)
