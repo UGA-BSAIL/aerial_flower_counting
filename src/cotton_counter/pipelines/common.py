@@ -6,6 +6,8 @@ from datetime import date
 from functools import partial
 from typing import Any, Dict, Iterable, List, Set, Tuple
 
+from loguru import logger
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -742,6 +744,56 @@ def compute_flowering_ramps(
         return plot_groups.apply(_fit_line_for_plot)
 
 
+def compute_last_effective_flower_percentage(
+    cumulative_counts: pd.DataFrame,
+    field_planted_date: date,
+    last_effective_flower_date: date,
+) -> pd.DataFrame:
+    """
+    Computes the percentage of flowering that happens before the last
+    effective flower date. Flowers that open after this date will not have
+    time to develop into bolls.
+
+    Args:
+        cumulative_counts: The cumulative count data.
+        field_planted_date: The date at which the field was planted.
+        last_effective_flower_date: The date beyond which flowers won't develop into
+            bolls.
+
+    Returns:
+        A `DataFrame` indexed by plot with last flower percentage information.
+
+    """
+    # Figure out the DAP value for the final flowering date.
+    final_flower_dap = (last_effective_flower_date - field_planted_date).days
+    logger.debug("Last effective flower DAP: {}", final_flower_dap)
+
+    # Compute total counts.
+    total_counts = (
+        cumulative_counts[CountingColumns.COUNT.value]
+        .groupby(CountingColumns.PLOT.value)
+        .max()
+    )
+    # Eliminate counts beyond this day.
+    cumulative_counts = cumulative_counts[
+        cumulative_counts[CountingColumns.DAP.value] < final_flower_dap
+    ]
+    # Compute the new total counts.
+    final_flower_counts = (
+        cumulative_counts[CountingColumns.COUNT.value]
+        .groupby(CountingColumns.PLOT.value)
+        .max()
+    )
+
+    # Calculate the percentage.
+    final_flower_percentage = final_flower_counts / total_counts * 100
+
+    final_flower_counts.rename("Last Effective Flower Count", inplace=True)
+    final_flower_counts = final_flower_counts.to_frame()
+    final_flower_counts["Last Effective Flower %"] = final_flower_percentage
+    return final_flower_counts
+
+
 def _add_cumulative_counts(
     metric: pd.DataFrame, *, cumulative_counts: pd.DataFrame
 ) -> pd.DataFrame:
@@ -798,6 +850,7 @@ def create_metric_table(
     genotypes: pd.DataFrame,
     cumulative_counts: pd.DataFrame,
     outliers: pd.DataFrame | None = None,
+    last_effective_flower: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Combines all the per-plot metrics into a single, human-readable table.
@@ -812,6 +865,7 @@ def create_metric_table(
         cumulative_counts: The cumulative count data.
         outliers: Optional outlier information, which will also be included
             if present.
+        last_effective_flower: The last effective flower data, if present.
 
     Returns:
         The combined table with all metrics.
@@ -833,6 +887,9 @@ def create_metric_table(
     slope_and_genotype = merge(flowering_slopes, genotypes)
     combined = merge(peak_and_start, end_and_duration)
     combined = merge(combined, slope_and_genotype)
+
+    if last_effective_flower is not None:
+        combined = merge(combined, last_effective_flower)
 
     # Add the total counts.
     total_counts = (

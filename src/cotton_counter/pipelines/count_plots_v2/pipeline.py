@@ -39,6 +39,7 @@ from ..common import (
     plot_mean_flowering_curve,
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
+    compute_last_effective_flower_percentage,
 )
 from .nodes import (
     add_plot_index,
@@ -296,6 +297,15 @@ def _create_analysis_pipeline() -> Pipeline:
                 ),
                 "flowering_slopes",
             ),
+            node(
+                compute_last_effective_flower_percentage,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    field_planted_date="params:v2_field_planted_date",
+                    last_effective_flower_date="params:last_effective_flower_date",
+                ),
+                "last_effective_flower",
+            ),
             # Find outliers.
             node(
                 clean_genotypes,
@@ -327,6 +337,7 @@ def _create_analysis_pipeline() -> Pipeline:
                     outliers="outliers",
                     genotypes="cleaned_genotypes",
                     cumulative_counts="cumulative_counts",
+                    last_effective_flower="last_effective_flower",
                 ),
                 "human_readable_metrics",
             ),
