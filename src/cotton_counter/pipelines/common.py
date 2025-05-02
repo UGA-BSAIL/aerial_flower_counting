@@ -742,6 +742,52 @@ def compute_flowering_ramps(
         return plot_groups.apply(_fit_line_for_plot)
 
 
+def _add_cumulative_counts(
+    metric: pd.DataFrame, *, cumulative_counts: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Modifies metric data to use cumulative counts instead of raw counts.
+
+    Args:
+        metric: The metric DF.
+        cumulative_counts: The cumulative counts.
+
+    Returns:
+        The same metric with the counts replaced by cumulative counts.
+
+    """
+    cumulative_counts = cumulative_counts.copy()
+    metric = metric.copy()
+
+    # Index on both plot and DAP for easy merging.
+    metric.set_index(
+        CountingColumns.DAP.value, inplace=True, append=True, drop=False
+    )
+    cumulative_counts.set_index(
+        CountingColumns.DAP.value, inplace=True, append=True
+    )
+
+    # Delete extraneous columns.
+    metric.drop(
+        columns=[
+            CountingColumns.COUNT.value,
+            DetectionColumns.PLOT_NUM.value,
+            CountingColumns.SESSION.value,
+        ],
+        inplace=True,
+    )
+
+    merged = pd.merge(
+        metric,
+        cumulative_counts,
+        how="inner",
+        left_index=True,
+        right_index=True,
+    )
+    # Remove the extra index level.
+    return merged.droplevel(CountingColumns.DAP.value)
+
+
 def create_metric_table(
     *,
     peak_flowering_times: pd.DataFrame,
@@ -750,6 +796,7 @@ def create_metric_table(
     flowering_durations: pd.DataFrame,
     flowering_slopes: pd.DataFrame,
     genotypes: pd.DataFrame,
+    cumulative_counts: pd.DataFrame,
     outliers: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
@@ -762,6 +809,7 @@ def create_metric_table(
         flowering_durations: The flowering durations.
         flowering_slopes: The flowering slopes.
         genotypes: The genotype information.
+        cumulative_counts: The cumulative count data.
         outliers: Optional outlier information, which will also be included
             if present.
 
@@ -769,6 +817,13 @@ def create_metric_table(
         The combined table with all metrics.
 
     """
+    add_cumulative = partial(
+        _add_cumulative_counts, cumulative_counts=cumulative_counts
+    )
+    peak_flowering_times = add_cumulative(peak_flowering_times)
+    flowering_starts = add_cumulative(flowering_starts)
+    flowering_ends = add_cumulative(flowering_ends)
+
     # Everything should have the same index, so merge it all together.
     merge = partial(pd.merge, left_index=True, right_index=True)
     peak_and_start = merge(
@@ -778,6 +833,15 @@ def create_metric_table(
     slope_and_genotype = merge(flowering_slopes, genotypes)
     combined = merge(peak_and_start, end_and_duration)
     combined = merge(combined, slope_and_genotype)
+
+    # Add the total counts.
+    total_counts = (
+        cumulative_counts[CountingColumns.COUNT.value]
+        .groupby(CountingColumns.PLOT.value)
+        .max()
+    )
+    total_counts.rename("Total Count", inplace=True)
+    combined = merge(combined, total_counts)
 
     # Average across genotypes.
     combined = combined.groupby(

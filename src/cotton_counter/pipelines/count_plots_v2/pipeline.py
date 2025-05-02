@@ -326,6 +326,7 @@ def _create_analysis_pipeline() -> Pipeline:
                     flowering_slopes="flowering_slopes",
                     outliers="outliers",
                     genotypes="cleaned_genotypes",
+                    cumulative_counts="cumulative_counts",
                 ),
                 "human_readable_metrics",
             ),

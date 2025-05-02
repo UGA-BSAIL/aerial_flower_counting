@@ -375,6 +375,7 @@ def create_pipeline(**kwargs):
                     flowering_durations="flowering_durations",
                     flowering_slopes="flowering_slopes",
                     genotypes="cleaned_genotypes",
+                    cumulative_counts="cumulative_counts",
                 ),
                 "human_readable_metrics",
             ),
