@@ -1951,3 +1951,32 @@ def combine_excess_green(*excess_green: pd.DataFrame) -> pd.DataFrame:
     combined = pd.concat(excess_green, ignore_index=True)
     # Sort by greenness to make outliers easy to find.
     return combined.sort_values(CountingColumns.GREENNESS.value)
+
+
+def filter_poor_germination(
+    *,
+    counting_results: pd.DataFrame,
+    excess_green: pd.DataFrame,
+    threshold: float,
+) -> pd.DataFrame:
+    """
+    Filters out plots that appear to have germinated poorly.
+
+    Args:
+        counting_results: The raw counting results.
+        excess_green: The calculated excess green values.
+        threshold: The greenness threshold. Any plots below this will be
+            filtered out.
+
+    Returns:
+       The filtered counting results.
+
+    """
+    keep_plots = excess_green[
+        excess_green[CountingColumns.GREENNESS.value] >= threshold
+    ]
+    logger.info(
+        "Filtering {} plots with poor germination.",
+        len(excess_green) - len(keep_plots),
+    )
+    return counting_results.loc[keep_plots[CountingColumns.PLOT.value]]

@@ -62,6 +62,7 @@ from .nodes import (
     tables_to_partitions,
     analyze_excess_green,
     combine_excess_green,
+    filter_poor_germination,
 )
 
 
@@ -220,41 +221,6 @@ def _create_analysis_pipeline() -> Pipeline:
     """
     return Pipeline(
         [
-            # Compute flowering metrics.
-            node(
-                compute_cumulative_counts,
-                "counting_results",
-                "cumulative_counts",
-            ),
-            node(
-                compute_flowering_peak, "counting_results", "flowering_peaks"
-            ),
-            node(
-                compute_flowering_start_end,
-                dict(
-                    counting_results="counting_results",
-                    start_threshold="params:flower_start_threshold",
-                    end_threshold="params:flower_end_threshold",
-                ),
-                ["flowering_starts", "flowering_ends"],
-            ),
-            node(
-                compute_flowering_duration,
-                dict(
-                    flowering_starts="flowering_starts",
-                    flowering_ends="flowering_ends",
-                ),
-                "flowering_durations",
-            ),
-            node(
-                compute_flowering_ramps,
-                dict(
-                    peak_flowering_times="flowering_peaks",
-                    flowering_start_times="flowering_starts",
-                    cumulative_counts="cumulative_counts",
-                ),
-                "flowering_slopes",
-            ),
             # Greenness
             node(
                 analyze_excess_green,
@@ -284,6 +250,51 @@ def _create_analysis_pipeline() -> Pipeline:
                 combine_excess_green,
                 ["exg_top", "exg_middle", "exg_bottom"],
                 "exg_report",
+            ),
+            # Eliminate plots with low greenness.
+            node(
+                filter_poor_germination,
+                dict(
+                    counting_results="counting_results",
+                    excess_green="exg_report",
+                    threshold="params:excess_green_threshold",
+                ),
+                "counting_results_filtered",
+            ),
+            # Compute flowering metrics.
+            node(
+                compute_cumulative_counts,
+                "counting_results_filtered",
+                "cumulative_counts",
+            ),
+            node(
+                compute_flowering_peak, "counting_results", "flowering_peaks"
+            ),
+            node(
+                compute_flowering_start_end,
+                dict(
+                    counting_results="counting_results_filtered",
+                    start_threshold="params:flower_start_threshold",
+                    end_threshold="params:flower_end_threshold",
+                ),
+                ["flowering_starts", "flowering_ends"],
+            ),
+            node(
+                compute_flowering_duration,
+                dict(
+                    flowering_starts="flowering_starts",
+                    flowering_ends="flowering_ends",
+                ),
+                "flowering_durations",
+            ),
+            node(
+                compute_flowering_ramps,
+                dict(
+                    peak_flowering_times="flowering_peaks",
+                    flowering_start_times="flowering_starts",
+                    cumulative_counts="cumulative_counts",
+                ),
+                "flowering_slopes",
             ),
             # Find outliers.
             node(
@@ -457,7 +468,7 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    pipeline += _create_image_extents_pipeline()
+    # pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     output_nodes = []

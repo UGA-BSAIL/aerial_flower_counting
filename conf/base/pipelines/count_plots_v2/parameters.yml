@@ -7,3 +7,7 @@ num_genotypes_to_collect: 40
 early_late_quantiles: [0.05, 0.95]
 # Quantile range that defines the optimal flowering habit.
 optimal_quantile_range: 0.025
+
+# Excess green threshold to use for eliminating plots with poor germination.
+# The excess green values are normalized on a scale from 0-10.
+excess_green_threshold: 2
