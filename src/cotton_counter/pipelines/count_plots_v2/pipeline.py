@@ -64,6 +64,7 @@ from .nodes import (
     analyze_excess_green,
     combine_excess_green,
     filter_poor_germination,
+    clean_yield_data,
 )
 
 
@@ -325,6 +326,8 @@ def _create_analysis_pipeline() -> Pipeline:
                 ),
                 "outliers",
             ),
+            # Load yield
+            node(clean_yield_data, "yield_spreadsheet", "yield_cleaned"),
             # Save the metric table.
             node(
                 create_metric_table,
@@ -338,6 +341,8 @@ def _create_analysis_pipeline() -> Pipeline:
                     genotypes="cleaned_genotypes",
                     cumulative_counts="cumulative_counts",
                     last_effective_flower="last_effective_flower",
+                    yield_data="yield_cleaned",
+                    excess_green="exg_report",
                 ),
                 "human_readable_metrics",
             ),

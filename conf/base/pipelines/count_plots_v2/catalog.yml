@@ -79,6 +79,15 @@ genotype_spreadsheet_v2:
   load_args:
     engine: openpyxl
 
+# Dataset containing the yield information.
+yield_spreadsheet:
+  type: pandas.ExcelDataSet
+  filepath: "data/01_raw/UTF-82024 yield data GS.xlsx"
+  versioned: False
+  load_args:
+    engine: openpyxl
+    sheet_name: "2024"
+
 # Datasets containing the ground-truth.
 _gt_params: &gt_params
   type: pandas.ExcelDataSet

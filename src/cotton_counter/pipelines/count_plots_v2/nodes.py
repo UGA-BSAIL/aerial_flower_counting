@@ -43,7 +43,7 @@ from ..common import (
     detections_to_points,
     detections_to_polygons,
     merge_genotype_info,
-    query_intersecting,
+    query_intersecting, YieldColumns,
 )
 from .dm_count.models import make_divisible
 from .dm_count.models import yolov8 as dm_count_yolov8
@@ -1950,7 +1950,9 @@ def combine_excess_green(*excess_green: pd.DataFrame) -> pd.DataFrame:
     """
     combined = pd.concat(excess_green, ignore_index=True)
     # Sort by greenness to make outliers easy to find.
-    return combined.sort_values(CountingColumns.GREENNESS.value)
+    return combined.sort_values(CountingColumns.GREENNESS.value).set_index(
+        CountingColumns.PLOT.value
+    )
 
 
 def filter_poor_germination(
@@ -1979,4 +1981,23 @@ def filter_poor_germination(
         "Filtering {} plots with poor germination.",
         len(excess_green) - len(keep_plots),
     )
-    return counting_results.loc[keep_plots[CountingColumns.PLOT.value]]
+    return counting_results.loc[keep_plots.index]
+
+
+def clean_yield_data(yield_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans up the raw yield data and indexes by the plot number.
+
+    Args:
+        yield_data: The raw yield data.
+
+    Returns:
+        The flower data with additional yield columns.
+
+    """
+    # Extract just the columns that we care about.
+    yield_data = yield_data[[c.value for c in YieldColumns]]
+    # Index by plot number.
+    yield_data.set_index(YieldColumns.PLOT.value, inplace=True)
+
+    return yield_data

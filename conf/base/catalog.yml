@@ -128,6 +128,10 @@ exg_report:
   type: pandas.ExcelDataSet
   filepath: data/08_reporting/plot_greenness.xlsx
   versioned: True
+  save_args:
+    index: true
+  load_args:
+    index_col: 0
 
 # Plot of ground-truth vs. predicted data.
 ground_truth_vs_predicted:

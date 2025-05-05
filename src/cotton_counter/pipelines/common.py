@@ -140,6 +140,31 @@ class FloweringHabit(enum.Enum):
     """
 
 
+@enum.unique
+class YieldColumns(enum.Enum):
+    """
+    The columns in the yield table.
+    """
+
+    PLOT = "PLOT"
+    """
+    Plot that the yield is from.
+    """
+
+    RAW_YIELD = "raw_yld"
+    """
+    The raw yield amount.
+    """
+    LINT_PERCENT = "Lint_Pc"
+    """
+    The lint percentage.
+    """
+    LINT_YIELD = "lint_yld"
+    """
+    The lint yield amount.
+    """
+
+
 def batch_iter(iterable: Iterable, *, batch_size: int) -> Iterable[List]:
     """
     Condenses an iterable into batches.
@@ -851,6 +876,8 @@ def create_metric_table(
     cumulative_counts: pd.DataFrame,
     outliers: pd.DataFrame | None = None,
     last_effective_flower: pd.DataFrame | None = None,
+    yield_data: pd.DataFrame | None = None,
+    excess_green: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Combines all the per-plot metrics into a single, human-readable table.
@@ -866,6 +893,9 @@ def create_metric_table(
         outliers: Optional outlier information, which will also be included
             if present.
         last_effective_flower: The last effective flower data, if present.
+        yield_data: The cleaned yield data. Will also be included in the
+            metric table if present.
+        excess_green: The excess green data, if present.
 
     Returns:
         The combined table with all metrics.
@@ -890,6 +920,10 @@ def create_metric_table(
 
     if last_effective_flower is not None:
         combined = merge(combined, last_effective_flower)
+    if yield_data is not None:
+        combined = merge(combined, yield_data)
+    if excess_green is not None:
+        combined = merge(combined, excess_green)
 
     # Add the total counts.
     total_counts = (
@@ -921,6 +955,7 @@ def create_metric_table(
             CountingColumns.SESSION.value: "End Session",
             CountingColumns.DAP.value: "End DAP",
             CountingColumns.COUNT.value: "End Count",
+            CountingColumns.GREENNESS.value: "Stand Count Score",
             FloweringTimeColumns.DURATION.value: "Duration (days)",
             FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
             FloweringSlopeColumns.INTERCEPT.value: "Intercept",
@@ -931,6 +966,9 @@ def create_metric_table(
             OutlierColumns.DURATION.value: "Duration Outlier",
             OutlierColumns.PEAK.value: "Peak Outlier",
             OutlierColumns.SLOPE.value: "Slope Outlier",
+            YieldColumns.RAW_YIELD.value: "Raw Yield",
+            YieldColumns.LINT_YIELD.value: "Lint Yield",
+            YieldColumns.LINT_PERCENT.value: "Lint %",
         },
         inplace=True,
     )
