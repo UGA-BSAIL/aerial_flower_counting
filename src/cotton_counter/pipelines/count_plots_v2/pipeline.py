@@ -436,6 +436,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 dict(
                     start="flowering_starts",
                     end="flowering_ends",
+                    duration="flowering_durations",
                     peak="flowering_peaks",
                     slope="flowering_slopes",
                     genotypes="cleaned_genotypes",
@@ -480,7 +481,7 @@ def _create_analysis_pipeline() -> Pipeline:
 
 def create_pipeline(**kwargs) -> Pipeline:
     pipeline = _create_ground_truth_pipeline()
-    # pipeline += _create_image_extents_pipeline()
+    pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     output_nodes = []

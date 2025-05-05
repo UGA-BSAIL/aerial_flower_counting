@@ -1642,18 +1642,18 @@ def _find_spread(
 
 def _classify_flowering_habits(
     *,
-    peak: pd.DataFrame,
+    duration: pd.DataFrame,
     genotypes: pd.DataFrame,
     early_late_quantiles: Tuple[float, float] = (0.33, 0.66),
     optimal_quantile_range: float = 0.15,
 ) -> pd.DataFrame:
     """
-    Divides genotypes into early-flowering, optimal-flowering,
-    and late-flowering groups based upon GA 230 as a reference for when
-    the optimal flowering time is.
+    Divides genotypes into short-duration, optimal-duration,
+    and long-duration groups based upon GA 230 as a reference for the optimal
+    flowering duration.
 
     Args:
-        peak: The flowering peaks.
+        duration: The flowering peaks.
         genotypes: The associated genotype information.
         early_late_quantiles: The quantile thresholds to use for the upper limit
             on the early-flowering group and the lower limit on the late
@@ -1663,52 +1663,54 @@ def _classify_flowering_habits(
             optimal flowering.
 
     Returns:
-        The peak flowering data with an additional column classifying each
-        genotype as early, optimal, or late-flowering.
+        The flowering duration data with an additional column classifying each
+        genotype as short, optimal, or long-duration.
 
     """
     # Determine the average peak value for the GA 230 population.
-    peak_genotypes = merge_genotype_info(flower_data=peak, genotypes=genotypes)
-    peak_time_ga230 = peak_genotypes[
-        peak_genotypes[GenotypeColumns.POPULATION.value] == "GA 230"
-    ][CountingColumns.DAP.value]
-    mean_peak_time = peak_time_ga230.mean()
-    logger.info("GA 230 mean peak time is {} DAP.", mean_peak_time)
+    duration_genotypes = merge_genotype_info(
+        flower_data=duration, genotypes=genotypes
+    )
+    duration_ga230 = duration_genotypes[
+        duration_genotypes[GenotypeColumns.POPULATION.value] == "GA 230"
+    ][FloweringTimeColumns.DURATION.value]
+    mean_duration = duration_ga230.mean()
+    logger.info("GA 230 mean duration is {} days.", mean_duration)
 
     # Determine the cutoff times for each group.
-    peak_time = peak_genotypes[CountingColumns.DAP.value]
-    optimal_quantile = stats.percentileofscore(peak_time, mean_peak_time) / 100
-    max_early, min_late = early_late_quantiles
+    duration = duration_genotypes[FloweringTimeColumns.DURATION.value]
+    optimal_quantile = stats.percentileofscore(duration, mean_duration) / 100
+    max_short, min_long = early_late_quantiles
     habit_quantiles = [
-        max_early,
+        max_short,
         optimal_quantile - optimal_quantile_range,
         optimal_quantile + optimal_quantile_range,
-        min_late,
+        min_long,
     ]
     logger.debug("Using habit quantiles: {}", habit_quantiles)
-    cutoff_times = peak_time.quantile(habit_quantiles)
+    cutoff_times = duration.quantile(habit_quantiles)
 
     # Get the candidate genotypes for each group based on the cutoffs.
     (
-        early_max,
+        short_max,
         optimal_min,
         optimal_max,
-        late_min,
+        long_min,
     ) = cutoff_times
-    early_candidates = peak_genotypes[peak_time <= early_max]
-    optimal_candidates = peak_genotypes[
-        (peak_time >= optimal_min) & (peak_time <= optimal_max)
+    short_candidates = duration_genotypes[duration <= short_max]
+    optimal_candidates = duration_genotypes[
+        (duration >= optimal_min) & (duration <= optimal_max)
     ]
-    late_candidates = peak_genotypes[peak_time >= late_min]
+    long_candidates = duration_genotypes[duration >= long_min]
 
     # Combine into a single DF.
-    early_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
+    short_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
     optimal_candidates[
         CountingColumns.HABIT.value
     ] = FloweringHabit.OPTIMAL.value
-    late_candidates[CountingColumns.HABIT.value] = FloweringHabit.LATE.value
+    long_candidates[CountingColumns.HABIT.value] = FloweringHabit.LATE.value
     return pd.concat(
-        [early_candidates, optimal_candidates, late_candidates],
+        [short_candidates, optimal_candidates, long_candidates],
         axis=0,
         ignore_index=True,
     )
@@ -1718,6 +1720,7 @@ def find_genotypes_to_collect(
     *,
     start: pd.DataFrame,
     end: pd.DataFrame,
+    duration: pd.DataFrame,
     peak: pd.DataFrame,
     slope: pd.DataFrame,
     genotypes: pd.DataFrame,
@@ -1734,6 +1737,7 @@ def find_genotypes_to_collect(
     Args:
         start: The flowering start dates.
         end: The flowering end dates.
+        duration: The flowering durations.
         peak: The flowering peaks.
         slope: The flowering slopes.
         genotypes: The associated genotype information.
@@ -1745,7 +1749,7 @@ def find_genotypes_to_collect(
 
     """
     flowering_habits = _classify_flowering_habits(
-        genotypes=genotypes, peak=peak, **kwargs
+        genotypes=genotypes, duration=duration, **kwargs
     )
     # Remove GA-230 from consideration, because it will be selected regardless.
     flowering_habits = flowering_habits[
@@ -1792,10 +1796,6 @@ def find_genotypes_to_collect(
     )
     # Clean it up a bit for exporting to a spreadsheet.
     to_collect.reset_index(names="Genotype", inplace=True)
-    to_collect.drop(
-        columns=[DetectionColumns.PLOT_NUM.value, CountingColumns.COUNT.value],
-        inplace=True,
-    )
     return to_collect
 
 
