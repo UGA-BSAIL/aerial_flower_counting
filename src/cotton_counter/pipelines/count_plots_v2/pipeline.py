@@ -65,6 +65,8 @@ from .nodes import (
     combine_excess_green,
     filter_poor_germination,
     clean_yield_data,
+    classify_flowering_habits_by_count,
+    classify_flowering_habits_by_duration,
 )
 
 
@@ -437,19 +439,48 @@ def _create_analysis_pipeline() -> Pipeline:
             ),
             # Determine which genotypes should be collected in the field.
             node(
+                classify_flowering_habits_by_count,
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    genotypes="cleaned_genotypes",
+                ),
+                "flowering_habits_count",
+            ),
+            node(
+                classify_flowering_habits_by_duration,
+                dict(
+                    duration="flowering_durations",
+                    genotypes="cleaned_genotypes",
+                    early_late_quantiles="params:early_late_quantiles",
+                    optimal_quantile_range="params:optimal_quantile_range",
+                ),
+                "flowering_habits_duration",
+            ),
+            node(
                 find_genotypes_to_collect,
                 dict(
+                    flowering_habits="flowering_habits_duration",
                     start="flowering_starts",
                     end="flowering_ends",
-                    duration="flowering_durations",
                     peak="flowering_peaks",
                     slope="flowering_slopes",
                     genotypes="cleaned_genotypes",
                     num_to_select="params:num_genotypes_to_collect",
-                    early_late_quantiles="params:early_late_quantiles",
-                    optimal_quantile_range="params:optimal_quantile_range",
                 ),
                 "genotypes_to_collect",
+            ),
+            # Plot a separate mean flowering curve grouped by flowering habit.
+            node(
+                partial(
+                    plot_mean_flowering_curve,
+                    filter_populations={"Training", "Testing"},
+                ),
+                dict(
+                    cumulative_counts="cumulative_counts",
+                    genotypes="cleaned_genotypes",
+                    flowering_habits="flowering_habits_duration",
+                ),
+                "habit_flowering_curve",
             ),
         ],
         tags=["analysis"],
@@ -485,8 +516,9 @@ def _create_analysis_pipeline() -> Pipeline:
 
 
 def create_pipeline(**kwargs) -> Pipeline:
-    pipeline = _create_ground_truth_pipeline()
-    pipeline += _create_image_extents_pipeline()
+    pipeline = Pipeline([])
+    # pipeline = _create_ground_truth_pipeline()
+    # pipeline += _create_image_extents_pipeline()
 
     # Create session-specific pipelines for detection.
     output_nodes = []

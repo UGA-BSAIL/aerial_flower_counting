@@ -126,7 +126,7 @@ class FloweringHabit(enum.Enum):
     Describes the flowering habit of a genotype.
     """
 
-    EARLY = "early"
+    EARLY = "short"
     """
     Flowers early relative to GA 230.
     """
@@ -134,7 +134,7 @@ class FloweringHabit(enum.Enum):
     """
     Flowers at about the same time as GA 230.
     """
-    LATE = "late"
+    LATE = "long"
     """
     Flowers late relative to GA 230.
     """
@@ -1052,6 +1052,7 @@ def plot_mean_flowering_curve(
     cumulative_counts: pd.DataFrame,
     genotypes: pd.DataFrame,
     filter_populations: Set[str] | None = None,
+    flowering_habits: pd.DataFrame | None = None,
 ) -> plot.Figure:
     """
     Creates mean flowering curves for each population.
@@ -1062,6 +1063,8 @@ def plot_mean_flowering_curve(
         genotypes: The cleaned genotype information.
         filter_populations: If specified, will only keep data from these
             populations.
+        flowering_habits: If specified, it will group data by flowering habit
+            instead of population.
 
     Returns:
         The plot of the flowering curves.
@@ -1076,12 +1079,28 @@ def plot_mean_flowering_curve(
         aggregation=None,
     )
 
+    group_by = GenotypeColumns.POPULATION.value
+    if flowering_habits is not None:
+        combined_data = pd.merge(
+            flowering_habits[
+                [CountingColumns.HABIT.value, GenotypeColumns.GENOTYPE.value]
+            ],
+            combined_data,
+            on=GenotypeColumns.GENOTYPE.value,
+            how="inner",
+        )
+        combined_data[CountingColumns.HABIT.value] += " "
+        combined_data[CountingColumns.HABIT.value] += combined_data[
+            GenotypeColumns.POPULATION.value
+        ]
+        group_by = CountingColumns.HABIT.value
+
     # Plot the curve.
     axes = sns.lineplot(
         data=combined_data,
         x=CountingColumns.DAP.value,
         y=CountingColumns.COUNT.value,
-        hue=GenotypeColumns.POPULATION.value,
+        hue=group_by,
     )
     axes.set_title("Average Flowering Curves", fontsize=20)
     axes.set_xlabel("Days After Planting", fontsize=20)

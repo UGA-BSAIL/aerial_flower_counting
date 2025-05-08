@@ -43,7 +43,8 @@ from ..common import (
     detections_to_points,
     detections_to_polygons,
     merge_genotype_info,
-    query_intersecting, YieldColumns,
+    query_intersecting,
+    YieldColumns,
 )
 from .dm_count.models import make_divisible
 from .dm_count.models import yolov8 as dm_count_yolov8
@@ -1640,7 +1641,7 @@ def _find_spread(
     ).rename(columns={0: CountingColumns.SPREAD.value})
 
 
-def _classify_flowering_habits(
+def classify_flowering_habits_by_duration(
     *,
     duration: pd.DataFrame,
     genotypes: pd.DataFrame,
@@ -1716,16 +1717,59 @@ def _classify_flowering_habits(
     )
 
 
+def classify_flowering_habits_by_count(
+    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Divides genotypes into short-duration, optimal-duration,
+    and long-duration groups based upon GA 230 as a reference for the optimal
+    flowering duration.
+
+    Args:
+        cumulative_counts: The cumulative counting data.
+        genotypes: The associated genotype information.
+
+    Returns:
+        The flowering duration data with an additional column classifying each
+        genotype as short, optimal, or long-duration.
+
+    """
+    # Calculate total counts.
+    total_counts = cumulative_counts.groupby(CountingColumns.PLOT.value).max()
+    # Average per genotype
+    count_genotypes = merge_genotype_info(
+        flower_data=total_counts, genotypes=genotypes
+    )
+    count_genotypes = count_genotypes.groupby(
+        GenotypeColumns.GENOTYPE.value
+    ).mean()
+    count_genotypes[GenotypeColumns.GENOTYPE.value] = count_genotypes.index
+
+    # Determine the cutoff times for each group.
+    count = count_genotypes[CountingColumns.COUNT.value]
+    median = count.median()
+
+    # Get the candidate genotypes for each group based on the cutoffs.
+    low_candidates = count_genotypes[count <= median]
+    high_candidates = count_genotypes[count > median]
+
+    # Combine into a single DF.
+    low_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
+    high_candidates[CountingColumns.HABIT.value] = FloweringHabit.LATE.value
+    return pd.concat(
+        [low_candidates, high_candidates], axis=0, ignore_index=True
+    )
+
+
 def find_genotypes_to_collect(
     *,
+    flowering_habits: pd.DataFrame,
     start: pd.DataFrame,
     end: pd.DataFrame,
-    duration: pd.DataFrame,
     peak: pd.DataFrame,
     slope: pd.DataFrame,
     genotypes: pd.DataFrame,
     num_to_select: int,
-    **kwargs: Any,
 ) -> pd.DataFrame:
     """
     Finds an ideal set of genotypes to collect plant samples from. These are
@@ -1735,25 +1779,21 @@ def find_genotypes_to_collect(
     between replicates.
 
     Args:
+        flowering_habits: Metric data with an added flowering habits column.
         start: The flowering start dates.
         end: The flowering end dates.
-        duration: The flowering durations.
         peak: The flowering peaks.
         slope: The flowering slopes.
         genotypes: The associated genotype information.
         num_to_select: Total number of genotypes that we wish to select.
-        **kwargs: Will be forwarded to `_classify_flowering_habits`.
 
     Returns:
         A single DataFrame containing the selected genotypes.
 
     """
-    flowering_habits = _classify_flowering_habits(
-        genotypes=genotypes, duration=duration, **kwargs
-    )
     # Remove GA-230 from consideration, because it will be selected regardless.
     flowering_habits = flowering_habits[
-        flowering_habits[GenotypeColumns.POPULATION.value] != "GA 230"
+        flowering_habits[GenotypeColumns.GENOTYPE.value] != "GA 230"
     ]
     flowering_habits.set_index(
         GenotypeColumns.GENOTYPE.value, append=False, inplace=True
@@ -1782,18 +1822,26 @@ def find_genotypes_to_collect(
         CountingColumns.HABIT.value, as_index=False
     )
     early_flowering = habit_groups.get_group(FloweringHabit.EARLY.value)
-    optimal_flowering = habit_groups.get_group(FloweringHabit.OPTIMAL.value)
+    try:
+        optimal_flowering = habit_groups.get_group(
+            FloweringHabit.OPTIMAL.value
+        )
+    except KeyError:
+        # No optimal data.
+        optimal_flowering = None
     late_flowering = habit_groups.get_group(FloweringHabit.LATE.value)
 
     # Take only the ones we need.
     num_to_select_per_group = num_to_select // 3
     early_flowering = early_flowering.iloc[:num_to_select_per_group]
-    optimal_flowering = optimal_flowering.iloc[:num_to_select_per_group]
+    if optimal_flowering is not None:
+        optimal_flowering = optimal_flowering.iloc[:num_to_select_per_group]
     late_flowering = late_flowering.iloc[:num_to_select_per_group]
 
-    to_collect = pd.concat(
-        [early_flowering, optimal_flowering, late_flowering]
-    )
+    to_concat = [early_flowering, late_flowering]
+    if optimal_flowering is not None:
+        to_concat.append(optimal_flowering)
+    to_collect = pd.concat(to_concat)
     # Clean it up a bit for exporting to a spreadsheet.
     to_collect.reset_index(names="Genotype", inplace=True)
     return to_collect

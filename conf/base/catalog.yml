@@ -210,3 +210,9 @@ mean_flowering_curve:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/mean_flowering_curve.png
   versioned: True
+
+# Mean flowering curve for each habit.
+habit_flowering_curve:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/habit_flowering_curve.png
+  versioned: True
