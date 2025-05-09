@@ -586,10 +586,10 @@ def compute_flowering_peak(counting_results: pd.DataFrame) -> pd.DataFrame:
         ]
 
     # Find the rows with the maximum count for each plot.
-    plot_groups = counting_results.groupby(
+    genotype_groups = counting_results.groupby(
         counting_results.index, group_keys=False
     )
-    return plot_groups.apply(_find_peak)
+    return genotype_groups.apply(_find_peak)
 
 
 def compute_flowering_start_end(
@@ -678,7 +678,14 @@ def compute_flowering_duration(
         flowering_ends[CountingColumns.DAP.value]
         - flowering_starts[CountingColumns.DAP.value]
     )
-    return pd.DataFrame(data={FloweringTimeColumns.DURATION.value: durations})
+    output_df = flowering_starts[
+        [
+            GenotypeColumns.POPULATION.value,
+            CountingColumns.PLOT.value,
+        ]
+    ].copy()
+    output_df[FloweringTimeColumns.DURATION.value] = durations
+    return output_df
 
 
 def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
@@ -703,14 +710,14 @@ def compute_cumulative_counts(counting_results: pd.DataFrame) -> pd.DataFrame:
 
         return plot_counts
 
-    plot_groups = counting_results.groupby(
+    genotype_groups = counting_results.groupby(
         counting_results.index, group_keys=False
     )
     if len(counting_results) > 1:
-        return plot_groups.parallel_apply(_count_cumulative)
+        return genotype_groups.parallel_apply(_count_cumulative)
     else:
         # Work around a bug in Pandarallel.
-        return plot_groups.apply(_count_cumulative)
+        return genotype_groups.apply(_count_cumulative)
 
 
 def compute_flowering_ramps(
@@ -735,13 +742,13 @@ def compute_flowering_ramps(
 
     def _fit_line_for_plot(plot_counts: pd.DataFrame) -> pd.Series:
         # All plots should be the same in this DF.
-        plot_num = plot_counts.index[0]
+        genotype = plot_counts.index[0]
         # Filter the counting results to only those between the flowering
         # start and end.
-        start_dap = flowering_start_times.loc[plot_num][
+        start_dap = flowering_start_times.loc[genotype][
             CountingColumns.DAP.value
         ]
-        peak_dap = peak_flowering_times.loc[plot_num][
+        peak_dap = peak_flowering_times.loc[genotype][
             CountingColumns.DAP.value
         ]
         plot_daps = plot_counts[CountingColumns.DAP.value]
@@ -759,14 +766,17 @@ def compute_flowering_ramps(
             {
                 FloweringSlopeColumns.SLOPE.value: model.params[1],
                 FloweringSlopeColumns.INTERCEPT.value: model.params[0],
+                GenotypeColumns.POPULATION.value: plot_counts[
+                    GenotypeColumns.POPULATION.value
+                ].iloc[0],
             },
         )
 
-    plot_groups = cumulative_counts.groupby([cumulative_counts.index])
+    genotype_groups = cumulative_counts.groupby([cumulative_counts.index])
     if len(cumulative_counts) > 1:
-        return plot_groups.parallel_apply(_fit_line_for_plot)
+        return genotype_groups.parallel_apply(_fit_line_for_plot)
     else:
-        return plot_groups.apply(_fit_line_for_plot)
+        return genotype_groups.apply(_fit_line_for_plot)
 
 
 def compute_last_effective_flower_percentage(
@@ -796,7 +806,7 @@ def compute_last_effective_flower_percentage(
     # Compute total counts.
     total_counts = (
         cumulative_counts[CountingColumns.COUNT.value]
-        .groupby(CountingColumns.PLOT.value)
+        .groupby(GenotypeColumns.GENOTYPE.value)
         .max()
     )
     # Eliminate counts beyond this day.
@@ -806,7 +816,7 @@ def compute_last_effective_flower_percentage(
     # Compute the new total counts.
     final_flower_counts = (
         cumulative_counts[CountingColumns.COUNT.value]
-        .groupby(CountingColumns.PLOT.value)
+        .groupby(GenotypeColumns.GENOTYPE.value)
         .max()
     )
 
@@ -848,8 +858,7 @@ def _add_cumulative_counts(
     metric.drop(
         columns=[
             CountingColumns.COUNT.value,
-            DetectionColumns.PLOT_NUM.value,
-            CountingColumns.SESSION.value,
+            CountingColumns.PLOT.value,
         ],
         inplace=True,
     )
@@ -872,7 +881,6 @@ def create_metric_table(
     flowering_ends: pd.DataFrame,
     flowering_durations: pd.DataFrame,
     flowering_slopes: pd.DataFrame,
-    genotypes: pd.DataFrame,
     cumulative_counts: pd.DataFrame,
     outliers: pd.DataFrame | None = None,
     last_effective_flower: pd.DataFrame | None = None,
@@ -888,7 +896,6 @@ def create_metric_table(
         flowering_ends: The flowering end times.
         flowering_durations: The flowering durations.
         flowering_slopes: The flowering slopes.
-        genotypes: The genotype information.
         cumulative_counts: The cumulative count data.
         outliers: Optional outlier information, which will also be included
             if present.
@@ -914,64 +921,59 @@ def create_metric_table(
         peak_flowering_times, flowering_starts, suffixes=("_peak", "_start")
     )
     end_and_duration = merge(flowering_ends, flowering_durations)
-    slope_and_genotype = merge(flowering_slopes, genotypes)
     combined = merge(peak_and_start, end_and_duration)
-    combined = merge(combined, slope_and_genotype)
+    combined = merge(combined, flowering_slopes)
 
     if last_effective_flower is not None:
         combined = merge(combined, last_effective_flower)
     if yield_data is not None:
         combined = merge(combined, yield_data)
     if excess_green is not None:
+        # Average the replicates.
+        excess_green = excess_green.groupby(
+            GenotypeColumns.GENOTYPE.value
+        ).mean()
         combined = merge(combined, excess_green)
 
     # Add the total counts.
     total_counts = (
         cumulative_counts[CountingColumns.COUNT.value]
-        .groupby(CountingColumns.PLOT.value)
+        .groupby(GenotypeColumns.GENOTYPE.value)
         .max()
     )
     total_counts.rename("Total Count", inplace=True)
     combined = merge(combined, total_counts)
 
-    # Average across genotypes.
-    combined = combined.groupby(
-        GenotypeColumns.GENOTYPE.value, as_index=False
-    ).mean()
-    combined.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
-
     if outliers is not None:
         combined = merge(combined, outliers)
 
     # Convert to human-readable names.
+    column_mapping = {
+        f"{CountingColumns.DAP.value}_peak": "Peak DAP",
+        f"{CountingColumns.COUNT.value}_peak": "Peak Count",
+        f"{CountingColumns.DAP.value}_start": "Start DAP",
+        f"{CountingColumns.COUNT.value}_start": "Start Count",
+        CountingColumns.DAP.value: "End DAP",
+        CountingColumns.COUNT.value: "End Count",
+        CountingColumns.GREENNESS.value: "Stand Count Score",
+        FloweringTimeColumns.DURATION.value: "Duration (days)",
+        FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
+        FloweringSlopeColumns.INTERCEPT.value: "Intercept",
+        f"{GenotypeColumns.POPULATION.value}_x_peak": "Population",
+        OutlierColumns.START.value: "Start Outlier",
+        OutlierColumns.END.value: "End Outlier",
+        OutlierColumns.DURATION.value: "Duration Outlier",
+        OutlierColumns.PEAK.value: "Peak Outlier",
+        OutlierColumns.SLOPE.value: "Slope Outlier",
+        YieldColumns.RAW_YIELD.value: "Raw Yield",
+        YieldColumns.LINT_YIELD.value: "Lint Yield",
+        YieldColumns.LINT_PERCENT.value: "Lint %",
+    }
     combined.rename(
-        columns={
-            f"{CountingColumns.SESSION.value}_peak": "Peak Session",
-            f"{CountingColumns.DAP.value}_peak": "Peak DAP",
-            f"{CountingColumns.COUNT.value}_peak": "Peak Count",
-            f"{CountingColumns.SESSION.value}_start": "Start Session",
-            f"{CountingColumns.DAP.value}_start": "Start DAP",
-            f"{CountingColumns.COUNT.value}_start": "Start Count",
-            CountingColumns.SESSION.value: "End Session",
-            CountingColumns.DAP.value: "End DAP",
-            CountingColumns.COUNT.value: "End Count",
-            CountingColumns.GREENNESS.value: "Stand Count Score",
-            FloweringTimeColumns.DURATION.value: "Duration (days)",
-            FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
-            FloweringSlopeColumns.INTERCEPT.value: "Intercept",
-            GenotypeColumns.GENOTYPE.value: "Genotype",
-            GenotypeColumns.POPULATION.value: "Population",
-            OutlierColumns.START.value: "Start Outlier",
-            OutlierColumns.END.value: "End Outlier",
-            OutlierColumns.DURATION.value: "Duration Outlier",
-            OutlierColumns.PEAK.value: "Peak Outlier",
-            OutlierColumns.SLOPE.value: "Slope Outlier",
-            YieldColumns.RAW_YIELD.value: "Raw Yield",
-            YieldColumns.LINT_YIELD.value: "Lint Yield",
-            YieldColumns.LINT_PERCENT.value: "Lint %",
-        },
+        columns=column_mapping,
         inplace=True,
     )
+    combined = combined[list(column_mapping.values())]
     # Turn the index into a column so it shows up in the spreadsheet.
     combined.insert(0, "Genotype", combined.index.values)
 
@@ -1011,6 +1013,8 @@ def merge_genotype_info(
     combined_data = pd.merge(
         flower_data, genotypes, left_index=True, right_index=True
     )
+    # Save the plot numbers.
+    combined_data[CountingColumns.PLOT.value] = combined_data.index
 
     if filter_populations is not None:
         # Remove extraneous populations.
@@ -1039,8 +1043,8 @@ def merge_genotype_info(
             as_index=False,
         ).agg(aggregation)
 
+    combined_data.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
     if outliers is not None:
-        combined_data.set_index(GenotypeColumns.GENOTYPE.value, inplace=True)
         combined_data = pd.merge(
             combined_data, outliers, left_index=True, right_index=True
         )
@@ -1050,7 +1054,6 @@ def merge_genotype_info(
 def plot_mean_flowering_curve(
     *,
     cumulative_counts: pd.DataFrame,
-    genotypes: pd.DataFrame,
     filter_populations: Set[str] | None = None,
     flowering_habits: pd.DataFrame | None = None,
 ) -> plot.Figure:
@@ -1060,7 +1063,6 @@ def plot_mean_flowering_curve(
     Args:
         cumulative_counts: The complete counting results, with cumulative
             counts.
-        genotypes: The cleaned genotype information.
         filter_populations: If specified, will only keep data from these
             populations.
         flowering_habits: If specified, it will group data by flowering habit
@@ -1070,34 +1072,37 @@ def plot_mean_flowering_curve(
         The plot of the flowering curves.
 
     """
-    # Merge flowering and genotype data together for easy plotting.
-    combined_data = merge_genotype_info(
-        flower_data=cumulative_counts,
-        genotypes=genotypes,
-        group_on_dap=True,
-        filter_populations=filter_populations,
-        aggregation=None,
-    )
+    if filter_populations is not None:
+        # Remove extraneous populations.
+        extracted = []
+        for population in filter_populations:
+            extracted.append(
+                cumulative_counts[
+                    cumulative_counts[
+                        GenotypeColumns.POPULATION.value
+                    ].str.contains(population)
+                ]
+            )
+        cumulative_counts = pd.concat(extracted)
 
     group_by = GenotypeColumns.POPULATION.value
     if flowering_habits is not None:
-        combined_data = pd.merge(
-            flowering_habits[
-                [CountingColumns.HABIT.value, GenotypeColumns.GENOTYPE.value]
-            ],
-            combined_data,
-            on=GenotypeColumns.GENOTYPE.value,
+        cumulative_counts = pd.merge(
+            flowering_habits[[CountingColumns.HABIT.value]],
+            cumulative_counts,
+            left_index=True,
+            right_index=True,
             how="inner",
         )
-        combined_data[CountingColumns.HABIT.value] += " "
-        combined_data[CountingColumns.HABIT.value] += combined_data[
+        cumulative_counts[CountingColumns.HABIT.value] += " "
+        cumulative_counts[CountingColumns.HABIT.value] += cumulative_counts[
             GenotypeColumns.POPULATION.value
         ]
         group_by = CountingColumns.HABIT.value
 
     # Plot the curve.
     axes = sns.lineplot(
-        data=combined_data,
+        data=cumulative_counts,
         x=CountingColumns.DAP.value,
         y=CountingColumns.COUNT.value,
         hue=group_by,
@@ -1115,7 +1120,7 @@ def plot_mean_flowering_curve(
 
 
 def _plot_flowering_time_histogram(
-    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
+    flower_data: pd.DataFrame, *, title: str
 ) -> plot.Figure:
     """
     Draws a histogram of some flowering attribute, predicated on DAP and
@@ -1124,27 +1129,21 @@ def _plot_flowering_time_histogram(
     Args:
         flower_data: The flowering data we want to plot. Should have one row
             for each plot and have a DAP column.
-        genotypes: The dataframe containing genotype information.
         title: The title to use for the plot.
 
     Returns:
         The plot that it made.
 
     """
-    combined_data = merge_genotype_info(
-        flower_data=flower_data,
-        genotypes=genotypes,
-    )
-
     # Plot it.
     axes = sns.histplot(
-        data=combined_data,
+        data=flower_data,
         x=CountingColumns.DAP.value,
         hue=GenotypeColumns.POPULATION.value,
         multiple="dodge",
         shrink=0.8,
         # Use one bin for each session.
-        bins=len(flower_data[CountingColumns.SESSION.value].unique()),
+        bins=len(flower_data[CountingColumns.DAP.value].unique()),
         stat="density",
         common_norm=False,
     )
@@ -1155,7 +1154,7 @@ def _plot_flowering_time_histogram(
 
 
 def _plot_flowering_time_means(
-    flower_data: pd.DataFrame, *, genotypes: pd.DataFrame, title: str
+    flower_data: pd.DataFrame, *, title: str
 ) -> plot.Figure:
     """
     Creates a bar plot that facilitates the analysis of whether there are
@@ -1165,23 +1164,17 @@ def _plot_flowering_time_means(
     Args:
         flower_data: The flowering data we want to plot. Should have one row
             for each plot and have a DAP column.
-        genotypes: The dataframe containing genotype information.
         title: The title to use for the plot.
 
     Returns:
         The plot that it made.
 
     """
-    # Merge flowering and genotype data together for easy plotting.
-    combined_data = merge_genotype_info(
-        flower_data=flower_data, genotypes=genotypes
-    )
-
     # Plot it.
     axes = sns.barplot(
         x=GenotypeColumns.POPULATION.value,
         y=CountingColumns.DAP.value,
-        data=combined_data,
+        data=flower_data,
         capsize=0.2,
     )
     axes.set_title(title)
@@ -1194,7 +1187,7 @@ def _plot_flowering_time_means(
 
 
 def plot_flowering_slope_dist(
-    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_slopes: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the slopes of the initial flowering ramp-up for each
@@ -1202,20 +1195,14 @@ def plot_flowering_slope_dist(
 
     Args:
         flowering_slopes: The extracted flowering slope data.
-        genotypes: The dataframe containing genotype information.
 
     Returns:
         The plot that it created.
 
     """
-    combined_data = merge_genotype_info(
-        flower_data=flowering_slopes,
-        genotypes=genotypes,
-    )
-
     # Plot it.
     axes = sns.histplot(
-        data=combined_data,
+        data=flowering_slopes,
         x=FloweringSlopeColumns.SLOPE.value,
         hue=GenotypeColumns.POPULATION.value,
         multiple="dodge",
@@ -1230,29 +1217,23 @@ def plot_flowering_slope_dist(
 
 
 def plot_flowering_slope_comparison(
-    *, flowering_slopes: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_slopes: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the flowering slopes of different populations.
 
     Args:
         flowering_slopes: The extracted flowering slope data.
-        genotypes: The dataframe containing genotype information.
 
     Returns:
         The plot that it created.
 
     """
-    # Merge flowering and genotype data together for easy plotting.
-    combined_data = pd.merge(
-        flowering_slopes, genotypes, left_index=True, right_index=True
-    )
-
     # Plot it.
     axes = sns.barplot(
         x=GenotypeColumns.POPULATION.value,
         y=FloweringSlopeColumns.SLOPE.value,
-        data=combined_data,
+        data=flowering_slopes,
         capsize=0.2,
     )
     axes.set_title("Mean Flowering Slope")
@@ -1265,7 +1246,7 @@ def plot_flowering_slope_comparison(
 
 
 def plot_peak_flowering_dist(
-    *, peak_flowering_times: pd.DataFrame, **kwargs: Any
+    *, peak_flowering_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the peak flowering times.
@@ -1273,19 +1254,18 @@ def plot_peak_flowering_dist(
     Args:
         peak_flowering_times: Dataset containing peak flowering times for
             each plot.
-        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
 
     Returns:
         The plot that it made.
 
     """
     return _plot_flowering_time_histogram(
-        peak_flowering_times, **kwargs, title="Peak Flowering Time"
+        peak_flowering_times, title="Peak Flowering Time"
     )
 
 
 def plot_peak_flowering_comparison(
-    *, peak_flowering_times: pd.DataFrame, **kwargs: Any
+    *, peak_flowering_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the peak flowering times of different populations.
@@ -1293,19 +1273,18 @@ def plot_peak_flowering_comparison(
     Args:
         peak_flowering_times: Dataset containing peak flowering times for
             each plot.
-        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
 
     Returns:
         The plot that it made.
 
     """
     return _plot_flowering_time_means(
-        peak_flowering_times, **kwargs, title="Mean Peak Flowering Time"
+        peak_flowering_times, title="Mean Peak Flowering Time"
     )
 
 
 def plot_flowering_start_dist(
-    *, flowering_start_times: pd.DataFrame, **kwargs: Any
+    *, flowering_start_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the flowering end times.
@@ -1313,19 +1292,18 @@ def plot_flowering_start_dist(
     Args:
         flowering_start_times: Dataset containing flowering start times for
             each plot.
-        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
 
     Returns:
         The plot that it made.
 
     """
     return _plot_flowering_time_histogram(
-        flowering_start_times, **kwargs, title="Flowering Start Time"
+        flowering_start_times, title="Flowering Start Time"
     )
 
 
 def plot_flowering_start_comparison(
-    *, flowering_start_times: pd.DataFrame, **kwargs: Any
+    *, flowering_start_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the flowering start times of different populations.
@@ -1333,19 +1311,18 @@ def plot_flowering_start_comparison(
     Args:
         flowering_start_times: Dataset containing flowering start times for
             each plot.
-        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
 
     Returns:
         The plot that it made.
 
     """
     return _plot_flowering_time_means(
-        flowering_start_times, **kwargs, title="Mean Flowering Start Time"
+        flowering_start_times, title="Mean Flowering Start Time"
     )
 
 
 def plot_flowering_end_dist(
-    *, flowering_end_times: pd.DataFrame, **kwargs: Any
+    *, flowering_end_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the flowering start times.
@@ -1353,19 +1330,18 @@ def plot_flowering_end_dist(
     Args:
         flowering_end_times: Dataset containing flowering start times for
             each plot.
-        **kwargs: Will be forwarded to `_plot_flowering_time_histogram`.
 
     Returns:
         The plot that it made.
 
     """
     return _plot_flowering_time_histogram(
-        flowering_end_times, **kwargs, title="Flowering End Time"
+        flowering_end_times, title="Flowering End Time"
     )
 
 
 def plot_flowering_end_comparison(
-    *, flowering_end_times: pd.DataFrame, **kwargs: Any
+    *, flowering_end_times: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the flowering end times of different populations.
@@ -1380,12 +1356,12 @@ def plot_flowering_end_comparison(
 
     """
     return _plot_flowering_time_means(
-        flowering_end_times, **kwargs, title="Mean Flowering End Time"
+        flowering_end_times, title="Mean Flowering End Time"
     )
 
 
 def plot_flowering_duration_dist(
-    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_durations: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a histogram of the flowering start times.
@@ -1393,20 +1369,14 @@ def plot_flowering_duration_dist(
     Args:
         flowering_durations: Dataset containing flowering durations for each
             plot.
-        genotypes: The cleaned genotype information.
 
     Returns:
         The plot that it made.
 
     """
-    combined_data = merge_genotype_info(
-        flower_data=flowering_durations,
-        genotypes=genotypes,
-    )
-
     # Plot it.
     axes = sns.histplot(
-        data=combined_data,
+        data=flowering_durations,
         x=FloweringTimeColumns.DURATION.value,
         hue=GenotypeColumns.POPULATION.value,
         multiple="dodge",
@@ -1419,7 +1389,7 @@ def plot_flowering_duration_dist(
 
 
 def plot_flowering_duration_comparison(
-    *, flowering_durations: pd.DataFrame, genotypes: pd.DataFrame
+    *, flowering_durations: pd.DataFrame
 ) -> plot.Figure:
     """
     Plots a comparison of the flowering end times of different populations.
@@ -1427,22 +1397,16 @@ def plot_flowering_duration_comparison(
     Args:
         flowering_durations: Dataset containing flowering durations for
             each plot.
-        genotypes: The cleaned genotype information.
 
     Returns:
         The plot that it made.
 
     """
-    # Merge flowering and genotype data together for easy plotting.
-    combined_data = pd.merge(
-        flowering_durations, genotypes, left_index=True, right_index=True
-    )
-
     # Plot it.
     axes = sns.barplot(
         x=GenotypeColumns.POPULATION.value,
         y=FloweringTimeColumns.DURATION.value,
-        data=combined_data,
+        data=flowering_durations,
         capsize=0.2,
     )
     axes.set_title("Mean Flowering Duration")

@@ -32,14 +32,23 @@ class CameraConfig:
     Attributes:
         chunk_transform: 3D transformation matrix from chunk coordinates to
             ECEF.
-        camera_intrinsics: The camera intrinsics matrix.
+        camera_intrinsics: The camera intrinsics matrix, with the
+            camera centered. Assumed to be valid after undistortion.
+        camera_intrinsics_distorted: The camera intrinsics matrix before
+            undistortion.
+        camera_distortion: The camera distortion coefficients.
         camera_transforms: Maps camera IDs to 4D transformation matrices from
             camera coordinates to chunk coordinates.
+        camera_positions: Saved camera positions from metashape.
+
     """
 
     chunk_transform: np.ndarray
     camera_intrinsics: np.ndarray
+    camera_intrinsics_distorted: np.ndarray
+    camera_distortion: np.ndarray
     camera_transforms: Dict[str, np.ndarray]
+    camera_positions: Dict[str, np.ndarray]
 
     @classmethod
     def _load_camera_transforms(
@@ -69,6 +78,42 @@ class CameraConfig:
         }
 
     @classmethod
+    def _load_camera_positions(
+        cls, cameras: ET.Element
+    ) -> Dict[str, np.ndarray]:
+        """
+        Loads the camera positions from an XML tree.
+
+        Args:
+            cameras: The `<cameras>` element from the camera.xml file.
+
+        Returns:
+            A mapping of the camera labels to the camera position vectors.
+
+        """
+        groups = cameras.findall("group")
+        for group in groups:
+            # We have groups. Extract the cameras from them.
+            cameras = group.findall("camera")
+
+        camera_positions = {}
+        for camera in cameras:
+            reference = camera.find("reference")
+            if reference is None:
+                # No location reference.
+                continue
+
+            ref_x = float(reference.attrib["x"])
+            ref_y = float(reference.attrib["y"])
+            ref_z = float(reference.attrib["z"])
+
+            camera_positions[camera.attrib["label"]] = np.array(
+                [ref_x, ref_y, ref_z]
+            )
+
+        return camera_positions
+
+    @classmethod
     def load(cls, camera_xml: str) -> "CameraConfig":
         """
         Initializes from a camera.xml file (from Metashape), and an
@@ -86,7 +131,13 @@ class CameraConfig:
         chunk_node = root.find("chunk")
 
         # Load camera intrinsics.
-        sensor_node = chunk_node.find("sensors")[0]
+        i = 0
+        calibration_node = None
+        while calibration_node is None:
+            sensor_node = chunk_node.find("sensors")[i]
+            calibration_node = sensor_node.find("calibration")
+            i += 1
+
         properties = sensor_node.findall("property")
         properties = {p.attrib["name"]: p for p in properties}
         focal_length = float(properties["focal_length"].attrib["value"])
@@ -107,6 +158,21 @@ class CameraConfig:
                 [0, 0, 1],
             ]
         )
+
+        camera_intrinsics_distorted = camera_intrinsics.copy()
+        calibration_node = sensor_node.find("calibration")
+        c_x = float(calibration_node.find("cx").text)
+        c_y = float(calibration_node.find("cy").text)
+        camera_intrinsics_distorted[0, 2] += c_x
+        camera_intrinsics_distorted[1, 2] += c_y
+
+        # Load the camera distortion.
+        k1 = float(calibration_node.find("k1").text)
+        k2 = float(calibration_node.find("k2").text)
+        k3 = float(calibration_node.find("k3").text)
+        p1 = float(calibration_node.find("p1").text)
+        p2 = float(calibration_node.find("p2").text)
+        distortion_coeffs = np.array([k1, k2, k3, p1, p2])
 
         # Load the chunk transform.
         chunk_transform_node = chunk_node.find("components")[0].find(
@@ -129,11 +195,15 @@ class CameraConfig:
         # Load the camera transforms.
         cameras_node = chunk_node.find("cameras")
         camera_transforms = cls._load_camera_transforms(cameras_node)
+        camera_positions = cls._load_camera_positions(cameras_node)
 
         return cls(
             chunk_transform=chunk_transform,
             camera_intrinsics=camera_intrinsics,
+            camera_intrinsics_distorted=camera_intrinsics_distorted,
             camera_transforms=camera_transforms,
+            camera_distortion=distortion_coeffs,
+            camera_positions=camera_positions,
         )
 
     @classmethod

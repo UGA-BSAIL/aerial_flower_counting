@@ -374,7 +374,6 @@ def create_pipeline(**kwargs):
                     flowering_ends="flowering_ends",
                     flowering_durations="flowering_durations",
                     flowering_slopes="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                     cumulative_counts="cumulative_counts",
                 ),
                 "human_readable_metrics",
@@ -384,7 +383,6 @@ def create_pipeline(**kwargs):
                 plot_peak_flowering_dist,
                 dict(
                     peak_flowering_times="flowering_peaks",
-                    genotypes="cleaned_genotypes",
                 ),
                 "peak_flowering_histogram",
             ),
@@ -392,7 +390,6 @@ def create_pipeline(**kwargs):
                 plot_peak_flowering_comparison,
                 dict(
                     peak_flowering_times="flowering_peaks",
-                    genotypes="cleaned_genotypes",
                 ),
                 "peak_flowering_comparison",
             ),
@@ -400,7 +397,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_start_dist,
                 dict(
                     flowering_start_times="flowering_starts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_start_histogram",
             ),
@@ -408,7 +404,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_start_comparison,
                 dict(
                     flowering_start_times="flowering_starts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_start_comparison",
             ),
@@ -416,7 +411,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_end_dist,
                 dict(
                     flowering_end_times="flowering_ends",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_histogram",
             ),
@@ -424,7 +418,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_end_comparison,
                 dict(
                     flowering_end_times="flowering_ends",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_comparison",
             ),
@@ -432,7 +425,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_duration_dist,
                 dict(
                     flowering_durations="flowering_durations",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_duration_histogram",
             ),
@@ -440,7 +432,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_duration_comparison,
                 dict(
                     flowering_durations="flowering_durations",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_duration_comparison",
             ),
@@ -448,7 +439,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_slope_dist,
                 dict(
                     flowering_slopes="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_slope_histogram",
             ),
@@ -456,7 +446,6 @@ def create_pipeline(**kwargs):
                 plot_flowering_slope_comparison,
                 dict(
                     flowering_slopes="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_slope_comparison",
             ),
@@ -493,7 +482,6 @@ def create_pipeline(**kwargs):
                 plot_mean_flowering_curve,
                 dict(
                     cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "mean_flowering_curve",
             ),

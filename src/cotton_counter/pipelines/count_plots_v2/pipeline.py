@@ -40,6 +40,7 @@ from ..common import (
     plot_peak_flowering_comparison,
     plot_peak_flowering_dist,
     compute_last_effective_flower_percentage,
+    merge_genotype_info,
 )
 from .nodes import (
     add_plot_index,
@@ -87,6 +88,7 @@ def _create_session_detection_pipeline(session: str) -> Tuple[Pipeline, str]:
         batch_size="params:prediction_batch_size",
         dry_run="params:dry_run",
         weights_file="params:flower_model_weights_file",
+        camera_configs="camera_config",
     )
     detect_session = partial(
         detect_flowers,
@@ -252,7 +254,7 @@ def _create_analysis_pipeline() -> Pipeline:
             ),
             node(
                 combine_excess_green,
-                ["exg_top", "exg_middle", "exg_bottom"],
+                ["cleaned_genotypes", "exg_top", "exg_middle", "exg_bottom"],
                 "exg_report",
             ),
             # Eliminate plots with low greenness.
@@ -263,6 +265,15 @@ def _create_analysis_pipeline() -> Pipeline:
                     excess_green="exg_report",
                     threshold="params:excess_green_threshold",
                 ),
+                "counting_results_filtered_by_plot",
+            ),
+            # Average replicates.
+            node(
+                partial(merge_genotype_info, group_on_dap=True),
+                dict(
+                    flower_data="counting_results_filtered_by_plot",
+                    genotypes="cleaned_genotypes",
+                ),
                 "counting_results_filtered",
             ),
             # Compute flowering metrics.
@@ -272,7 +283,9 @@ def _create_analysis_pipeline() -> Pipeline:
                 "cumulative_counts",
             ),
             node(
-                compute_flowering_peak, "counting_results", "flowering_peaks"
+                compute_flowering_peak,
+                "counting_results_filtered",
+                "flowering_peaks",
             ),
             node(
                 compute_flowering_start_end,
@@ -324,12 +337,18 @@ def _create_analysis_pipeline() -> Pipeline:
                     duration="flowering_durations",
                     peak="flowering_peaks",
                     slope="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                 ),
                 "outliers",
             ),
             # Load yield
-            node(clean_yield_data, "yield_spreadsheet", "yield_cleaned"),
+            node(
+                clean_yield_data,
+                dict(
+                    yield_data="yield_spreadsheet",
+                    genotypes="cleaned_genotypes",
+                ),
+                "yield_cleaned",
+            ),
             # Save the metric table.
             node(
                 create_metric_table,
@@ -340,7 +359,6 @@ def _create_analysis_pipeline() -> Pipeline:
                     flowering_durations="flowering_durations",
                     flowering_slopes="flowering_slopes",
                     outliers="outliers",
-                    genotypes="cleaned_genotypes",
                     cumulative_counts="cumulative_counts",
                     last_effective_flower="last_effective_flower",
                     yield_data="yield_cleaned",
@@ -353,7 +371,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_peak_flowering_dist,
                 dict(
                     peak_flowering_times="flowering_peaks",
-                    genotypes="cleaned_genotypes",
                 ),
                 "peak_flowering_histogram",
             ),
@@ -361,7 +378,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_peak_flowering_comparison,
                 dict(
                     peak_flowering_times="flowering_peaks",
-                    genotypes="cleaned_genotypes",
                 ),
                 "peak_flowering_comparison",
             ),
@@ -369,7 +385,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_start_dist,
                 dict(
                     flowering_start_times="flowering_starts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_start_histogram",
             ),
@@ -377,7 +392,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_start_comparison,
                 dict(
                     flowering_start_times="flowering_starts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_start_comparison",
             ),
@@ -385,7 +399,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_end_dist,
                 dict(
                     flowering_end_times="flowering_ends",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_histogram",
             ),
@@ -393,7 +406,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_end_comparison,
                 dict(
                     flowering_end_times="flowering_ends",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_end_comparison",
             ),
@@ -401,7 +413,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_duration_dist,
                 dict(
                     flowering_durations="flowering_durations",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_duration_histogram",
             ),
@@ -409,7 +420,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_duration_comparison,
                 dict(
                     flowering_durations="flowering_durations",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_duration_comparison",
             ),
@@ -417,7 +427,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_slope_dist,
                 dict(
                     flowering_slopes="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_slope_histogram",
             ),
@@ -425,7 +434,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_flowering_slope_comparison,
                 dict(
                     flowering_slopes="flowering_slopes",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_slope_comparison",
             ),
@@ -433,7 +441,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 plot_mean_flowering_curve,
                 dict(
                     cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "mean_flowering_curve",
             ),
@@ -442,7 +449,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 classify_flowering_habits_by_count,
                 dict(
                     cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
                 ),
                 "flowering_habits_count",
             ),
@@ -450,7 +456,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 classify_flowering_habits_by_duration,
                 dict(
                     duration="flowering_durations",
-                    genotypes="cleaned_genotypes",
                     early_late_quantiles="params:early_late_quantiles",
                     optimal_quantile_range="params:optimal_quantile_range",
                 ),
@@ -460,10 +465,7 @@ def _create_analysis_pipeline() -> Pipeline:
                 find_genotypes_to_collect,
                 dict(
                     flowering_habits="flowering_habits_duration",
-                    start="flowering_starts",
-                    end="flowering_ends",
-                    peak="flowering_peaks",
-                    slope="flowering_slopes",
+                    counting_results="counting_results_filtered_by_plot",
                     genotypes="cleaned_genotypes",
                     num_to_select="params:num_genotypes_to_collect",
                 ),
@@ -477,7 +479,6 @@ def _create_analysis_pipeline() -> Pipeline:
                 ),
                 dict(
                     cumulative_counts="cumulative_counts",
-                    genotypes="cleaned_genotypes",
                     flowering_habits="flowering_habits_duration",
                 ),
                 "habit_flowering_curve",
@@ -532,6 +533,20 @@ def create_pipeline(**kwargs) -> Pipeline:
 
     pipeline += Pipeline(
         [
+            # Load camera configuration.
+            node(
+                CameraConfig.load_partitioned,
+                dict(
+                    camera_xml="auto_camera_config",
+                ),
+                "camera_config",
+            ),
+        ],
+        tags=["detection", "analysis"],
+    )
+
+    pipeline += Pipeline(
+        [
             node(
                 partial(tables_to_partitions, session_names=SESSIONS),
                 output_nodes,
@@ -558,14 +573,6 @@ def create_pipeline(**kwargs) -> Pipeline:
 
     pipeline += Pipeline(
         [
-            # Load camera configuration.
-            node(
-                CameraConfig.load_partitioned,
-                dict(
-                    camera_xml="auto_camera_config",
-                ),
-                "camera_config",
-            ),
             # Filter low confidence detections.
             node(
                 filter_low_confidence,

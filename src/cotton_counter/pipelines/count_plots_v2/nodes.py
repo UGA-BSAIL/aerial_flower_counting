@@ -7,7 +7,9 @@ import random
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
+from concurrent.futures import ProcessPoolExecutor
 
+import cv2
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -358,6 +360,52 @@ def _fake_box_generator(
     return results
 
 
+def _undistort_single_image(
+    image_data: Tuple[str, Callable[[], Image.Image]],
+    camera_config: CameraConfig,
+) -> Tuple[str, Image.Image]:
+    """
+    Undistorts a single image.
+
+    Args:
+        image_data: Tuple of (image_id, image_loader)
+        camera_config: The camera configuration to use
+
+    Returns:
+        Tuple of (image_id, undistorted_image)
+    """
+    image_id, image_loader = image_data
+    image = np.array(image_loader())
+    undistorted = cv2.undistort(
+        image,
+        camera_config.camera_intrinsics_distorted,
+        camera_config.camera_distortion,
+    )
+    return image_id, Image.fromarray(undistorted)
+
+
+def _undistorted_images(
+    images: ImageDataSet, camera_config: CameraConfig
+) -> Iterable[Tuple[str, Image.Image]]:
+    """
+    Undistorts all the images in a dataset.
+
+    Args:
+        images: The images to undistort.
+        camera_config: The associated camera configuration.
+
+    Yields:
+        Each image in the dataset, undistorted, with its corresponding key.
+
+    """
+    with ProcessPoolExecutor(max_workers=16) as executor:
+        image_list = list(images.items())
+        undistort_fn = partial(
+            _undistort_single_image, camera_config=camera_config
+        )
+        yield from executor.map(undistort_fn, image_list)
+
+
 def _detect_organs(
     images: ImageDataSet,
     *,
@@ -365,6 +413,7 @@ def _detect_organs(
         [List[str], List[Image.Image], List[np.array]], List[pd.DataFrame]
     ],
     session_name: str,
+    camera_configs: Dict[str, CameraConfig],
     batch_size: int,
     dry_run: bool = False,
 ) -> pd.DataFrame:
@@ -375,6 +424,7 @@ def _detect_organs(
         images: The images to detect organs in.
         detector: The function to use for detection.
         session_name: The name of the session.
+        camera_configs: The camera configurations.
         batch_size: The batch size to use for inference.
         dry_run: If true, just return an empty dataframe without actually
             doing detection.
@@ -383,16 +433,15 @@ def _detect_organs(
         A dataframe containing the detected flowers.
 
     """
+    camera_config = camera_configs[f"{session_name}_cameras"]
 
     # Split individual images up into more manageable chunks.
     def _iter_patches() -> Iterable[Tuple[str, Image.Image, np.array]]:
-        for image_id_, image in images.items():
+        for image_id_, image in _undistorted_images(images, camera_config):
             if dry_run:
                 # Don't bother loading the actual image.
                 image = np.zeros((5472, 3648, 3), dtype=np.uint8)
                 image = Image.fromarray(image)
-            else:
-                image = image()
 
             for i, (patch, offsets_) in enumerate(_split_image_grid(image)):
                 yield f"{image_id_}_patch_{i}", patch, offsets_
@@ -1411,6 +1460,7 @@ def add_plot_index(
     plot_data = plot_data.set_index(CountingColumns.PLOT.value)
     plot_data.index.name = CountingColumns.PLOT.value
     plot_data.sort_index(inplace=True)
+    plot_data.drop(columns=[DetectionColumns.PLOT_NUM.value], inplace=True)
 
     return plot_data
 
@@ -1500,9 +1550,7 @@ def _find_outlier_genotypes(
     ] = Outlier.EXTREME.value
 
     # Build the dataframe.
-    return pd.Series(
-        index=dataset[GenotypeColumns.GENOTYPE.value], data=is_outlier
-    )
+    return pd.Series(index=dataset.index, data=is_outlier)
 
 
 def find_all_outliers(
@@ -1512,7 +1560,6 @@ def find_all_outliers(
     duration: pd.DataFrame,
     peak: pd.DataFrame,
     slope: pd.DataFrame,
-    genotypes: pd.DataFrame,
 ) -> pd.DataFrame:
     """
     Finds the outliers for all computed metrics.
@@ -1523,19 +1570,11 @@ def find_all_outliers(
         duration: The flowering durations.
         peak: The flowering peaks.
         slope: The flowering slopes.
-        genotypes: The associated genotype information.
 
     Returns:
         A single DataFrame containing outlier information for all metrics.
 
     """
-    # Merge genotype info.
-    start = merge_genotype_info(flower_data=start, genotypes=genotypes)
-    end = merge_genotype_info(flower_data=end, genotypes=genotypes)
-    duration = merge_genotype_info(flower_data=duration, genotypes=genotypes)
-    peak = merge_genotype_info(flower_data=peak, genotypes=genotypes)
-    slope = merge_genotype_info(flower_data=slope, genotypes=genotypes)
-
     start_outliers = _find_outlier_genotypes(
         start, metric_column=CountingColumns.DAP.value
     )
@@ -1574,10 +1613,7 @@ def find_all_outliers(
 
 def _find_spread(
     *,
-    start: pd.DataFrame,
-    end: pd.DataFrame,
-    peak: pd.DataFrame,
-    slope: pd.DataFrame,
+    counting_results: pd.DataFrame,
     genotypes: pd.DataFrame,
 ) -> pd.DataFrame:
     """
@@ -1586,10 +1622,8 @@ def _find_spread(
     particular genotype are to each-other.
 
     Args:
-        start: The flowering start dates.
-        end: The flowering end dates.
-        peak: The flowering peaks.
-        slope: The flowering slopes.
+        counting_results: The raw per-plot counting results, indexed by plot
+            number, not genotype.
         genotypes: The associated genotype information.
 
     Returns:
@@ -1602,49 +1636,17 @@ def _find_spread(
         aggregation="std",
         genotypes=genotypes,
     )
-    start_df = merge_std(flower_data=start)
-    start = start_df[CountingColumns.DAP.value]
-    end = merge_std(flower_data=end)[CountingColumns.DAP.value]
-    # Omission of duration is deliberate here, since that's entirely derived
-    # from start and end.
-    peak = merge_std(flower_data=peak)[CountingColumns.DAP.value]
-    shape = merge_std(flower_data=slope)
-    slope = shape[FloweringSlopeColumns.SLOPE.value]
-    intercept = shape[FloweringSlopeColumns.INTERCEPT.value]
-
+    count_spread = merge_std(flower_data=counting_results)
+    spread = count_spread[CountingColumns.COUNT.value]
     # Normalize the values.
-    start_spread = start / (start.max() - start.min())
-    end_spread = end / (end.max() - end.min())
-    peak_spread = peak / (peak.max() - peak.min())
-    slope_spread = slope / (slope.max() - slope.min())
-    intercept_spread = intercept / (intercept.max() - intercept.min())
+    spread = spread / (spread.max() - spread.min())
 
-    # Combine it into one spread value.
-    spread = (
-        start_spread
-        + end_spread
-        + peak_spread
-        + slope_spread
-        + intercept_spread
-    )
-    return pd.concat(
-        [
-            start_df[
-                [
-                    GenotypeColumns.GENOTYPE.value,
-                    GenotypeColumns.POPULATION.value,
-                ]
-            ],
-            spread,
-        ],
-        axis=1,
-    ).rename(columns={0: CountingColumns.SPREAD.value})
+    return spread.to_frame(name=CountingColumns.SPREAD.value)
 
 
 def classify_flowering_habits_by_duration(
     *,
     duration: pd.DataFrame,
-    genotypes: pd.DataFrame,
     early_late_quantiles: Tuple[float, float] = (0.33, 0.66),
     optimal_quantile_range: float = 0.15,
 ) -> pd.DataFrame:
@@ -1655,7 +1657,6 @@ def classify_flowering_habits_by_duration(
 
     Args:
         duration: The flowering peaks.
-        genotypes: The associated genotype information.
         early_late_quantiles: The quantile thresholds to use for the upper limit
             on the early-flowering group and the lower limit on the late
             flowering group.
@@ -1669,18 +1670,17 @@ def classify_flowering_habits_by_duration(
 
     """
     # Determine the average peak value for the GA 230 population.
-    duration_genotypes = merge_genotype_info(
-        flower_data=duration, genotypes=genotypes
-    )
-    duration_ga230 = duration_genotypes[
-        duration_genotypes[GenotypeColumns.POPULATION.value] == "GA 230"
+    duration_ga230 = duration[
+        duration[GenotypeColumns.POPULATION.value] == "GA 230"
     ][FloweringTimeColumns.DURATION.value]
     mean_duration = duration_ga230.mean()
     logger.info("GA 230 mean duration is {} days.", mean_duration)
 
     # Determine the cutoff times for each group.
-    duration = duration_genotypes[FloweringTimeColumns.DURATION.value]
-    optimal_quantile = stats.percentileofscore(duration, mean_duration) / 100
+    duration_col = duration[FloweringTimeColumns.DURATION.value]
+    optimal_quantile = (
+        stats.percentileofscore(duration_col, mean_duration) / 100
+    )
     max_short, min_long = early_late_quantiles
     habit_quantiles = [
         max_short,
@@ -1689,7 +1689,7 @@ def classify_flowering_habits_by_duration(
         min_long,
     ]
     logger.debug("Using habit quantiles: {}", habit_quantiles)
-    cutoff_times = duration.quantile(habit_quantiles)
+    cutoff_times = duration_col.quantile(habit_quantiles)
 
     # Get the candidate genotypes for each group based on the cutoffs.
     (
@@ -1698,11 +1698,11 @@ def classify_flowering_habits_by_duration(
         optimal_max,
         long_min,
     ) = cutoff_times
-    short_candidates = duration_genotypes[duration <= short_max]
-    optimal_candidates = duration_genotypes[
-        (duration >= optimal_min) & (duration <= optimal_max)
+    short_candidates = duration[duration_col <= short_max]
+    optimal_candidates = duration[
+        (duration_col >= optimal_min) & (duration_col <= optimal_max)
     ]
-    long_candidates = duration_genotypes[duration >= long_min]
+    long_candidates = duration[duration_col >= long_min]
 
     # Combine into a single DF.
     short_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
@@ -1713,12 +1713,11 @@ def classify_flowering_habits_by_duration(
     return pd.concat(
         [short_candidates, optimal_candidates, long_candidates],
         axis=0,
-        ignore_index=True,
     )
 
 
 def classify_flowering_habits_by_count(
-    *, cumulative_counts: pd.DataFrame, genotypes: pd.DataFrame
+    *, cumulative_counts: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Divides genotypes into short-duration, optimal-duration,
@@ -1727,7 +1726,6 @@ def classify_flowering_habits_by_count(
 
     Args:
         cumulative_counts: The cumulative counting data.
-        genotypes: The associated genotype information.
 
     Returns:
         The flowering duration data with an additional column classifying each
@@ -1735,23 +1733,18 @@ def classify_flowering_habits_by_count(
 
     """
     # Calculate total counts.
-    total_counts = cumulative_counts.groupby(CountingColumns.PLOT.value).max()
-    # Average per genotype
-    count_genotypes = merge_genotype_info(
-        flower_data=total_counts, genotypes=genotypes
-    )
-    count_genotypes = count_genotypes.groupby(
+    total_counts = cumulative_counts.groupby(
         GenotypeColumns.GENOTYPE.value
-    ).mean()
-    count_genotypes[GenotypeColumns.GENOTYPE.value] = count_genotypes.index
+    ).max()
+    total_counts[GenotypeColumns.GENOTYPE.value] = total_counts.index
 
     # Determine the cutoff times for each group.
-    count = count_genotypes[CountingColumns.COUNT.value]
+    count = total_counts[CountingColumns.COUNT.value]
     median = count.median()
 
     # Get the candidate genotypes for each group based on the cutoffs.
-    low_candidates = count_genotypes[count <= median]
-    high_candidates = count_genotypes[count > median]
+    low_candidates = total_counts[count <= median]
+    high_candidates = total_counts[count > median]
 
     # Combine into a single DF.
     low_candidates[CountingColumns.HABIT.value] = FloweringHabit.EARLY.value
@@ -1764,10 +1757,7 @@ def classify_flowering_habits_by_count(
 def find_genotypes_to_collect(
     *,
     flowering_habits: pd.DataFrame,
-    start: pd.DataFrame,
-    end: pd.DataFrame,
-    peak: pd.DataFrame,
-    slope: pd.DataFrame,
+    counting_results: pd.DataFrame,
     genotypes: pd.DataFrame,
     num_to_select: int,
 ) -> pd.DataFrame:
@@ -1780,10 +1770,7 @@ def find_genotypes_to_collect(
 
     Args:
         flowering_habits: Metric data with an added flowering habits column.
-        start: The flowering start dates.
-        end: The flowering end dates.
-        peak: The flowering peaks.
-        slope: The flowering slopes.
+        counting_results: The raw per-plot counting results, indexed by plot.
         genotypes: The associated genotype information.
         num_to_select: Total number of genotypes that we wish to select.
 
@@ -1792,27 +1779,14 @@ def find_genotypes_to_collect(
 
     """
     # Remove GA-230 from consideration, because it will be selected regardless.
-    flowering_habits = flowering_habits[
-        flowering_habits[GenotypeColumns.GENOTYPE.value] != "GA 230"
-    ]
-    flowering_habits.set_index(
-        GenotypeColumns.GENOTYPE.value, append=False, inplace=True
-    )
+    flowering_habits = flowering_habits[flowering_habits.index != "GA 230"]
 
     # We're going to choose the actual genotypes based on which ones have the
     # lowest spread.
     spread = _find_spread(
-        start=start,
-        end=end,
-        peak=peak,
-        slope=slope,
+        counting_results=counting_results,
         genotypes=genotypes,
     )
-    spread.set_index(
-        GenotypeColumns.GENOTYPE.value, append=False, inplace=True
-    )
-    # Drop a duplicate Population column before merging.
-    spread = spread.drop(columns=GenotypeColumns.POPULATION.value)
     flowering_habits = pd.merge(
         spread, flowering_habits, left_index=True, right_index=True
     )
@@ -1985,21 +1959,28 @@ def analyze_excess_green(
     return excess_green
 
 
-def combine_excess_green(*excess_green: pd.DataFrame) -> pd.DataFrame:
+def combine_excess_green(
+    genotypes: pd.DataFrame, *excess_green: pd.DataFrame
+) -> pd.DataFrame:
     """
     Combines excess green values from different fields.
 
     Args:
+        genotypes: The associated genotype information.
         *excess_green: The excess green values.
 
     Returns:
-        The combined values.
+        The combined values. Note that it will NOT average all the replicates.
 
     """
     combined = pd.concat(excess_green, ignore_index=True)
     # Sort by greenness to make outliers easy to find.
-    return combined.sort_values(CountingColumns.GREENNESS.value).set_index(
-        CountingColumns.PLOT.value
+    combined.sort_values(CountingColumns.GREENNESS.value, inplace=True)
+
+    # Add the genotype information.
+    combined.set_index(CountingColumns.PLOT.value, inplace=True)
+    return pd.merge(
+        combined, genotypes, how="inner", left_index=True, right_index=True
     )
 
 
@@ -2032,12 +2013,15 @@ def filter_poor_germination(
     return counting_results.loc[keep_plots.index]
 
 
-def clean_yield_data(yield_data: pd.DataFrame) -> pd.DataFrame:
+def clean_yield_data(
+    yield_data: pd.DataFrame, genotypes: pd.DataFrame
+) -> pd.DataFrame:
     """
     Cleans up the raw yield data and indexes by the plot number.
 
     Args:
         yield_data: The raw yield data.
+        genotypes: The genotype information.
 
     Returns:
         The flower data with additional yield columns.
@@ -2047,5 +2031,11 @@ def clean_yield_data(yield_data: pd.DataFrame) -> pd.DataFrame:
     yield_data = yield_data[[c.value for c in YieldColumns]]
     # Index by plot number.
     yield_data.set_index(YieldColumns.PLOT.value, inplace=True)
+
+    # Merge genotypes and average plots.
+    yield_data = pd.merge(
+        yield_data, genotypes, how="inner", left_index=True, right_index=True
+    )
+    yield_data = yield_data.groupby(GenotypeColumns.GENOTYPE.value).mean()
 
     return yield_data
