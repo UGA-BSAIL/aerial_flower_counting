@@ -1754,6 +1754,47 @@ def classify_flowering_habits_by_count(
     )
 
 
+def _find_genotypes_to_collect_in_subpop(
+    flowering_habits: pd.DataFrame, *, num_to_select: int
+) -> pd.DataFrame:
+    """
+    Finds the genotypes to collect for a single sub-population.
+
+    Args:
+        flowering_habits: The flowering habit data for that population.
+        num_to_select: Total number of genotypes that we wish to select.
+
+    Returns:
+        The genotypes to collect for that population.
+
+    """
+    flowering_habits.sort_values(CountingColumns.SPREAD.value, inplace=True)
+    habit_groups = flowering_habits.groupby(
+        CountingColumns.HABIT.value, as_index=False
+    )
+    early_flowering = habit_groups.get_group(FloweringHabit.EARLY.value)
+    try:
+        optimal_flowering = habit_groups.get_group(
+            FloweringHabit.OPTIMAL.value
+        )
+    except KeyError:
+        # No optimal data.
+        optimal_flowering = None
+    late_flowering = habit_groups.get_group(FloweringHabit.LATE.value)
+
+    # Take only the ones we need.
+    num_to_select_per_group = num_to_select // 3
+    early_flowering = early_flowering.iloc[:num_to_select_per_group]
+    if optimal_flowering is not None:
+        optimal_flowering = optimal_flowering.iloc[:num_to_select_per_group]
+    late_flowering = late_flowering.iloc[:num_to_select_per_group]
+
+    to_concat = [early_flowering, late_flowering]
+    if optimal_flowering is not None:
+        to_concat.append(optimal_flowering)
+    return pd.concat(to_concat)
+
+
 def find_genotypes_to_collect(
     *,
     flowering_habits: pd.DataFrame,
@@ -1791,31 +1832,20 @@ def find_genotypes_to_collect(
         spread, flowering_habits, left_index=True, right_index=True
     )
 
-    flowering_habits.sort_values(CountingColumns.SPREAD.value, inplace=True)
-    habit_groups = flowering_habits.groupby(
-        CountingColumns.HABIT.value, as_index=False
+    pop_groups = flowering_habits.groupby(
+        GenotypeColumns.POPULATION.value, as_index=False
     )
-    early_flowering = habit_groups.get_group(FloweringHabit.EARLY.value)
-    try:
-        optimal_flowering = habit_groups.get_group(
-            FloweringHabit.OPTIMAL.value
-        )
-    except KeyError:
-        # No optimal data.
-        optimal_flowering = None
-    late_flowering = habit_groups.get_group(FloweringHabit.LATE.value)
+    training_group = pop_groups.get_group("Training")
+    testing_group = pop_groups.get_group("Testing")
 
-    # Take only the ones we need.
-    num_to_select_per_group = num_to_select // 3
-    early_flowering = early_flowering.iloc[:num_to_select_per_group]
-    if optimal_flowering is not None:
-        optimal_flowering = optimal_flowering.iloc[:num_to_select_per_group]
-    late_flowering = late_flowering.iloc[:num_to_select_per_group]
+    training_selections = _find_genotypes_to_collect_in_subpop(
+        training_group, num_to_select=num_to_select
+    )
+    testing_selections = _find_genotypes_to_collect_in_subpop(
+        testing_group, num_to_select=num_to_select
+    )
+    to_collect = pd.concat([training_selections, testing_selections])
 
-    to_concat = [early_flowering, late_flowering]
-    if optimal_flowering is not None:
-        to_concat.append(optimal_flowering)
-    to_collect = pd.concat(to_concat)
     # Clean it up a bit for exporting to a spreadsheet.
     to_collect.reset_index(names="Genotype", inplace=True)
     return to_collect
