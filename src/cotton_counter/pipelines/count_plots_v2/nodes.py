@@ -7,9 +7,12 @@ import random
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, FIRST_COMPLETED, wait
 
 import cv2
+from tensorflow.python.keras.utils.data_utils import (
+    dont_use_multiprocessing_pool,
+)
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -398,12 +401,28 @@ def _undistorted_images(
         Each image in the dataset, undistorted, with its corresponding key.
 
     """
-    with ProcessPoolExecutor(max_workers=16) as executor:
+    # We carefully limit the number of running tasks to conserve memory.
+    running_tasks = set()
+    max_num_tasks = 8
+    with ProcessPoolExecutor(max_workers=max_num_tasks) as executor:
         image_list = list(images.items())
         undistort_fn = partial(
             _undistort_single_image, camera_config=camera_config
         )
-        yield from executor.map(undistort_fn, image_list)
+
+        while len(image_list) > 0 or len(running_tasks) > 0:
+            while len(running_tasks) < max_num_tasks and len(image_list) > 0:
+                # Submit new tasks.
+                image_data = image_list.pop()
+                running_tasks.add(executor.submit(undistort_fn, image_data))
+
+            # Wait for a task to complete.
+            done_tasks, running_tasks = wait(
+                running_tasks, return_when=FIRST_COMPLETED
+            )
+
+            for task in done_tasks:
+                yield task.result()
 
 
 def _detect_organs(

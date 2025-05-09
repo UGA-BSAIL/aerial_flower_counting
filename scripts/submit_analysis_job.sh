@@ -13,7 +13,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:a100:1
 #SBATCH --time=48:00:00
-#SBATCH --mem=32gb
+#SBATCH --mem=48gb
 #SBATCH --account=cli2
 #SBATCH --qos=cli2
 #SBATCH --mail-user=djpetti@gmail.com

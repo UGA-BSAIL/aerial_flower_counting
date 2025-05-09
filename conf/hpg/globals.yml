@@ -2,6 +2,6 @@
 plot_image_dir: "/blue/cli2/daniel.petti/2021_flowering_analysis/plot_extraction/auto_extraction"
 
 # Base directory containing undistorted images for 2023.
-corrected_image_dir: "/blue/cli2/daniel.petti/metashape_projects/undistorted_images"
+corrected_image_dir: "data/01_raw/raw_images"
 # Base directory containing DEMs for 2023.
 dem_dir: "/blue/cli2/daniel.petti/metashape_projects/dems"
