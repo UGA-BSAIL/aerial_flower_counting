@@ -18,15 +18,15 @@ mars_field_config_raw:
 # Plot boundaries.
 plot_borders_top:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_borders_top.shp
+  filepath: data/01_raw/plot_boundaries/top/top_field_exg.shp
 
 plot_borders_middle:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/middle/2023-08-14_plot_borders_middle.shp
+  filepath: data/01_raw/plot_boundaries/middle/middle_field_exg.shp
 
 plot_borders_bottom:
   type: cotton_counter.data_sets.ShapefileDataSet
-  filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_borders_bottom.shp
+  filepath: data/01_raw/plot_boundaries/bottom/bottom_field_exg.shp
 
 plot_borders_mars:
   type: cotton_counter.data_sets.ShapefileDataSet
@@ -74,10 +74,11 @@ plot_gt_sample_locations_bottom_sep:
 # Dataset containing the genotype information.
 genotype_spreadsheet_v2:
   type: pandas.ExcelDataSet
-  filepath: "data/01_raw/2024_genotype_info.xlsx"
+  filepath: "data/01_raw/2023 PT Field.xlsx"
   versioned: False
   load_args:
     engine: openpyxl
+    sheet_name: "Listing"
 
 # Dataset containing the yield information.
 yield_spreadsheet:

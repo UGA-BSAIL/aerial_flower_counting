@@ -906,6 +906,7 @@ def create_metric_table(
     last_effective_flower: pd.DataFrame | None = None,
     yield_data: pd.DataFrame | None = None,
     excess_green: pd.DataFrame | None = None,
+    flowering_habits: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Combines all the per-plot metrics into a single, human-readable table.
@@ -923,6 +924,7 @@ def create_metric_table(
         yield_data: The cleaned yield data. Will also be included in the
             metric table if present.
         excess_green: The excess green data, if present.
+        flowering_habits: Flowering habit data, if present.
 
     Returns:
         The combined table with all metrics.
@@ -954,6 +956,10 @@ def create_metric_table(
             GenotypeColumns.GENOTYPE.value
         ).mean()
         combined = merge(combined, excess_green)
+    if flowering_habits is not None:
+        combined = merge(
+            combined, flowering_habits[[CountingColumns.HABIT.value]]
+        )
 
     # Add the total counts.
     total_counts = (
@@ -975,20 +981,37 @@ def create_metric_table(
         f"{CountingColumns.COUNT.value}_start": "Start Count",
         CountingColumns.DAP.value: "End DAP",
         CountingColumns.COUNT.value: "End Count",
-        CountingColumns.GREENNESS.value: "Stand Count Score",
         FloweringTimeColumns.DURATION.value: "Duration (days)",
         FloweringSlopeColumns.SLOPE.value: "Slope (flowers/day)",
         FloweringSlopeColumns.INTERCEPT.value: "Intercept",
         f"{GenotypeColumns.POPULATION.value}_x_peak": "Population",
-        OutlierColumns.START.value: "Start Outlier",
-        OutlierColumns.END.value: "End Outlier",
-        OutlierColumns.DURATION.value: "Duration Outlier",
-        OutlierColumns.PEAK.value: "Peak Outlier",
-        OutlierColumns.SLOPE.value: "Slope Outlier",
-        YieldColumns.RAW_YIELD.value: "Raw Yield",
-        YieldColumns.LINT_YIELD.value: "Lint Yield",
-        YieldColumns.LINT_PERCENT.value: "Lint %",
     }
+    if excess_green is not None:
+        column_mapping.update(
+            {
+                CountingColumns.GREENNESS.value: "Stand Count Score",
+            }
+        )
+    if outliers is not None:
+        column_mapping.update(
+            {
+                OutlierColumns.START.value: "Start Outlier",
+                OutlierColumns.END.value: "End Outlier",
+                OutlierColumns.DURATION.value: "Duration Outlier",
+                OutlierColumns.PEAK.value: "Peak Outlier",
+                OutlierColumns.SLOPE.value: "Slope Outlier",
+            }
+        )
+    if yield_data is not None:
+        column_mapping.update(
+            {
+                YieldColumns.RAW_YIELD.value: "Raw Yield",
+                YieldColumns.LINT_YIELD.value: "Lint Yield",
+                YieldColumns.LINT_PERCENT.value: "Lint %",
+            }
+        )
+    if flowering_habits is not None:
+        column_mapping.update({CountingColumns.HABIT.value: "Habit"})
     combined.rename(
         columns=column_mapping,
         inplace=True,

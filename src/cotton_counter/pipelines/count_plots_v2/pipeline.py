@@ -341,14 +341,14 @@ def _create_analysis_pipeline() -> Pipeline:
                 "outliers",
             ),
             # Load yield
-            node(
-                clean_yield_data,
-                dict(
-                    yield_data="yield_spreadsheet",
-                    genotypes="cleaned_genotypes",
-                ),
-                "yield_cleaned",
-            ),
+            # node(
+            #     clean_yield_data,
+            #     dict(
+            #         yield_data="yield_spreadsheet",
+            #         genotypes="cleaned_genotypes",
+            #     ),
+            #     "yield_cleaned",
+            # ),
             # Save the metric table.
             node(
                 create_metric_table,
@@ -361,8 +361,9 @@ def _create_analysis_pipeline() -> Pipeline:
                     outliers="outliers",
                     cumulative_counts="cumulative_counts",
                     last_effective_flower="last_effective_flower",
-                    yield_data="yield_cleaned",
+                    # yield_data="yield_cleaned",
                     excess_green="exg_report",
+                    flowering_habits="flowering_habits_duration",
                 ),
                 "human_readable_metrics",
             ),
