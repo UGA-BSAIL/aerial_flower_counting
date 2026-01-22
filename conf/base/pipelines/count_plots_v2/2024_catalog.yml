@@ -1,0 +1,263 @@
+# Field configuration.
+top_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_top_2024.yml
+
+middle_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_middle_2024.yml
+
+bottom_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_bottom_2024.yml
+
+mars_field_config_raw:
+  type: yaml.YAMLDataSet
+  filepath: data/01_raw/field_config_tifton_MARS_2024.yml
+
+# Plot boundaries.
+plot_borders_top:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2024/top_field_exg.shp
+
+plot_borders_middle:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2024/middle_field_exg.shp
+
+plot_borders_bottom:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_field_exg.shp
+
+plot_borders_mars:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/mars/plot_outlines.shp
+
+# Plot borders for september onwards.
+plot_borders_top_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2024/top_plot_boundaries.shp
+
+plot_borders_middle_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2024/middle_plot_boundaries.shp
+
+plot_borders_bottom_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2024/bottom_plot_boundaries.shp
+
+# Plot sampling locations for ground truth.
+plot_gt_sample_locations_top:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2023-08-14_plot_sampling_locations_top.shp
+
+plot_gt_sample_locations_middle:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2023-08-14_plot_sampling_locations_middle.shp
+
+plot_gt_sample_locations_bottom:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2023-08-14_plot_sampling_locations_bottom.shp
+
+# GT sampling locations for september onwards.
+plot_gt_sample_locations_top_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/top/2023-09-01_plot_sampling_locations_top.shp
+
+plot_gt_sample_locations_middle_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/middle/2023-09-01_plot_sampling_locations_middle.shp
+
+plot_gt_sample_locations_bottom_sep:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/01_raw/plot_boundaries/bottom/2023-09-01_plot_sampling_locations_bottom.shp
+
+# Dataset containing the genotype information.
+genotype_spreadsheet_v2:
+  type: pandas.ExcelDataSet
+  filepath: "data/01_raw/2024_genotype_info.xlsx"
+  versioned: False
+  load_args:
+    engine: openpyxl
+
+# Dataset containing the yield information.
+yield_spreadsheet:
+  type: pandas.ExcelDataSet
+  filepath: "data/01_raw/UTF-82024 yield data GS.xlsx"
+  versioned: False
+  load_args:
+    engine: openpyxl
+    sheet_name: "2024"
+
+# Datasets containing the ground-truth.
+_gt_params: &gt_params
+  type: pandas.ExcelDataSet
+  filepath: data/01_raw/2023_ground_truth_counts.xlsx
+
+_gt_load_args: &gt_load_args
+  engine: openpyxl
+  # Otherwise it reads empty boxes as NA...
+  na_filter: false
+
+gt_2023-07-27:
+  << : *gt_params
+  load_args:
+    sheet_name: "7-27-23"
+    << : *gt_load_args
+
+gt_2023-08-01:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-2-23"
+    # This one has some extraneous text, so limit the number of rows.
+    skiprows: [37]
+    << : *gt_load_args
+
+gt_2023-08-03:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-3-23"
+    << : *gt_load_args
+
+gt_2023-08-07:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-7-23"
+    << : *gt_load_args
+
+gt_2023-08-10:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-10-23"
+    << : *gt_load_args
+
+gt_2023-08-14:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-14-23"
+    << : *gt_load_args
+
+gt_2023-08-18:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-18-23"
+    << : *gt_load_args
+
+gt_2023-08-21:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-21-23"
+    << : *gt_load_args
+
+gt_2023-08-24:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-24-23"
+    << : *gt_load_args
+
+gt_2023-08-28:
+  << : *gt_params
+  load_args:
+    sheet_name: "8-28-23"
+    << : *gt_load_args
+
+gt_2023-09-01:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-1-23"
+    << : *gt_load_args
+
+gt_2023-09-05:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-5-23"
+    << : *gt_load_args
+
+gt_2023-09-07:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-7-23"
+    << : *gt_load_args
+
+gt_2023-09-12:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-11-23"
+    << : *gt_load_args
+
+gt_2023-09-14:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-14-23"
+    << : *gt_load_args
+
+gt_2023-09-18:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-18-23"
+    << : *gt_load_args
+
+gt_2023-09-21:
+  << : *gt_params
+  load_args:
+    sheet_name: "9-21-23"
+    << : *gt_load_args
+
+# Dataset containing the DEMs.
+dems:
+  type: PartitionedDataSet
+  filename_suffix: ".tif"
+  path: ${dem_dir}
+  dataset:
+    type: cotton_counter.data_sets.RasterDataSet
+
+# The camera configuration from metashape.
+auto_camera_config:
+  type: PartitionedDataSet
+  filename_suffix: ".xml"
+  path: data/01_raw/metashape_cameras
+  dataset:
+    type: text.TextDataSet
+
+# Shapefiles containing the image extents.
+image_extents:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/08_reporting/image_extents/image_extents.shp
+  versioned: True
+  schema:
+    geometry: Polygon
+    properties:
+      - [ image_id, str ]
+      - [ session, str ]
+  epsg_crs: 32617
+
+# Shapefile containing the output bounding boxes.
+bounding_box_shapes:
+  type: cotton_counter.data_sets.ShapefileDataSet
+  filepath: data/08_reporting/bounding_boxes.shp
+  versioned: True
+  schema:
+    geometry: Point
+    properties:
+      - [confidence, float]
+      - [session, str]
+      - [image_id, str]
+      - [box_num, int]
+      - [plot_num, int]
+  epsg_crs: 32617
+
+# Intermediate datasets for detections with associated plot numbers.
+detection_results_plot_num:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_results_plot_num.parquet
+  versioned: True
+
+detection_results_gt_sample:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/detection_results_gt_sample.parquet
+  versioned: True
+
+# Dataset containing information about specific genotypes to harvest.
+genotypes_to_collect:
+  type: pandas.ExcelDataSet
+  filepath: data/08_reporting/genotypes_to_collect.xlsx
+  versioned: True

@@ -1,8 +1,10 @@
 # Date on which the field was planted.
-v2_field_planted_date: 2023-05-19
+#v2_field_planted_date: 2023-05-19
+v2_field_planted_date: 2024-05-30
 # Last effective flower date to use for analysis. Flowers that open later than
 # this date will be assumed not to develop into bolls.
-last_effective_flower_date: 2023-09-15
+#last_effective_flower_date: 2023-09-15
+last_effective_flower_date: 2024-09-15
 
 # Number of genotypes we want to collect from the field.
 num_genotypes_to_collect: 75
