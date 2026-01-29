@@ -203,6 +203,15 @@ human_readable_metrics:
   filepath: data/08_reporting/plot_metrics.xlsx
   versioned: True
 
+# Dataset containing combined metrics and yield data.
+2024_combined_metrics_yield:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/GS_GenoLevel_Phenotypes_2024.csv
+
+2023_combined_metrics_yield:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/GS_GenoLevel_Phenotypes_2023.csv
+
 # Report containing excess green information.
 exg_report:
   type: pandas.ExcelDataSet
